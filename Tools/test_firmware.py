@@ -1,11 +1,18 @@
 import pathlib
 import struct
 import unittest
-from analyze_firmware import der, payload, macho, device_tree
+from analyze_firmware import der, payload, macho, device_tree, arm64_slice
 from fetch_firmware import RemoteZIP
 
 
 class FirmwareTests(unittest.TestCase):
+    def test_fat_arm64_slice_and_bounds(self):
+        header = struct.pack(">7I", 0xcafebabe, 1, 0x100000c, 0, 28, 4, 0)
+        self.assertEqual(arm64_slice(header + b"test"), b"test")
+        with self.assertRaises(ValueError):
+            arm64_slice(header)
+        with self.assertRaises(ValueError):
+            arm64_slice(struct.pack(">II", 0xcafebabe, 100))
     def test_truncated_der(self):
         for data in [b"", b"\x30", b"\x30\x80", b"\x30\x05hi", b"\x30\x84\x01"]:
             with self.assertRaises(ValueError):

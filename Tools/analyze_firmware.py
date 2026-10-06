@@ -56,12 +56,36 @@ def decompress(data):
     return destination.raw[:count]
 
 
+def arm64_slice(data):
+    if data[:4] not in (b"\xca\xfe\xba\xbe", b"\xca\xfe\xba\xbf"):
+        return data
+    if len(data) < 8:
+        raise ValueError("truncated fat Mach-O")
+    count = struct.unpack_from(">I", data, 4)[0]
+    wide = data[:4] == b"\xca\xfe\xba\xbf"
+    stride = 32 if wide else 20
+    if count > 64 or 8 + count * stride > len(data):
+        raise ValueError("fat architecture bounds")
+    slices = []
+    for index in range(count):
+        cursor = 8 + index * stride
+        cpu, subtype = struct.unpack_from(">II", data, cursor)
+        offset, size = struct.unpack_from(">QQ" if wide else ">II", data, cursor + 8)
+        if offset > len(data) or size > len(data) - offset or offset < 8 + count * stride:
+            raise ValueError("fat slice out of file bounds")
+        if cpu == 0x100000c and subtype & 0xffffff in (0, 1):
+            slices.append(data[offset:offset + size])
+    if len(slices) != 1:
+        raise ValueError("expected one ARM64 (non-arm64e) kernel slice")
+    return slices[0]
+
+
 def macho(data):
     if len(data) < 32:
         raise ValueError("truncated Mach-O")
     magic, cpu, subtype, filetype, commands, command_bytes, flags, reserved = struct.unpack_from("<8I", data)
     if magic != 0xfeedfacf or cpu != 0x100000c or commands > 10000 or command_bytes > len(data) - 32:
-        raise ValueError("not bounded ARM64 Mach-O")
+        raise ValueError(f"not bounded ARM64 Mach-O: magic={magic:x} cpu={cpu:x} bytes={len(data)} commands={commands}/{command_bytes}")
     cursor, segments, entry = 32, [], None
     for _ in range(commands):
         if cursor + 8 > 32 + command_bytes:
@@ -128,7 +152,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--directory", type=pathlib.Path, default=pathlib.Path(".firmware"))
     directory = parser.parse_args().directory
-    kernel = decompress(payload((directory / "KernelCache.im4p").read_bytes(), b"krnl"))
+    kernel = arm64_slice(decompress(payload((directory / "KernelCache.im4p").read_bytes(), b"krnl")))
     tree = decompress(payload((directory / "DeviceTree.im4p").read_bytes(), b"dtre"))
     analysis = {"kernel": macho(kernel), "device_tree": device_tree(tree)}
     (directory / "KernelCache.macho").write_bytes(kernel)

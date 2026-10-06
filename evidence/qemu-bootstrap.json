@@ -1,0 +1,41 @@
+{
+  "booted_ios": false,
+  "kernel_entry_seen": true,
+  "physical_kernel_entry": "0x43cac4e8",
+  "exception_tail": [
+    "Taking exception 1 [Undefined Instruction] on CPU 0"
+  ],
+  "backend": "QEMU emulator version 11.1.1",
+  "board": "QEMU virt bootstrap experiment, not T8010",
+  "physical_ram_base": "0x42000000",
+  "command": [
+    "qemu-system-aarch64",
+    "-machine",
+    "virt,secure=off,virtualization=off",
+    "-cpu",
+    "max",
+    "-accel",
+    "tcg",
+    "-m",
+    "2048",
+    "-smp",
+    "1",
+    "-display",
+    "none",
+    "-monitor",
+    "none",
+    "-serial",
+    "stdio",
+    "-device",
+    "loader,file=.firmware/qemu-kernel-probe.elf,cpu-num=0",
+    "-d",
+    "in_asm,int,guest_errors,unimp",
+    "-D",
+    ".firmware/qemu-trace.txt"
+  ],
+  "stop": "bounded trace limit reached",
+  "returncode": 0,
+  "seconds": 10.080478959000004,
+  "console_tail": "qemu-system-aarch64: terminating on signal 15 from pid 2218 (<unknown process>)\n",
+  "trace_bytes": 2635
+}

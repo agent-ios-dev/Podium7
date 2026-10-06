@@ -1,0 +1,94 @@
+----------------
+IN: 
+0x448ec000:  d2800000  mov      x0, #0
+0x448ec004:  f2a891e0  movk     x0, #0x448f, lsl #16
+0x448ec008:  d2989d01  mov      x1, #0xc4e8
+0x448ec00c:  f2a87941  movk     x1, #0x43ca, lsl #16
+0x448ec010:  d61f0020  br       x1
+
+----------------
+IN: 
+0x43cac4e8:  14000ee4  b        #0x43cb0078
+
+----------------
+IN: 
+0x43cb0078:  d510109f  msr      oslar_el1, xzr
+
+----------------
+IN: 
+0x43cb007c:  d5034fdf  msr      daifset, #0xf
+
+----------------
+IN: 
+0x43cb0080:  aa0003f4  mov      x20, x0
+0x43cb0084:  d2800015  mov      x21, #0
+0x43cb0088:  b0ffffe0  adrp     x0, #0x43cad000
+0x43cb008c:  91000000  add      x0, x0, #0
+0x43cb0090:  aa1e03e1  mov      x1, x30
+0x43cb0094:  94000111  bl       #0x43cb04d8
+
+----------------
+IN: 
+0x43cb04d8:  d2facbe2  mov      x2, #-0x29a1000000000000
+0x43cb04dc:  f2c07802  movk     x2, #0x3c0, lsl #32
+0x43cb04e0:  f2baa302  movk     x2, #0xd518, lsl #16
+0x43cb04e4:  f2980002  movk     x2, #0xc000
+0x43cb04e8:  90003443  adrp     x3, #0x44338000
+0x43cb04ec:  91002063  add      x3, x3, #8
+0x43cb04f0:  f9400063  ldr      x3, [x3]
+0x43cb04f4:  eb03005f  cmp      x2, x3
+0x43cb04f8:  54000001  b.ne     #0x43cb04f8
+
+----------------
+IN: 
+0x43cb04fc:  141a1ec3  b        #0x44338008
+
+----------------
+IN: 
+0x44338008:  d518c000  msr      vbar_el1, x0
+
+----------------
+IN: 
+0x4433800c:  d65f03c0  ret      
+
+----------------
+IN: 
+0x43cb0098:  aa0103fe  mov      x30, x1
+0x43cb009c:  aa1e03e1  mov      x1, x30
+0x43cb00a0:  f2e88aa0  movk     x0, #0x4455, lsl #48
+0x43cb00a4:  f2c80aa0  movk     x0, #0x4055, lsl #32
+0x43cb00a8:  f2acccc0  movk     x0, #0x6666, lsl #16
+0x43cb00ac:  f28ccee0  movk     x0, #0x6677
+0x43cb00b0:  9400013c  bl       #0x43cb05a0
+
+----------------
+IN: 
+0x43cb05a0:  d2facbe2  mov      x2, #-0x29a1000000000000
+0x43cb05a4:  f2c07802  movk     x2, #0x3c0, lsl #32
+0x43cb05a8:  f2baa382  movk     x2, #0xd51c, lsl #16
+0x43cb05ac:  f29e4402  movk     x2, #0xf220
+0x43cb05b0:  90003443  adrp     x3, #0x44338000
+0x43cb05b4:  9100c063  add      x3, x3, #0x30
+0x43cb05b8:  f9400063  ldr      x3, [x3]
+0x43cb05bc:  eb03005f  cmp      x2, x3
+0x43cb05c0:  54000001  b.ne     #0x43cb05c0
+
+----------------
+IN: 
+0x43cb05c4:  141a1e9b  b        #0x44338030
+
+write access to unsupported AArch64 system register op0:3 op1:4 crn:15 crm:2 op2:1
+----------------
+IN: 
+0x44338030:  d51cf220  msr      s3_4_c15_c2_1, x0
+
+Taking exception 1 [Undefined Instruction] on CPU 0
+...from EL1 to EL1
+...with ESR 0x0/0x2000000
+...with SPSR 0x600003c5
+...with ELR 0x44338030
+...to EL1 PC 0x43cad200 PSTATE 0x23c5
+----------------
+IN: 
+0x43cad200:  14000000  b        #0x43cad200
+

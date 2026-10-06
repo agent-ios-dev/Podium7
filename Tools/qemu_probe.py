@@ -105,6 +105,7 @@ def run_probe(directory, executable="qemu-system-aarch64"):
                "exception_tail": exception_tail, "backend": version, "board": "QEMU virt bootstrap experiment, not T8010",
                "physical_ram_base": hex(PHYSICAL_BASE), "command": command, "stop": stop,
                "returncode": process.returncode, "seconds": time.monotonic() - start,
+               "console_tail": serial.read_text(errors="replace")[-4096:],
                "trace_bytes": trace.stat().st_size if trace.exists() else 0}
     (directory / "qemu-probe.json").write_text(json.dumps(summary, indent=2))
     print(json.dumps(summary, indent=2))

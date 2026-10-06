@@ -29,7 +29,8 @@ final class CPUTests: XCTestCase {
         try c.run(); XCTAssertEqual(c.retired, 2)
     }
     func testByteMemoryRoundTripAboveFourGiB() throws {
-        let c = try cpu([0xd2c00021, 0x52800aa0, 0x39004020, 0x39404022, 0xd4200000])
+        // Keep data at +0x100, outside the instruction stream.
+        let c = try cpu([0xd2c00021, 0x52800aa0, 0x39040020, 0x39440022, 0xd4200000])
         try c.run(); XCTAssertEqual(c.registers[2], 85)
     }
     func testUnknownOpcodeDoesNotAdvancePC() throws {

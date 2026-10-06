@@ -1,0 +1,26 @@
+name: Verify ARM64 core and build iOS app
+on: [push, workflow_dispatch]
+jobs:
+  verify:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test instruction semantics and memory faults
+        run: swift test
+      - name: Execute diagnostic ROM
+        run: swift run podium7
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Build iPhone app
+        run: xcodebuild -project Podium7.xcodeproj -scheme Podium7 -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - name: Package unsigned laboratory IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/Podium7.app Payload/
+          zip -qr Podium7-laboratory-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Podium7-laboratory-unsigned
+          path: Podium7-laboratory-unsigned.ipa

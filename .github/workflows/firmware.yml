@@ -12,6 +12,10 @@ jobs:
       - run: python3 Tools/verify_encodings.py
       - name: Probe actual kernel entry and report the first unsupported operation
         run: swift run podium7 --probe-kernel .firmware/KernelCache.macho > .firmware/kernel-entry-probe.json
+      - name: Install external CPU and MMU backend for bootstrap research
+        run: brew install qemu
+      - name: Execute unpatched Apple kernel in bounded QEMU bootstrap harness
+        run: python3 Tools/qemu_probe.py
       - uses: actions/upload-artifact@v4
         with:
           name: firmware-analysis
@@ -19,4 +23,7 @@ jobs:
             .firmware/analysis.json
             .firmware/firmware.json
             .firmware/kernel-entry-probe.json
+            .firmware/qemu-probe.json
+            .firmware/qemu-trace.txt
+            .firmware/qemu-serial.txt
           include-hidden-files: true

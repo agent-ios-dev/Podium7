@@ -13,3 +13,4 @@ Payload/
 *.payload
 __pycache__/
 *.pyc
+*.elf

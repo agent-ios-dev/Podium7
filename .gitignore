@@ -11,3 +11,5 @@ Payload/
 .firmware/
 *.macho
 *.payload
+__pycache__/
+*.pyc

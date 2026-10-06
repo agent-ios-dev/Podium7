@@ -45,6 +45,10 @@ public final class AArch64CPU {
     public private(set) var debugOSLock = true
     public private(set) var interruptMask: UInt8 = 0
     public private(set) var vectorBase: UInt64 = 0
+    public private(set) var negative = false
+    public private(set) var zero = false
+    public private(set) var carry = false
+    public private(set) var overflow = false
     public let memory: any Memory64
     public init(memory: any Memory64, entry: UInt64 = LabMemory.ramBase) {
         self.memory = memory; self.pc = entry
@@ -56,6 +60,32 @@ public final class AArch64CPU {
     private func signed(_ value: UInt32, bits: Int) -> Int64 {
         let shift = 64 - bits
         return Int64(bitPattern: UInt64(value) << shift) >> shift
+    }
+    private func arithmetic(_ a: UInt64, _ b: UInt64, subtract: Bool, wide: Bool, flags: Bool) -> UInt64 {
+        let mask = wide ? UInt64.max : 0xffff_ffff
+        let left = a & mask, right = b & mask
+        let result = (subtract ? left &- right : left &+ right) & mask
+        if flags {
+            let sign: UInt64 = wide ? 1 << 63 : 1 << 31
+            negative = result & sign != 0; zero = result == 0
+            carry = subtract ? left >= right : (wide ? left.addingReportingOverflow(right).overflow : left + right > mask)
+            overflow = ((subtract ? left ^ right : ~(left ^ right)) & (left ^ result) & sign) != 0
+        }
+        return result
+    }
+    private func condition(_ condition: UInt32) -> Bool {
+        let result: Bool
+        switch condition >> 1 {
+        case 0: result = zero
+        case 1: result = carry
+        case 2: result = negative
+        case 3: result = overflow
+        case 4: result = carry && !zero
+        case 5: result = negative == overflow
+        case 6: result = !zero && negative == overflow
+        default: return true
+        }
+        return condition & 1 == 0 ? result : !result
     }
     public func step() throws {
         guard !stopped else { return }
@@ -93,19 +123,35 @@ public final class AArch64CPU {
                 var value: UInt64 = 0
                 for i in 0..<size { value |= UInt64(try memory.read(address &+ UInt64(i))) << (8 * i) }
                 set(rd, value, wide: size == 8)
+            } else if op & 0xff000010 == 0x54000000 {
+                if condition(op & 15) { next = pc &+ UInt64(bitPattern: signed((op >> 5) & 0x7ffff, bits: 19) * 4) }
+            } else if op & 0x7e000000 == 0x36000000 {
+                let bit = ((op >> 19) & 31) | ((op >> 26) & 32)
+                if (reg(rd) & (UInt64(1) << bit) == 0) == (op & 0x01000000 == 0) {
+                    next = pc &+ UInt64(bitPattern: signed((op >> 5) & 0x3fff, bits: 14) * 4)
+                }
+            } else if op & 0x1f200000 == 0x0b000000 {
+                let shift = (op >> 22) & 3, amount = (op >> 10) & 63
+                guard shift < 3, wide || amount < 32 else { throw MachineFault.unsupported(pc: pc, opcode: op) }
+                var value = reg(Int((op >> 16) & 31)) & (wide ? UInt64.max : 0xffff_ffff)
+                if shift == 0 { value <<= amount }
+                else if shift == 1 { value >>= amount }
+                else if wide { value = UInt64(bitPattern: Int64(bitPattern: value) >> amount) }
+                else { value = UInt64(UInt32(bitPattern: Int32(bitPattern: UInt32(value)) >> amount)) }
+                set(rd, arithmetic(reg(rn), value, subtract: op & 0x40000000 != 0, wide: wide, flags: op & 0x20000000 != 0), wide: wide)
             } else if op & 0x7f800000 == 0x52800000 || op & 0x7f800000 == 0x72800000 {
                 let shift = Int((op >> 21) & 3) * 16
                 guard wide || shift < 32 else { throw MachineFault.unsupported(pc: pc, opcode: op) }
                 let immediate = UInt64((op >> 5) & 0xffff) << shift
                 let keep = op & 0x7f800000 == 0x72800000
                 set(rd, keep ? (reg(rd) & ~(UInt64(0xffff) << shift)) | immediate : immediate, wide: wide)
-            } else if op & 0x1f800000 == 0x11000000 && op & 0x20000000 == 0 {
-                // ADD/SUB immediate, without flags. Register 31 denotes SP here.
+            } else if op & 0x1f800000 == 0x11000000 {
+                // Register 31 is SP as a source, and ZR as a flag-setting destination.
                 let immediate = UInt64((op >> 10) & 0xfff) << (op & 0x00400000 == 0 ? 0 : 12)
                 let source = rn == 31 ? sp : reg(rn)
-                var value = op & 0x40000000 == 0 ? source &+ immediate : source &- immediate
-                if !wide { value &= 0xffff_ffff }
-                if rd == 31 { sp = value } else { set(rd, value, wide: wide) }
+                let flags = op & 0x20000000 != 0
+                let value = arithmetic(source, immediate, subtract: op & 0x40000000 != 0, wide: wide, flags: flags)
+                if rd == 31 && !flags { sp = value } else { set(rd, value, wide: wide) }
             } else if op & 0x7c000000 == 0x14000000 {
                 next = pc &+ UInt64(bitPattern: signed(op & 0x03ff_ffff, bits: 26) * 4)
                 if op & 0x80000000 != 0 { set(30, pc &+ 4, wide: true) }

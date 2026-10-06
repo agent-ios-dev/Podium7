@@ -13,8 +13,9 @@ import subprocess
 import time
 from analyze_firmware import macho
 
-PHYSICAL_BASE = 0x40000000  # QEMU virt RAM, deliberately not claimed as T8010.
-RAM_SIZE = 2 * 1024 * 1024 * 1024
+# Leave QEMU's own DTB/boot reservations intact at the start of virt RAM.
+PHYSICAL_BASE = 0x42000000  # Synthetic harness map, deliberately not T8010.
+RAM_SIZE = 2 * 1024 * 1024 * 1024 - 0x02000000
 
 
 def align(value):

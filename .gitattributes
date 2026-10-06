@@ -1,0 +1,2 @@
+# Preserve QEMU's original log formatting as evidence.
+evidence/*-trace.txt whitespace=-blank-at-eol,-blank-at-eof

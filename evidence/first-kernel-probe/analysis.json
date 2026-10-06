@@ -1,0 +1,1425 @@
+{
+  "kernel": {
+    "entry": "0xfffffff0071904e8",
+    "segments": [
+      {
+        "name": "__TEXT",
+        "address": "0xfffffff007004000",
+        "length": 720896,
+        "offset": 0,
+        "file_size": 720896
+      },
+      {
+        "name": "__DATA_CONST",
+        "address": "0xfffffff0070b4000",
+        "length": 835584,
+        "offset": 720896,
+        "file_size": 835584
+      },
+      {
+        "name": "__TEXT_EXEC",
+        "address": "0xfffffff007180000",
+        "length": 6897664,
+        "offset": 1556480,
+        "file_size": 6897664
+      },
+      {
+        "name": "__KLD",
+        "address": "0xfffffff007814000",
+        "length": 16384,
+        "offset": 8454144,
+        "file_size": 16384
+      },
+      {
+        "name": "__LASTDATA_CONST",
+        "address": "0xfffffff007818000",
+        "length": 16384,
+        "offset": 8470528,
+        "file_size": 16384
+      },
+      {
+        "name": "__LAST",
+        "address": "0xfffffff00781c000",
+        "length": 16384,
+        "offset": 8486912,
+        "file_size": 16384
+      },
+      {
+        "name": "__KLDDATA",
+        "address": "0xfffffff007820000",
+        "length": 16384,
+        "offset": 8503296,
+        "file_size": 16384
+      },
+      {
+        "name": "__DATA",
+        "address": "0xfffffff007824000",
+        "length": 688128,
+        "offset": 8519680,
+        "file_size": 196608
+      },
+      {
+        "name": "__BOOTDATA",
+        "address": "0xfffffff0078cc000",
+        "length": 278528,
+        "offset": 8716288,
+        "file_size": 278528
+      },
+      {
+        "name": "__PRELINK_TEXT",
+        "address": "0xfffffff0054e4000",
+        "length": 6373376,
+        "offset": 9863168,
+        "file_size": 6373376
+      },
+      {
+        "name": "__PRELINK_INFO",
+        "address": "0xfffffff007b30000",
+        "length": 2752512,
+        "offset": 39665664,
+        "file_size": 2752512
+      },
+      {
+        "name": "__PLK_TEXT_EXEC",
+        "address": "0xfffffff005af8000",
+        "length": 19070976,
+        "offset": 16236544,
+        "file_size": 19070976
+      },
+      {
+        "name": "__PRELINK_DATA",
+        "address": "0xfffffff0079e4000",
+        "length": 1359872,
+        "offset": 38305792,
+        "file_size": 1359872
+      },
+      {
+        "name": "__PLK_DATA_CONST",
+        "address": "0xfffffff006d28000",
+        "length": 2998272,
+        "offset": 35307520,
+        "file_size": 2998272
+      },
+      {
+        "name": "__PLK_LLVM_COV",
+        "address": "0xfffffff007b30000",
+        "length": 0,
+        "offset": 39665664,
+        "file_size": 0
+      },
+      {
+        "name": "__PLK_LINKEDIT",
+        "address": "0xfffffff007b30000",
+        "length": 0,
+        "offset": 39665664,
+        "file_size": 0
+      },
+      {
+        "name": "__LINKINFO",
+        "address": "0xfffffff007910000",
+        "length": 278528,
+        "offset": 8994816,
+        "file_size": 278528
+      },
+      {
+        "name": "__LINKEDIT",
+        "address": "0xfffffff007954000",
+        "length": 582408,
+        "offset": 9273344,
+        "file_size": 582408
+      }
+    ],
+    "entry_words": [
+      "0x14000ee4",
+      "0xd503201f",
+      "0xd503201f",
+      "0xd503201f",
+      "0xd503201f",
+      "0xd503201f",
+      "0xd503201f",
+      "0xd503201f",
+      "0xd503201f",
+      "0xd503201f",
+      "0xd503201f",
+      "0xd503201f",
+      "0xd503201f",
+      "0xd503201f",
+      "0xd503201f",
+      "0xd503201f"
+    ],
+    "sha256": "115489dd3e2adbe3e0d646413adb9397cfaf1c47f7b5d03620f78dd7d9371814"
+  },
+  "device_tree": [
+    {
+      "path": "/device-tree",
+      "properties": {
+        "compatible": "4e31313241500069506f64392c31004170706c6541524d00",
+        "model": "69506f64392c3100",
+        "device_type": "626f6f74726f6d00"
+      }
+    },
+    {
+      "path": "/device-tree/chosen",
+      "properties": {
+        "board-id": "00000000",
+        "chip-id": "00000000"
+      }
+    },
+    {
+      "path": "/device-tree/chosen/manifest-properties",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/chosen/manifest-object-properties",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/chosen/boot-object-manifests",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/chosen/secure-boot-hashes",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/chosen/memory-map",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/chosen/carveout-memory-map",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/chosen/lock-regs",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/chosen/lock-regs/amcc",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/chosen/lock-regs/amcc/amcc-ctrr-a",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/chosen/iBoot",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/chosen/memory-report",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/chosen/memory-report/zeroization-report",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/options",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/cpus",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/cpus/cpu0",
+      "properties": {
+        "compatible": "6170706c652c687572726963616e652d7a65706879720041524d2c763800",
+        "interrupts": "400100005300000041010000",
+        "device_type": "63707500",
+        "reg": "00000000"
+      }
+    },
+    {
+      "path": "/device-tree/cpus/cpu1",
+      "properties": {
+        "compatible": "6170706c652c687572726963616e652d7a65706879720041524d2c763800",
+        "interrupts": "420100005600000043010000",
+        "reg": "01000000",
+        "device_type": "63707500"
+      }
+    },
+    {
+      "path": "/device-tree/aliases",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/memory",
+      "properties": {
+        "device_type": "6d656d6f727900",
+        "reg": "0000000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/pram",
+      "properties": {
+        "device_type": "7072616d00",
+        "reg": "00000000000000000000000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/vram",
+      "properties": {
+        "device_type": "7672616d00",
+        "reg": "00000000000000000000000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io",
+      "properties": {
+        "compatible": "61726d2d696f2c743830313000",
+        "reg": "0000f40202000000000001000000000000000502020000000010000000000000000015020200000000100000000000000000100f020000000040000000000000",
+        "device_type": "74383031302d696f00",
+        "ranges": "000000000000000000000000020000000000000001000000000000000600000000000000060000000000000002000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/aic",
+      "properties": {
+        "compatible": "6169632c3100",
+        "reg": "0000100e0000000000800000000000000080100e000000000010000000000000",
+        "device_type": "696e746572727570742d636f6e74726f6c6c657200"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/aic-timebase",
+      "properties": {
+        "device_type": "74696d657200",
+        "reg": "0080100e000000000010000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/pmgr",
+      "properties": {
+        "compatible": "706d6772312c743830313000",
+        "device_type": "706d677200",
+        "reg": "0000000e000000000000100000000000000020100000000000001000000000000000f202000000000010010000000000004000100000000000100000000000000000f4020000000000000100000000000000f5020000000000100000000000000000f802000000000010000000000000000005020000000000a0000000000000000015020000000000a00000000000000080300e00000000001000000000000000000007000000000010000000000000000080070000000000900000000000000000a0070000000000900000000000000000c007000000000090000000000000000000080000000000500000000000000000b00500000000001001000000000000000006000000000010000000000000000010060000000000900000000000000000f0010000000000900000000000000000f8010000000000100000000000000000b00c00000000001000000000000000000100060000000050000000000000000008080000000000100000000000000000000f000000000090000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/pmgr/soc-tuner",
+      "properties": {
+        "compatible": "736f632d74756e65722c743830313000",
+        "device_type": "736f632d74756e657200"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/pmgr/clpc",
+      "properties": {
+        "compatible": "636c70632c743830313000",
+        "device_type": "636c706300",
+        "reg": "00000102020000000000010000000000000003020200000000000100000000000000110202000000000001000000000000001302020000000000010000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/nco",
+      "properties": {
+        "compatible": "6e636f2c7438303130006e636f2c73356c383936307800",
+        "device_type": "6e636f00",
+        "reg": "0040040e000000000040010000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/wdt",
+      "properties": {
+        "compatible": "7764742c7438303130007764742c73356c383936307800",
+        "reg": "00002b1000000000004000000000000020802b10000000000400000000000000",
+        "interrupts": "04000000",
+        "device_type": "77647400"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/gpio",
+      "properties": {
+        "compatible": "6770696f2c7438303130006770696f2c73356c383936307800",
+        "interrupts": "2a0000002b0000002c0000002d0000002e0000002f00000030000000",
+        "reg": "0000100f000000000000100000000000",
+        "device_type": "696e746572727570742d636f6e74726f6c6c657200"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/mcc",
+      "properties": {
+        "compatible": "6d63632c743830313000",
+        "device_type": "6d636300",
+        "reg": "0000000000000000000030000000000000400b0e000000000010000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/error-handler",
+      "properties": {
+        "compatible": "6572726f722d68616e646c65722c743830313000",
+        "interrupts": "340000002500000077000000",
+        "reg": "00000000000000000010000000000000000020000000000000001000000000000000d0000000000000300100000000000000d2000000000000100000000000000000d9000000000000100000000000000000e2000000000000100000000000000000e900000000000010000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dwi",
+      "properties": {
+        "compatible": "6477692c7438303130006477692c733830303000",
+        "interrupts": "05000000",
+        "reg": "0000200e000000000040000000000000",
+        "device_type": "64776900"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/pwm",
+      "properties": {
+        "compatible": "70776d2c74383031300070776d2c73356c383932307800",
+        "interrupts": "ec000000",
+        "device_type": "70776d00",
+        "reg": "0080110a000000000010000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/aes",
+      "properties": {
+        "compatible": "6165732c733830303000",
+        "reg": "0080100a00000000004000000000000000002d10000000000040000000000000",
+        "interrupts": "ed000000",
+        "device_type": "61657300"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/aop",
+      "properties": {
+        "compatible": "696f702c743830313000696f702c733830303000",
+        "reg": "000080100000000000c00100000000000000e0100000000000000a00000000000005001000000000000100000000000008040010000000000800000000000000",
+        "interrupts": "92000000910000009400000093000000",
+        "device_type": "616f7000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/aop/iop-aop-nub",
+      "properties": {
+        "compatible": "696f702d6e75622c7274627564647900"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/aop/iop-aop-nub/accel",
+      "properties": {
+        "device_type": "616363656c00"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/aop/iop-aop-nub/gyro",
+      "properties": {
+        "device_type": "6779726f00"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/aop/iop-aop-nub/compass",
+      "properties": {
+        "device_type": "636f6d7061737300"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/aop/iop-aop-nub/pressure",
+      "properties": {
+        "device_type": "707265737375726500"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/aop/iop-aop-nub/spherecontrol",
+      "properties": {
+        "device_type": "737068657265636f6e74726f6c00"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/aop/iop-aop-nub/prox",
+      "properties": {
+        "device_type": "70726f7800"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/aop/iop-aop-nub/aop-button",
+      "properties": {
+        "device_type": "616f702d627574746f6e00"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/aop-gpio",
+      "properties": {
+        "compatible": "6770696f2c7438303130006770696f2c73356c383936307800",
+        "interrupts": "80000000810000008200000083000000840000008500000086000000",
+        "reg": "00000f10000000000040000000000000",
+        "device_type": "696e746572727570742d636f6e74726f6c6c657200"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/pmp",
+      "properties": {
+        "compatible": "696f702d706d702c733830303000",
+        "reg": "0000300e0000000000000200000000000000500e0000000000000200000000000000400e000000000000010000000000",
+        "interrupts": "a8000000a7000000aa000000a9000000",
+        "device_type": "706d7000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/pmp/iop-pmp-nub",
+      "properties": {
+        "compatible": "696f702d6e75622c7274627564647900"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/sep",
+      "properties": {
+        "compatible": "696f702c743830313000696f702c733830303000",
+        "interrupts": "73000000720000007500000074000000",
+        "reg": "0000a00d000000000000010000000000",
+        "device_type": "73657000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/sep/iop-sep-nub",
+      "properties": {
+        "compatible": "696f702d6e75622c73657000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/sep/iop-sep-nub/xART",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/arm-io/sio",
+      "properties": {
+        "compatible": "696f702c743830313000696f702c733830303000",
+        "interrupts": "d3000000d2000000d5000000d4000000",
+        "reg": "0000e00a000000000000010000000000",
+        "device_type": "73696f00"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/sio/iop-sio-nub",
+      "properties": {
+        "compatible": "696f702d6e75622c73696f00"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/sio/iop-sio-nub/sio-dma",
+      "properties": {
+        "compatible": "73696f2d646d612d636f6e74726f6c6c657200",
+        "device_type": "73696f2d646d6100"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart0",
+      "properties": {
+        "compatible": "756172742d312c73616d73756e6700",
+        "interrupts": "da000000",
+        "reg": "00000c0a000000000040000000000000",
+        "device_type": "7561727400"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart0/debug-console",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/arm-io/uart1",
+      "properties": {
+        "compatible": "756172742d312c73616d73756e6700",
+        "interrupts": "db000000",
+        "reg": "00400c0a000000000040000000000000",
+        "device_type": "7561727400"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart1/bluetooth",
+      "properties": {
+        "compatible": "626c7565746f6f74682c6e383800",
+        "device_type": "626c7565746f6f746800"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart4",
+      "properties": {
+        "compatible": "756172742d312c73616d73756e6700",
+        "interrupts": "de000000",
+        "reg": "00000d0a000000000040000000000000",
+        "device_type": "7561727400"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart4/wlan",
+      "properties": {
+        "device_type": "776c616e00",
+        "compatible": "776c616e2d706369652d756172742c62636d3533343500776c616e2d706369652d756172742c62636d00"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart5",
+      "properties": {
+        "compatible": "756172742d312c73616d73756e6700",
+        "interrupts": "df000000",
+        "reg": "00400d0a000000000040000000000000",
+        "device_type": "7561727400"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart5/gas-gauge",
+      "properties": {
+        "compatible": "6761732d67617567652c62713237353430006761732d67617567652c68647100",
+        "device_type": "6761732d676175676500"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart6",
+      "properties": {
+        "compatible": "756172742d312c73616d73756e6700",
+        "interrupts": "e0000000",
+        "reg": "00800d0a000000000040000000000000",
+        "device_type": "7561727400"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart6/iap",
+      "properties": {
+        "compatible": "6961702c7561727400"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/spi1",
+      "properties": {
+        "compatible": "7370692d312c73616d73756e6700",
+        "interrupts": "d7000000",
+        "reg": "0040080a000000000040000000000000",
+        "device_type": "73706900"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/spi1/audio-codec",
+      "properties": {
+        "compatible": "617564696f2d636f6e74726f6c2c637334326c383100",
+        "interrupts": "ab00000001000000",
+        "reg": "0000000053000000000001080000000014000000000000000000000000000000",
+        "device_type": "617564696f2d636f6e74726f6c00"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/spi2",
+      "properties": {
+        "compatible": "7370692d312c73616d73756e6700",
+        "interrupts": "d8000000",
+        "reg": "0080080a000000000040000000000000",
+        "device_type": "73706900"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/spi2/multi-touch",
+      "properties": {
+        "compatible": "6d756c74692d746f7563682c6e3130320000000000000000",
+        "interrupts": "a600000000000000",
+        "reg": "000000007c000000000001088813000010270000000000000000000000000000",
+        "device_type": "6d756c74692d746f75636800"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/i2c0",
+      "properties": {
+        "compatible": "6932632c7438303130006932632c73356c3839343078006969632c736f667400",
+        "interrupts": "e8000000",
+        "reg": "0000110a000000000010000000000000",
+        "device_type": "69326300"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/i2c0/tristar",
+      "properties": {
+        "interrupts": "1300000003000006",
+        "compatible": "747269737461722c6362746c3136313000",
+        "reg": "1a000000c40900000000000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/i2c0/display-pmu",
+      "properties": {
+        "compatible": "646973706c61792d706d752c63686573746e757400",
+        "reg": "27000000c40900000000000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/i2c0/lm3534",
+      "properties": {
+        "compatible": "6261636b6c696768742c6c6d3335333400",
+        "device_type": "6261636b6c6967687400",
+        "reg": "63000000c40900000000000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/i2c0/boost",
+      "properties": {
+        "device_type": "626f6f737400",
+        "reg": "ea000000c40900000000000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/i2c1",
+      "properties": {
+        "compatible": "6932632c7438303130006932632c73356c3839343078006969632c736f667400",
+        "interrupts": "e9000000",
+        "reg": "0010110a000000000010000000000000",
+        "device_type": "69326300"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/i2c1/pmu",
+      "properties": {
+        "compatible": "706d752c643233333300",
+        "interrupts": "1a00000001000006",
+        "reg": "74000000c40900000000000000000000",
+        "device_type": "696e746572727570742d636f6e74726f6c6c657200"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/i2c1/tigris",
+      "properties": {
+        "compatible": "636861726765722c736e3234303000",
+        "interrupts": "30000000",
+        "device_type": "7573622d6368617267657200",
+        "reg": "75000000c40900000000000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/i2c2",
+      "properties": {
+        "compatible": "6932632c7438303130006932632c73356c3839343078006969632c736f667400",
+        "interrupts": "ea000000",
+        "reg": "0020110a000000000010000000000000",
+        "device_type": "69326300"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/i2c2/audio-speaker",
+      "properties": {
+        "compatible": "617564696f2d636f6e74726f6c2c637333356c313900",
+        "interrupts": "aa00000001000000",
+        "reg": "40000000c40900000000000000000000",
+        "device_type": "617564696f2d636f6e74726f6c00"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/otgphyctrl",
+      "properties": {
+        "compatible": "6f74677068796374726c2c7438303130006f74677068796374726c2c73356c383936307800",
+        "reg": "3000000c00000000200000000000000000800d0e000000000010000000000000",
+        "device_type": "6f74677068796374726c00"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/usb-complex",
+      "properties": {
+        "compatible": "7573622d636f6d706c65782c7438303130007573622d636f6d706c65782c73356c383936307800",
+        "ranges": "00000000000000000000000c000000000000600000000000",
+        "reg": "0000900c00000000a000000000000000",
+        "device_type": "7573622d636f6d706c657800"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/usb-complex/usb-device",
+      "properties": {
+        "compatible": "7573622d6465766963652c7438303130007573622d6465766963652c7437303030007573622d6465766963652c73356c383930307800",
+        "interrupts": "f1000000",
+        "device_type": "7573622d64657669636500",
+        "reg": "0000100000000000000001000000000020000000100000001000000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/usb-complex/usb-ehci0",
+      "properties": {
+        "compatible": "7573622d656863692c7438303130007573622d656863692c7437303030007573622d656863692c73356c383936307800",
+        "interrupts": "f2000000",
+        "reg": "0000200000000000000001000000000000000000000000000800000000000000",
+        "device_type": "7573622d6568636900"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/usb-complex/usb-ehci0/usb-ehci0-port1",
+      "properties": {
+        "device_type": "7573622d65686369302d706f72743100"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/usb-complex/usb-ohci0",
+      "properties": {
+        "compatible": "7573622d6f6863692c7438303130007573622d6f6863692c7437303030007573622d6f6863692c73356c383936307800",
+        "interrupts": "f3000000",
+        "reg": "0000300000000000000001000000000008000000000000000800000000000000",
+        "device_type": "7573622d6f68636900"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/usb-complex/usb-ohci0/usb-ohci0-port1",
+      "properties": {
+        "device_type": "7573622d6f686369302d706f72743100"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/mipi-dsim",
+      "properties": {
+        "compatible": "6d6970692d6473696d2d312c73796e6f7073797300",
+        "interrupts": "a3000000",
+        "reg": "00006006000000000000100000000000",
+        "device_type": "6d6970692d6473696d00"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/mipi-dsim/lcd",
+      "properties": {
+        "compatible": "6c63642c70696e6f7400",
+        "device_type": "6c636400"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/disp0",
+      "properties": {
+        "compatible": "64697370302c743830313000",
+        "interrupts": "9a0000009e0000009f000000a0000000a10000009b000000",
+        "device_type": "646973706c61792d73756273797374656d00",
+        "reg": "0000200600000000009000000000000000c0200600000000004000000000000000004006000000000040000000000000000044060000000000400000000000000000480600000000008000000000000000004c06000000000080000000000000000050060000000000400000000000000000540600000000004000000000000000007c06000000000040000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dart-disp0",
+      "properties": {
+        "compatible": "646172742c743830313000646172742c73356c383936307800",
+        "interrupts": "9c0000009d000000",
+        "reg": "0040300600000000004000000000000000003006000000000040000000000000",
+        "device_type": "6461727400"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dart-disp0/mapper-disp0",
+      "properties": {
+        "compatible": "696f6d6d752d6d617070657200",
+        "device_type": "646172742d6d617070657200",
+        "reg": "00000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/scaler0",
+      "properties": {
+        "compatible": "7363616c65722c7438303130007363616c65722c73356c383936307800",
+        "interrupts": "cc000000cd000000",
+        "reg": "0000900700000000004000000000000000a09007000000000002000000000000",
+        "device_type": "7363616c657200"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dart-scaler",
+      "properties": {
+        "compatible": "646172742c743830313000646172742c73356c383936307800",
+        "interrupts": "ce000000cd000000cf000000",
+        "reg": "0080900700000000002000000000000000409007000000000040000000000000",
+        "device_type": "6461727400"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dart-scaler/mapper-scaler",
+      "properties": {
+        "compatible": "696f6d6d752d6d617070657200",
+        "device_type": "646172742d6d617070657200",
+        "reg": "00000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/jpeg0",
+      "properties": {
+        "compatible": "6a7065672c7438303130006a7065672c73356c383932307800",
+        "interrupts": "c4000000",
+        "reg": "0000b007000000000040000000000000",
+        "device_type": "6a70656700"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dart-jpeg0",
+      "properties": {
+        "compatible": "646172742c743830313000646172742c73356c383936307800",
+        "interrupts": "c5000000c6000000",
+        "reg": "0040b007000000000040000000000000",
+        "device_type": "6461727400"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dart-jpeg0/mapper-jpeg0",
+      "properties": {
+        "compatible": "696f6d6d752d6d617070657200",
+        "device_type": "646172742d6d617070657200",
+        "reg": "00000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/jpeg1",
+      "properties": {
+        "compatible": "6a7065672c7438303130006a7065672c73356c383932307800",
+        "interrupts": "c7000000",
+        "reg": "0080b007000000000040000000000000",
+        "device_type": "6a70656700"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dart-jpeg1",
+      "properties": {
+        "compatible": "646172742c743830313000646172742c73356c383936307800",
+        "interrupts": "c8000000c9000000",
+        "reg": "00c0b007000000000040000000000000",
+        "device_type": "6461727400"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dart-jpeg1/mapper-jpeg1",
+      "properties": {
+        "compatible": "696f6d6d752d6d617070657200",
+        "device_type": "646172742d6d617070657200",
+        "reg": "00000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/isp",
+      "properties": {
+        "interrupts": "6c0000006d0000006e0000006f000000",
+        "compatible": "6973702c7438303130006973702c73356c383936307800",
+        "device_type": "69737000",
+        "reg": "0000b005000000000000140000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dart-isp",
+      "properties": {
+        "compatible": "646172742c743830313000646172742c73356c383936307800",
+        "interrupts": "70000000",
+        "device_type": "6461727400",
+        "reg": "0080b20500000000004000000000000000c0b205000000000040000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dart-isp/mapper-isp",
+      "properties": {
+        "compatible": "696f6d6d752d6d617070657200",
+        "device_type": "646172742d6d617070657200",
+        "reg": "00000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/ave",
+      "properties": {
+        "compatible": "6176653200",
+        "interrupts": "b5000000af000000ae000000b1000000b0000000",
+        "reg": "0000d0070000000000003000000000000000c8070000000000000800000000000000cc070000000000100000000000000080080e000000000040000000000000",
+        "device_type": "61766500"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dart-ave",
+      "properties": {
+        "compatible": "646172742c743830313000646172742c73356c383936307800",
+        "interrupts": "b3000000b2000000",
+        "reg": "0000c3070000000000400000000000000000c207000000000040000000000000",
+        "device_type": "6461727400"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dart-ave/mapper-ave",
+      "properties": {
+        "compatible": "696f6d6d752d6d617070657200",
+        "device_type": "646172742d6d617070657200",
+        "reg": "00000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/vxd",
+      "properties": {
+        "compatible": "7678642c7438303130007678642c73356c383932307800",
+        "interrupts": "ac000000",
+        "reg": "0000100800000000000003000000000000001308000000000010000000000000",
+        "device_type": "76786400"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/sgx",
+      "properties": {
+        "interrupts": "b9000000ba000000bb000000bc000000c1000000",
+        "device_type": "73677800",
+        "compatible": "6770752c743830313000",
+        "reg": "000000010000000000001000000000000000d001000000000000020000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/gfx-kf",
+      "properties": {
+        "compatible": "696f702d6766782c743830313000",
+        "reg": "0000d2010000000000000100000000000000d001000000000000020000000000",
+        "interrupts": "be000000bd000000c0000000bf000000",
+        "device_type": "6766782d6b6600"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/gfx-kf/iop-gfx-nub",
+      "properties": {
+        "compatible": "696f702d6e75622c7274627564647900"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/i2s-switch",
+      "properties": {
+        "compatible": "6932732d7377697463682c743830313000",
+        "device_type": "6932732d73776974636800",
+        "reg": "0040000a000000000010000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/aop-i2s-switch",
+      "properties": {
+        "compatible": "616f702d6932732d7377697463682c743830313000",
+        "reg": "0000541000000000001000000000000000060010000000000400000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/mca0",
+      "properties": {
+        "compatible": "6d63612c7438303130006d63612c73356c383935307800",
+        "interrupts": "e3000000",
+        "reg": "00000a0a0000000000400000000000000020000a000000000400000000000000",
+        "device_type": "69327300"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/mca0/audio-codec",
+      "properties": {
+        "compatible": "617564696f2d646174612c637334326c383100",
+        "device_type": "617564696f2d6461746100",
+        "reg": "1000000002000100001bb700000000000000000003000000010000000201181800000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/mca2",
+      "properties": {
+        "compatible": "6d63612c7438303130006d63612c73356c383935307800",
+        "interrupts": "e5000000",
+        "reg": "00800a0a0000000000400000000000000820000a000000000400000000000000",
+        "device_type": "69327300"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/mca2/audio-speaker",
+      "properties": {
+        "compatible": "617564696f2d646174612c637333356c313900",
+        "device_type": "617564696f2d6461746100",
+        "reg": "1012000008000100001bb700000010003000010001000000030000000102181800000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/mca3",
+      "properties": {
+        "compatible": "6d63612c7438303130006d63612c73356c383935307800",
+        "interrupts": "e6000000",
+        "reg": "00c00a0a0000000000400000000000000c20000a000000000400000000000000",
+        "device_type": "69327300"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/mca3/audio-codec-voice",
+      "properties": {
+        "compatible": "617564696f2d646174612c766f69636500",
+        "device_type": "617564696f2d6461746100",
+        "reg": "011200000800010000000000000010003000010001000000010000000101181800000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/apcie",
+      "properties": {
+        "reg": "00000010060000000000000100000000000000010600000000400000000000000040000106000000004000000000000000000002060000000040000000000000004000020600000000400000000000000000000306000000004000000000000000400003060000000040000000000000000000040600000000400000000000000040000406000000004000000000000000000000060000000080000000000000008000000600000000400000000000000000000a060000000000040000000000",
+        "compatible": "61706369652c743830313000",
+        "interrupts": "0e010000110100001401000017010000",
+        "ranges": "0000004300000020060000000000002006000000000000a00100000000000002000000c000000000000000c0070000000000004000000000",
+        "device_type": "70636900"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/apcie/pci-bridge0",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/arm-io/apcie/pci-bridge0/s3e",
+      "properties": {
+        "device_type": "706369652d64657669636500"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/apcie/pci-bridge3",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/arm-io/apcie/pci-bridge3/wlan",
+      "properties": {
+        "compatible": "776c616e2d706369652c62636d3433343500776c616e2d706369652c62636d00",
+        "device_type": "706369652d64657669636500"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/nvme-mmu0",
+      "properties": {
+        "compatible": "6e766d652d6d6d752c7438303130006e766d652d6d6d752c733830303000",
+        "interrupts": "10010000",
+        "reg": "00400001060000000040000000000000",
+        "device_type": "6e766d652d6d6d7500"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dart-apcie0",
+      "properties": {
+        "compatible": "646172742c743830313000646172742c73356c383936307800",
+        "interrupts": "0f010000",
+        "reg": "00800001060000000040000000000000",
+        "device_type": "6461727400"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dart-apcie0/mapper-apcie0",
+      "properties": {
+        "compatible": "696f6d6d752d6d617070657200",
+        "device_type": "646172742d6d617070657200",
+        "reg": "00000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dart-apcie3",
+      "properties": {
+        "compatible": "646172742c743830313000646172742c73356c383936307800",
+        "interrupts": "18010000",
+        "reg": "00800004060000000040000000000000",
+        "device_type": "6461727400"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dart-apcie3/mapper-apcie3",
+      "properties": {
+        "compatible": "696f6d6d752d6d617070657200",
+        "device_type": "646172742d6d617070657200",
+        "reg": "00000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/amc",
+      "properties": {
+        "compatible": "616d6374656d7073656e736f722c743830313000616d6374656d7073656e736f722c73356c383936307800",
+        "reg": "00000000000000000010000000000000",
+        "device_type": "74656d7073656e736f7200"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/sochot0",
+      "properties": {
+        "compatible": "736f63686f742c73356c383935357800",
+        "interrupts": "1e000000",
+        "reg": "00400c0e00000000001000000000000000000c0e0000000000100000000000000040f30200000000001000000000000000c02b10000000000040000000000000",
+        "device_type": "736f63686f7400"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/sochot1",
+      "properties": {
+        "compatible": "736f63686f742c73356c383935357800",
+        "device_type": "736f63686f7400",
+        "reg": "0000f302000000000010000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/tempsensor0",
+      "properties": {
+        "compatible": "74656d7073656e736f722c743830313000",
+        "interrupts": "09000000",
+        "device_type": "74656d7073656e736f7200",
+        "reg": "00c00b0e000000000080000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/tempsensor1",
+      "properties": {
+        "compatible": "74656d7073656e736f722c743830313000",
+        "interrupts": "0b000000",
+        "device_type": "74656d7073656e736f7200",
+        "reg": "00c00b0e000000000080000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/tempsensor2",
+      "properties": {
+        "compatible": "74656d7073656e736f722c743830313000",
+        "interrupts": "0d000000",
+        "device_type": "74656d7073656e736f7200",
+        "reg": "00c00b0e000000000080000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/tempsensor3",
+      "properties": {
+        "compatible": "74656d7073656e736f722c743830313000",
+        "interrupts": "11000000",
+        "device_type": "74656d7073656e736f7200",
+        "reg": "0000f302000000000080000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/tempsensor4",
+      "properties": {
+        "compatible": "74656d7073656e736f722c743830313000",
+        "interrupts": "13000000",
+        "device_type": "74656d7073656e736f7200",
+        "reg": "0000f302000000000080000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/tempsensor5",
+      "properties": {
+        "compatible": "74656d7073656e736f722c743830313000",
+        "interrupts": "15000000",
+        "device_type": "74656d7073656e736f7200",
+        "reg": "0000f302000000000080000000000000"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/dietempctl0",
+      "properties": {
+        "compatible": "64696574656d7063746c2c743830313000",
+        "device_type": "64696574656d7063746c00"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/vtempctl0",
+      "properties": {
+        "compatible": "7674656d7063746c2c743830313000",
+        "device_type": "7674656d7063746c00"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/cpu-debug-interface",
+      "properties": {
+        "device_type": "6370752d64656275672d696e7465726661636500"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/swcpt",
+      "properties": {
+        "compatible": "73776370742c743830313000",
+        "reg": "0000f000000000000040000000000000",
+        "device_type": "737763707400"
+      }
+    },
+    {
+      "path": "/device-tree/buttons",
+      "properties": {
+        "compatible": "627574746f6e7300",
+        "interrupts": "5600000005000000b3000000050000001700000005000000b400000005000000",
+        "device_type": "627574746f6e7300"
+      }
+    },
+    {
+      "path": "/device-tree/dock",
+      "properties": {
+        "compatible": "646f636b2c3970696e00",
+        "device_type": "646f636b00"
+      }
+    },
+    {
+      "path": "/device-tree/charger",
+      "properties": {
+        "compatible": "636861726765722c6e383800",
+        "device_type": "6368617267657200"
+      }
+    },
+    {
+      "path": "/device-tree/backlight",
+      "properties": {
+        "compatible": "6261636b6c6967687400",
+        "device_type": "6261636b6c6967687400"
+      }
+    },
+    {
+      "path": "/device-tree/sacm",
+      "properties": {
+        "compatible": "7361636d2c3100"
+      }
+    },
+    {
+      "path": "/device-tree/defaults",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/product",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/product/camera",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/product/facetime",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/product/maps",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/product/audio",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/filesystems",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/filesystems/fstab",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/filesystems/fstab/xart-vol",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/filesystems/fstab/system-vol",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/filesystems/fstab/preboot-vol",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/filesystems/fstab/data-vol",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/filesystems/fstab/update-vol",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/filesystems/fstab/hardware-vol",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/filesystems/fstab-ephemeral-recovery-data",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/filesystems/fstab-ephemeral-recovery-data/ephemeral-recovery-data-vol",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/filesystems/fstab-ephemeral-recovery-data/preboot-vol",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/filesystems/fstab-ephemeral-recovery-data/hardware-vol",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/filesystems/fstab-ephemeral-diag-data",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/filesystems/fstab-ephemeral-diag-data/ephemeral-diag-data-vol",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/filesystems/fstab-ephemeral-diag-data/update-vol",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/filesystems/fstab-ephemeral-diag-data/preboot-vol",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/filesystems/fstab-ephemeral-diag-data/hardware-vol",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/recovery-environment",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/recovery-environment/ephemeral-recovery-data-volume",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/recovery-environment/ephemeral-storage",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/recovery-environment/no-sepfw-load-at-boot",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/recovery-environment/no-protected-data-access",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/recovery-environment/amfi-allows-trust-cache-load",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/recovery-environment/disable-av-content-protection",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/recovery-environment/use-recovery-securityd",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/recovery-environment/disable-accessory-firmware",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/diagnostics-environment",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/diagnostics-environment/ephemeral-diag-data-volume",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/diagnostics-environment/ephemeral-storage",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/diagnostics-environment/disable-transport-rm",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/diagnostics-environment/no-protected-data-access",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/diagnostics-environment/amfi-allows-trust-cache-load",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/darwinos-ramdisk-environment",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/darwinos-ramdisk-environment/isp-horizon",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/darwinos-ramdisk-environment/ephemeral-recovery-data-volume",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/darwinos-ramdisk-environment/ephemeral-storage",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/darwinos-ramdisk-environment/no-protected-data-access",
+      "properties": {}
+    },
+    {
+      "path": "/device-tree/osenvironments/darwinos-ramdisk-environment/no-sepfw-load-at-boot",
+      "properties": {}
+    }
+  ]
+}

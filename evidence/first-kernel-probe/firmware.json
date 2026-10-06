@@ -1,0 +1,56 @@
+{
+  "url": "https://updates.cdn-apple.com/2025FallFCS/fullrestores/122-76865/68174A8B-44B2-4689-B8D4-C8F42F4FFBEE/iPodtouch_7_15.8.8_19H422_Restore.ipsw",
+  "version": "15.8.8",
+  "build": "19H422",
+  "device": "iPod9,1",
+  "identity": {
+    "BuildNumber": "19H422",
+    "BuildTrain": "SkyUpdate",
+    "DeviceClass": "n112ap",
+    "FDRSupport": true,
+    "MinimumSystemPartition": 6904,
+    "MobileDeviceMinVersion": "1351",
+    "OSVarContentSize": 199208960,
+    "RestoreBehavior": "Erase",
+    "SystemPartitionPadding": {
+      "1024": 1280,
+      "128": 1280,
+      "16": 160,
+      "256": 1280,
+      "32": 320,
+      "512": 1280,
+      "64": 640,
+      "768": 1280,
+      "8": 80
+    },
+    "Variant": "Customer Erase Install (IPSW)",
+    "VariantContents": {
+      "BasebandFirmware": "Release",
+      "DFU": "Production",
+      "Firmware": "Production",
+      "InstalledKernelCache": "Production",
+      "OS": "Production",
+      "RestoreKernelCache": "Production",
+      "RestoreRamDisk": "Production",
+      "RestoreSEP": "Production",
+      "SEP": "Production",
+      "VinylFirmware": "Release"
+    }
+  },
+  "components": {
+    "KernelCache": {
+      "source": "kernelcache.release.n112",
+      "file": "KernelCache.im4p",
+      "bytes": 15316343,
+      "sha256": "c1db894503b985cc390c6a40b978c081ed0cf725c909310383f4971eb2e660b7",
+      "zip_crc32": "0ff2c7ba"
+    },
+    "DeviceTree": {
+      "source": "Firmware/all_flash/DeviceTree.n112ap.im4p",
+      "file": "DeviceTree.im4p",
+      "bytes": 24775,
+      "sha256": "7c51cce2f3ecfda89bc08401f7e81dec798902892001a14686653779e88b0699",
+      "zip_crc32": "691b93ec"
+    }
+  }
+}

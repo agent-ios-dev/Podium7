@@ -112,7 +112,19 @@ def macho(data):
         address = int(segment["address"], 16)
         if address <= entry < address + segment["file_size"]:
             offset = segment["offset"] + entry - address
-            return {"entry": hex(entry), "segments": segments, "entry_words": [hex(x[0]) for x in struct.iter_unpack("<I", data[offset:offset + 64])], "sha256": hashlib.sha256(data).hexdigest()}
+            opcode = struct.unpack_from("<I", data, offset)[0]
+            windows = {}
+            if opcode & 0xfc000000 == 0x14000000:
+                displacement = opcode & 0x3ffffff
+                if displacement & 0x2000000:
+                    displacement -= 0x4000000
+                target = entry + displacement * 4
+                for destination in segments:
+                    base = int(destination["address"], 16)
+                    if base <= target and target + 256 <= base + destination["file_size"]:
+                        start = destination["offset"] + target - base
+                        windows[hex(target)] = [hex(x[0]) for x in struct.iter_unpack("<I", data[start:start + 256])]
+            return {"entry": hex(entry), "segments": segments, "entry_words": [hex(x[0]) for x in struct.iter_unpack("<I", data[offset:offset + 64])], "bootstrap_windows": windows, "sha256": hashlib.sha256(data).hexdigest()}
     raise ValueError("entry not backed by segment bytes")
 
 

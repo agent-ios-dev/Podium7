@@ -42,6 +42,9 @@ public final class AArch64CPU {
     public private(set) var sp: UInt64 = 0
     public private(set) var retired: UInt64 = 0
     public private(set) var stopped = false
+    public private(set) var debugOSLock = true
+    public private(set) var interruptMask: UInt8 = 0
+    public private(set) var vectorBase: UInt64 = 0
     public let memory: any Memory64
     public init(memory: any Memory64, entry: UInt64 = LabMemory.ramBase) {
         self.memory = memory; self.pc = entry
@@ -65,7 +68,32 @@ public final class AArch64CPU {
         case 0xd503201f: break // NOP
         case 0xd4200000: stopped = true // BRK #0 is the lab's explicit stop convention.
         default:
-            if op & 0x7f800000 == 0x52800000 || op & 0x7f800000 == 0x72800000 {
+            if op & 0xffffffe0 == 0xd5101080 { // MSR OSLAR_EL1, Xt
+                debugOSLock = reg(rd) & 1 != 0
+            } else if op & 0xfffff0ff == 0xd50340df { // MSR DAIFSet, #imm
+                interruptMask |= UInt8((op >> 8) & 15)
+            } else if op & 0xfffff0ff == 0xd50340ff { // MSR DAIFClr, #imm
+                interruptMask &= ~UInt8((op >> 8) & 15)
+            } else if op & 0xffffffe0 == 0xd518c000 { // MSR VBAR_EL1, Xt
+                vectorBase = reg(rd) & ~UInt64(0x7ff)
+            } else if op & 0x9f000000 == 0x10000000 || op & 0x9f000000 == 0x90000000 {
+                let immediate = ((op >> 5) & 0x7ffff) << 2 | ((op >> 29) & 3)
+                let page = op & 0x80000000 != 0
+                let delta = signed(immediate, bits: 21) * (page ? 4096 : 1)
+                set(rd, (page ? pc & ~UInt64(4095) : pc) &+ UInt64(bitPattern: delta), wide: true)
+            } else if op & 0x7fe0ffe0 == 0x2a0003e0 { // MOV alias: ORR Rd, ZR, Rm (LSL #0)
+                set(rd, reg(Int((op >> 16) & 31)), wide: wide)
+            } else if op & 0xfffffc1f == 0xd61f0000 || op & 0xfffffc1f == 0xd63f0000 || op & 0xfffffc1f == 0xd65f0000 {
+                next = reg(rn)
+                if op & 0xfffffc1f == 0xd63f0000 { set(30, pc &+ 4, wide: true) }
+            } else if op & 0xffc00000 == 0xf9400000 || op & 0xffc00000 == 0xb9400000 {
+                let size = op >> 30 == 3 ? 8 : 4
+                let base = rn == 31 ? sp : reg(rn)
+                let address = base &+ UInt64((op >> 10) & 0xfff) * UInt64(size)
+                var value: UInt64 = 0
+                for i in 0..<size { value |= UInt64(try memory.read(address &+ UInt64(i))) << (8 * i) }
+                set(rd, value, wide: size == 8)
+            } else if op & 0x7f800000 == 0x52800000 || op & 0x7f800000 == 0x72800000 {
                 let shift = Int((op >> 21) & 3) * 16
                 guard wide || shift < 32 else { throw MachineFault.unsupported(pc: pc, opcode: op) }
                 let immediate = UInt64((op >> 5) & 0xffff) << shift
@@ -78,8 +106,9 @@ public final class AArch64CPU {
                 var value = op & 0x40000000 == 0 ? source &+ immediate : source &- immediate
                 if !wide { value &= 0xffff_ffff }
                 if rd == 31 { sp = value } else { set(rd, value, wide: wide) }
-            } else if op & 0xfc000000 == 0x14000000 {
+            } else if op & 0x7c000000 == 0x14000000 {
                 next = pc &+ UInt64(bitPattern: signed(op & 0x03ff_ffff, bits: 26) * 4)
+                if op & 0x80000000 != 0 { set(30, pc &+ 4, wide: true) }
             } else if op & 0x7e000000 == 0x34000000 {
                 let value = wide ? reg(rd) : reg(rd) & 0xffff_ffff
                 if (value == 0) == (op & 0x01000000 == 0) {

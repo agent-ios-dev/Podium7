@@ -4,7 +4,7 @@ import XCTest
 final class BootstrapTests: XCTestCase {
     func testEarlySystemRegisterStateChanges() throws {
         let m = LabMemory()
-        try m.load([0xd510109f, 0xd5034fdf, 0xd50343ff, 0xd2802000, 0xd518c000, 0xd4200000])
+        try m.load([0xd510109f, 0xd5034fdf, 0xd50343ff, 0xd2820000, 0xd518c000, 0xd4200000])
         let cpu = AArch64CPU(memory: m)
         try cpu.run()
         XCTAssertFalse(cpu.debugOSLock)

@@ -11,6 +11,7 @@ jobs:
         run: swift run podium7
       - name: Test firmware parsers
         run: python3 -m unittest discover -s Tools -p 'test_*.py'
+      - run: python3 Tools/verify_encodings.py
       - name: Generate Xcode project
         run: |
           brew install xcodegen

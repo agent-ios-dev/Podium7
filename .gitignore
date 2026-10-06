@@ -8,3 +8,6 @@ Payload/
 *.ipsw
 *.im4p
 *.img4
+.firmware/
+*.macho
+*.payload

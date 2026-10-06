@@ -1,0 +1,17 @@
+name: Inspect genuine iPod touch 7 firmware
+on: [workflow_dispatch]
+jobs:
+  inspect:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s Tools -p 'test_*.py'
+      - run: python3 Tools/fetch_firmware.py
+      - run: python3 Tools/analyze_firmware.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-analysis
+          path: |
+            .firmware/analysis.json
+            .firmware/firmware.json
+          include-hidden-files: true

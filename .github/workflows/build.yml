@@ -9,6 +9,8 @@ jobs:
         run: swift test
       - name: Execute diagnostic ROM
         run: swift run podium7
+      - name: Test firmware parsers
+        run: python3 -m unittest discover -s Tools -p 'test_*.py'
       - name: Generate Xcode project
         run: |
           brew install xcodegen

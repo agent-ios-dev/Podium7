@@ -7,6 +7,7 @@ boot_args layout: Apple's xnu-8019.80.24 pexpert/pexpert/arm64/boot.h.
 import argparse
 import json
 import pathlib
+import re
 import struct
 import subprocess
 import time
@@ -72,11 +73,11 @@ def make_probe(directory):
                  (tree_address, align(len(tree)), tree)]
     destination = directory / "qemu-kernel-probe.elf"
     destination.write_bytes(elf_image(stub_address, segments))
-    return destination
+    return destination, entry
 
 
 def run_probe(directory, executable="qemu-system-aarch64"):
-    image = make_probe(directory)
+    image, kernel_entry = make_probe(directory)
     trace, serial = directory / "qemu-trace.txt", directory / "qemu-serial.txt"
     command = [executable, "-machine", "virt,secure=off,virtualization=off", "-cpu", "max", "-accel", "tcg",
                "-m", "2048", "-smp", "1", "-display", "none", "-monitor", "none", "-serial", "stdio",
@@ -97,7 +98,11 @@ def run_probe(directory, executable="qemu-system-aarch64"):
                     process.wait()
                 break
             time.sleep(0.1)
-    summary = {"booted_ios": False, "backend": version, "board": "QEMU virt bootstrap experiment, not T8010",
+    trace_text = trace.read_text(errors="replace") if trace.exists() else ""
+    entry_seen = any(int(address, 16) == kernel_entry for address in re.findall(r"^0x([0-9a-fA-F]+):", trace_text, re.MULTILINE))
+    exception_tail = [line for line in trace_text.splitlines() if "exception" in line.lower() or "unimplemented" in line.lower() or "unallocated" in line.lower()][-24:]
+    summary = {"booted_ios": False, "kernel_entry_seen": entry_seen, "physical_kernel_entry": hex(kernel_entry),
+               "exception_tail": exception_tail, "backend": version, "board": "QEMU virt bootstrap experiment, not T8010",
                "physical_ram_base": hex(PHYSICAL_BASE), "command": command, "stop": stop,
                "returncode": process.returncode, "seconds": time.monotonic() - start,
                "trace_bytes": trace.stat().st_size if trace.exists() else 0}
@@ -105,6 +110,8 @@ def run_probe(directory, executable="qemu-system-aarch64"):
     print(json.dumps(summary, indent=2))
     if not trace.exists() or trace.stat().st_size == 0:
         raise RuntimeError("QEMU produced no guest execution trace")
+    if not entry_seen:
+        raise RuntimeError("trace does not show the genuine Apple kernel entry")
 
 
 if __name__ == "__main__":

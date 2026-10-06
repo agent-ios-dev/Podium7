@@ -4,8 +4,13 @@ public enum MachineFault: Error, Equatable {
     case unmapped(UInt64), unalignedPC(UInt64), unsupported(pc: UInt64, opcode: UInt32), budgetExceeded
 }
 
+public protocol Memory64: AnyObject {
+    func read(_ address: UInt64) throws -> UInt8
+    func write(_ address: UInt64, value: UInt8) throws
+}
+
 /// Development board only. These are synthetic addresses, not an A10 memory map.
-public final class LabMemory {
+public final class LabMemory: Memory64 {
     public static let ramBase: UInt64 = 0x1_0000_0000
     public static let uart: UInt64 = 0x2_0000_0000
     private var bytes: [UInt8]
@@ -37,8 +42,10 @@ public final class AArch64CPU {
     public private(set) var sp: UInt64 = 0
     public private(set) var retired: UInt64 = 0
     public private(set) var stopped = false
-    public let memory: LabMemory
-    public init(memory: LabMemory) { self.memory = memory }
+    public let memory: any Memory64
+    public init(memory: any Memory64, entry: UInt64 = LabMemory.ramBase) {
+        self.memory = memory; self.pc = entry
+    }
     private func reg(_ index: Int) -> UInt64 { index == 31 ? 0 : registers[index] }
     private func set(_ index: Int, _ value: UInt64, wide: Bool) {
         if index != 31 { registers[index] = wide ? value : value & 0xffff_ffff }

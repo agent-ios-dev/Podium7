@@ -8,10 +8,14 @@ jobs:
       - run: python3 -m unittest discover -s Tools -p 'test_*.py'
       - run: python3 Tools/fetch_firmware.py
       - run: python3 Tools/analyze_firmware.py
+      - run: swift test
+      - name: Probe actual kernel entry and report the first unsupported operation
+        run: swift run podium7 --probe-kernel .firmware/KernelCache.macho > .firmware/kernel-entry-probe.json
       - uses: actions/upload-artifact@v4
         with:
           name: firmware-analysis
           path: |
             .firmware/analysis.json
             .firmware/firmware.json
+            .firmware/kernel-entry-probe.json
           include-hidden-files: true

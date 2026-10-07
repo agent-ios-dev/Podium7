@@ -4,7 +4,6 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <mach/mach.h>
-#include <mach/mach_vm.h>
 #include <pthread.h>
 #include <setjmp.h>
 #include <signal.h>
@@ -80,10 +79,10 @@ static bool prepare_alias(P7JITPool *pool) {
     if (sigsetjmp(protocol_jump, 1) == 0) {
         void *prepared = prepare_region(pool->rx, pool->size);
         if (prepared == pool->rx) {
-            mach_vm_address_t alias = 0;
+            vm_address_t alias = 0;
             vm_prot_t current = 0, maximum = 0;
-            kern_return_t result = mach_vm_remap(mach_task_self(), &alias, pool->size, 0, VM_FLAGS_ANYWHERE,
-                mach_task_self(), (mach_vm_address_t)pool->rx, false, &current, &maximum, VM_INHERIT_NONE);
+            kern_return_t result = vm_remap(mach_task_self(), &alias, pool->size, 0, VM_FLAGS_ANYWHERE,
+                mach_task_self(), (vm_address_t)pool->rx, false, &current, &maximum, VM_INHERIT_NONE);
             if (result == KERN_SUCCESS) {
                 pool->rw = (void *)alias; pool->alias = true;
                 if (mprotect(pool->rw, pool->size, PROT_READ | PROT_WRITE) == 0) {
@@ -131,7 +130,7 @@ P7JITPool *p7_jit_create(size_t capacity, int *error) {
 }
 void p7_jit_destroy(P7JITPool *pool) {
     if (!pool) return;
-    if (pool->alias && pool->rw) mach_vm_deallocate(mach_task_self(), (mach_vm_address_t)pool->rw, pool->size);
+    if (pool->alias && pool->rw) vm_deallocate(mach_task_self(), (vm_address_t)pool->rw, pool->size);
     if (pool->rx && pool->rx != MAP_FAILED) munmap(pool->rx, pool->size);
     free(pool);
 }

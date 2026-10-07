@@ -280,9 +280,11 @@ static void podium7_mcc_create(MachineState *machine, MemoryRegion *memory)
 '''
     aic = '''
 /* Minimal Apple AIC v1 research model for the T8010 bootstrap.
- * Register layout and 896 IRQ count follow the public Linux apple-aic driver.
+ * The n112 firmware's ipid-mask is 40 bytes, so model 320 implemented IRQs;
+ * the Linux driver documents the broader AIC family's 896-IRQ capability.
  * External device wiring and timer FIQ delivery are not modeled yet.
  */
+#define PODIUM7_AIC_IRQ_COUNT 320
 typedef struct Podium7AIC {
     MemoryRegion io;
     uint32_t config;
@@ -297,7 +299,7 @@ typedef struct Podium7AIC {
 static uint32_t podium7_aic_event(Podium7AIC *aic)
 {
     unsigned irq;
-    for (irq = 0; irq < 896; irq++) {
+    for (irq = 0; irq < PODIUM7_AIC_IRQ_COUNT; irq++) {
         uint32_t bit = 1U << (irq & 31);
         if ((aic->target_cpu[irq] & 1) &&
             (aic->irq_state[irq >> 5] & bit) &&
@@ -325,7 +327,7 @@ static uint64_t podium7_aic_read(void *opaque, hwaddr address, unsigned size)
         address = address - 0x5000 + 0x2000; /* explicit CPU 0 register view */
     }
     switch (address) {
-    case 0x0004: value = 896; break; /* AIC_INFO: implemented IRQ count */
+    case 0x0004: value = PODIUM7_AIC_IRQ_COUNT; break; /* AIC_INFO */
     case 0x0010: value = aic->config; break;
     case 0x2000: value = 0; break; /* AIC_WHOAMI: CPU 0 */
     case 0x2004: value = podium7_aic_event(aic); break; /* AIC_EVENT */

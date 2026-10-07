@@ -68,7 +68,7 @@ def make_probe(directory):
     tree, clocks = prepare(original_tree, COUNTER_FREQUENCY, dram_base=QEMU_RAM_BASE, dram_size=QEMU_RAM_SIZE)
     (directory / "device-tree-preparation.json").write_text(json.dumps({
         "bootloader_placeholder_flags_cleared": True, "original_bytes": len(original_tree),
-        "prepared_bytes": len(tree), "cpu_clocks": clocks}, indent=2))
+        "prepared_bytes": len(tree), "device_tree_changes": clocks}, indent=2))
     info = macho(kernel)
     regions = [x for x in info["segments"] if x["length"]]
     minimum = min(int(x["address"], 16) for x in regions)

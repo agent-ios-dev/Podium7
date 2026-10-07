@@ -17,7 +17,7 @@ ldr w4, [x3]
 cmp w4, #0
 b.ne failure
 ldr w4, [x3, #4]
-cmp w4, #896
+cmp w4, #320
 b.ne failure
 ldr w4, [x3, #0x2000]
 cmp w4, #0
@@ -94,7 +94,7 @@ failure_exit:
                    "-monitor", "none", "-serial", "none", "-semihosting-config",
                    "enable=on,target=native", "-device", f"loader,file={image},cpu-num=0"]
         result = subprocess.run(command, capture_output=True, text=True, timeout=10)
-        checks = ["AIC v1 reserved register", "896 IRQ capability", "WHOAMI and empty event",
+        checks = ["AIC v1 reserved register", "320 IRQs matching the n112 firmware mask", "WHOAMI and empty event",
                   "configuration read/write", "target CPU register", "initial IRQ mask",
                   "mask clear", "software IRQ pending/event auto-mask/clear"]
         passed = result.returncode == 0

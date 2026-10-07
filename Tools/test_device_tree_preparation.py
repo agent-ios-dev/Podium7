@@ -39,3 +39,16 @@ class DeviceTreePreparationTests(unittest.TestCase):
         self.assertIn(b"dram-size", first)
         self.assertEqual(next(x for x in changes if x["property"] == "dram-base")["value"], "0x40000000")
         with self.assertRaises(ValueError): prepare(tree, 24_000_000, dram_base=0xffffffffffffffff, dram_size=2)
+
+    def test_aic_ipid_mask_is_preserved_for_hardware_sized_model(self):
+        mask = bytes(range(40))
+        aic = node([("name", b"aic\0"), ("compatible", b"aic,1\0"), ("ipid-mask", mask)])
+        arm_io = node([("name", b"arm-io\0")], [aic])
+        cpu = node([("name", b"cpu0\0"), ("device_type", b"cpu\0")])
+        tree = node([("name", b"device-tree\0")], [node([("name", b"cpus\0")], [cpu]), arm_io])
+
+        prepared, changes = prepare(tree, 24_000_000, random_seed=bytes(64))
+
+        encoded_property = b"ipid-mask".ljust(32, b"\0") + struct.pack("<I", len(mask)) + mask
+        self.assertIn(encoded_property, prepared)
+        self.assertFalse(any(x.get("property") == "ipid-mask" for x in changes))

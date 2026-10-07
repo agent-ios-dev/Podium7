@@ -39,9 +39,11 @@ str w5, [x3, #0x12c]
 ldr w4, [x3, #0x12c]
 cmp w4, w5
 b.ne failure
+movz x6, #0x7ffc
+add x6, x3, x6
 mov w5, #0x7f
-str w5, [x3, #0x7ffc]
-ldr w4, [x3, #0x7ffc]
+str w5, [x6]
+ldr w4, [x6]
 cmp w4, w5
 b.ne failure
 mov x0, #0x20

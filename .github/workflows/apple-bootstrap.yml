@@ -6,6 +6,10 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install distlib==0.3.9
       - run: python3 -m unittest discover -s Tools -p 'test_*.py'
       - run: python3 Tools/fetch_firmware.py
       - run: python3 Tools/analyze_firmware.py
@@ -19,7 +23,7 @@ jobs:
         run: |
           mkdir .qemu/build
           cd .qemu/build
-          ../configure --target-list=aarch64-softmmu --disable-docs --disable-tools --disable-guest-agent --disable-slirp --disable-hvf --disable-cocoa --disable-vnc --disable-sdl --disable-gtk --disable-curses
+          ../configure --python="$(python -c 'import sys; print(sys.executable)')" --target-list=aarch64-softmmu --disable-docs --disable-tools --disable-guest-agent --disable-slirp --disable-hvf --disable-cocoa --disable-vnc --disable-sdl --disable-gtk --disable-curses
           ninja qemu-system-aarch64
       - name: Execute original kernel and retain the next failure
         run: python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research

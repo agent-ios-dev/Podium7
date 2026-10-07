@@ -101,15 +101,17 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
     trace, serial = directory / "qemu-trace.txt", directory / "qemu-serial.txt"
     command = [executable, "-machine", "virt,secure=off,virtualization=off", "-cpu", f"{cpu},cntfrq={COUNTER_FREQUENCY}", "-accel", "tcg",
                "-m", "2048", "-smp", "1", "-display", "none", "-monitor", "none", "-serial", "stdio",
-               "-device", f"loader,file={image},cpu-num=0", "-d", "in_asm,cpu,int,guest_errors,unimp", "-D", str(trace)]
+               "-device", f"loader,file={image},cpu-num=0", "-d", "in_asm,int,guest_errors,unimp", "-D", str(trace)]
     version = subprocess.check_output([executable, "--version"], text=True).splitlines()[0]
     with serial.open("wb") as output:
         process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT)
         start = time.monotonic()
         stop = "QEMU exited"
         while process.poll() is None:
-            if time.monotonic() - start > 10 or trace.exists() and trace.stat().st_size > 16 * 1024 * 1024:
-                stop = "bounded trace limit reached"
+            deadline = time.monotonic() - start > 30
+            full_trace = trace.exists() and trace.stat().st_size > 16 * 1024 * 1024
+            if deadline or full_trace:
+                stop = "30-second execution deadline reached" if deadline else "16-MiB trace limit reached"
                 process.terminate()
                 try:
                     process.wait(timeout=3)
@@ -123,6 +125,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
     faults = [line for line in trace_text.splitlines() if "exception" in line.lower() or "unimplemented" in line.lower() or "unallocated" in line.lower() or "unsupported" in line.lower()]
     exception_tail = faults[-24:]
     summary = {"booted_ios": False, "kernel_entry_seen": entry_seen, "physical_kernel_entry": hex(kernel_entry),
+               "last_translated_blocks": re.findall(r"^0x([0-9a-fA-F]+):", trace_text, re.MULTILINE)[-8:],
                "cpu_model": cpu, "aprr_permissions_enforced": False,
                "counter_frequency": COUNTER_FREQUENCY,
                "first_faults": faults[:12],

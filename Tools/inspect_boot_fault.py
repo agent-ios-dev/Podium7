@@ -36,3 +36,11 @@ if first:
         result.check_returncode()
 else:
     print("No CPU exception captured; inspect the serial output and instruction trace")
+    blocks = re.findall(r"^0x([0-9a-fA-F]+):", trace, re.MULTILINE)
+    if blocks and int(blocks[-1], 16) >= 0xfffffff000000000:
+        address = int(blocks[-1], 16)
+        result = subprocess.run(["xcrun", "llvm-objdump", "--disassemble",
+            f"--start-address={hex(address - 64)}", f"--stop-address={hex(address + 192)}",
+            str(root / "KernelCache.macho")], capture_output=True, text=True)
+        (root / "last-block-disassembly.txt").write_text(result.stdout + result.stderr)
+        result.check_returncode()

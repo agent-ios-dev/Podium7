@@ -81,6 +81,10 @@ static void podium7_research_initfn(Object *obj)
 }
 
 '''
+    # This derived CPU uses Apple encodings that overlap implementation-defined
+    # Cortex controls inherited from max/A57. Override only our named entries.
+    definitions = definitions.replace('.access = PL1_RW, .resetvalue = 0,',
+                                      '.access = PL1_RW, .type = ARM_CP_OVERRIDE, .resetvalue = 0,')
     replace_once(directory / "target/arm/cpu64.c", "static const ARMCPUInfo aarch64_cpus[] = {",
                  definitions + 'static const ARMCPUInfo aarch64_cpus[] = {\n    { .name = "podium7-research", .initfn = podium7_research_initfn },')
     replace_once(directory / "hw/arm/virt.c", '        ARM_CPU_TYPE_NAME("max"),',

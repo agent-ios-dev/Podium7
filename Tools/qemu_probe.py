@@ -134,6 +134,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
     outside_harness_ram_mappings = [line for line in trace_text.splitlines()
                                     if "PODIUM7 KVA-OUTSIDE-HARNESS-RAM" in line]
     aic_transactions = [line for line in trace_text.splitlines() if "PODIUM7 AIC1 " in line]
+    mcc_transactions = [line for line in trace_text.splitlines() if "PODIUM7 MCC " in line]
     wdt_transactions = [line for line in trace_text.splitlines() if "PODIUM7 WDT1 " in line]
     gpio_transactions = [line for line in trace_text.splitlines() if "PODIUM7 GPIO " in line]
     exception_tail = faults[-24:]
@@ -144,6 +145,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
                "first_faults": faults[:12],
                "exception_tail": exception_tail,
                "outside_harness_ram_kernel_mappings": outside_harness_ram_mappings,
+               "mcc_transactions": mcc_transactions[:128],
                "aic_transactions": aic_transactions[:128],
                "watchdog_transactions": wdt_transactions[:128],
                "gpio_transactions": gpio_transactions[:128],

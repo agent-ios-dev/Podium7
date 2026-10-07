@@ -40,6 +40,12 @@ strb w5, [x4]
 ldrb w6, [x4]
 cmp w6, #0x5a
 b.ne failure
+mov x7, #0x482
+lsl x7, x7, #8
+add x7, x3, x7
+ldr x8, [x7]
+cmp x8, #0
+b.ne failure
 mov x0, #0x20
 adr x1, success_exit
 hlt #0xf000
@@ -65,7 +71,8 @@ failure_exit:
             "-semihosting-config", "enable=on,target=native", "-device", f"loader,file={image},cpu-num=0"],
             capture_output=True, text=True, timeout=10)
         report.write_text(json.dumps({"passed": result.returncode == 0, "model": "minimal one-plane MCC",
-            "checks": ["range lock", "locked registers immutable", "guest STRB write rejected", "adjacent guest RAM writable"],
+            "checks": ["range lock", "locked registers immutable", "guest STRB write rejected",
+                       "adjacent guest RAM writable", "64-bit MCC-region MMIO read"],
             "returncode": result.returncode, "stderr": result.stderr}, indent=2))
         if result.returncode != 0:
             raise RuntimeError("MCC guest memory-protection test failed")

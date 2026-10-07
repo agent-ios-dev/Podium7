@@ -228,18 +228,26 @@ typedef struct Podium7MCC {
     MachineState *machine;
     MemoryRegion *memory;
     uint32_t lower, upper;
+    unsigned logged_accesses;
     bool locked;
 } Podium7MCC;
 static uint64_t podium7_mcc_read(void *opaque, hwaddr address, unsigned size)
 {
     Podium7MCC *mcc = opaque;
+    uint64_t value = 0;
     switch (address) {
-    case 0: return 0; /* cache disabled in this minimal controller */
-    case 0x7e4: return mcc->lower;
-    case 0x7e8: return mcc->upper;
-    case 0x7ec: return mcc->locked;
-    default: return 0;
+    case 0: value = 0; break; /* cache disabled in this minimal controller */
+    case 0x7e4: value = mcc->lower; break;
+    case 0x7e8: value = mcc->upper; break;
+    case 0x7ec: value = mcc->locked; break;
+    default: break;
     }
+    if (mcc->logged_accesses < 256) {
+        qemu_log("PODIUM7 MCC read offset=%05" PRIx64 " size=%u value=%016" PRIx64 "\\n",
+                 (uint64_t)address, size, value);
+        mcc->logged_accesses++;
+    }
+    return value;
 }
 static void podium7_mcc_write(void *opaque, hwaddr address, uint64_t value,
                              unsigned size)
@@ -266,7 +274,8 @@ static void podium7_mcc_write(void *opaque, hwaddr address, uint64_t value,
 static const MemoryRegionOps podium7_mcc_ops = {
     .read = podium7_mcc_read, .write = podium7_mcc_write,
     .endianness = DEVICE_LITTLE_ENDIAN,
-    .valid = { .min_access_size = 4, .max_access_size = 4 },
+    .valid = { .min_access_size = 4, .max_access_size = 8 },
+    .impl = { .min_access_size = 4, .max_access_size = 4 },
 };
 static void podium7_mcc_create(MachineState *machine, MemoryRegion *memory)
 {

@@ -51,3 +51,4 @@ jobs:
             .firmware/qemu-serial.txt
             .firmware/qemu-register-checks.json
             .firmware/first-fault-disassembly.txt
+            .firmware/first-fault-strings.txt

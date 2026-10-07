@@ -51,6 +51,7 @@ public final class AArch64CPU {
     public private(set) var overflow = false
     public let memory: any Memory64
     public let researchAPRR: APRRResearchRegisters?
+    public var jit: AArch64BlockJIT?
     public init(memory: any Memory64, entry: UInt64 = LabMemory.ramBase, researchAPRR: APRRResearchRegisters? = nil) {
         self.memory = memory; self.pc = entry; self.researchAPRR = researchAPRR
     }
@@ -177,7 +178,15 @@ public final class AArch64CPU {
         pc = next; retired &+= 1
     }
     public func run(budget: Int = 10000) throws {
-        for _ in 0..<max(0, budget) { if stopped { return }; try step() }
+        let start = retired
+        while retired - start < UInt64(max(0, budget)) {
+            if stopped { return }
+            if let jit, pc & 3 == 0 {
+                let count = jit.execute(memory: memory, pc: pc, registers: &registers, limit: max(0, budget) - Int(retired - start))
+                if count > 0 { pc &+= UInt64(count * 4); retired &+= UInt64(count); continue }
+            }
+            try step()
+        }
         if !stopped { throw MachineFault.budgetExceeded }
     }
 }
@@ -191,9 +200,9 @@ public enum DiagnosticROM {
         }
         return code + [0xd4200000]
     }
-    public static func execute() throws -> (output: String, instructions: UInt64) {
+    public static func execute(jit: AArch64BlockJIT? = nil) throws -> (output: String, instructions: UInt64) {
         let memory = LabMemory(); try memory.load(words())
-        let cpu = AArch64CPU(memory: memory); try cpu.run()
+        let cpu = AArch64CPU(memory: memory); cpu.jit = jit; try cpu.run()
         return (memory.serial, cpu.retired)
     }
 }

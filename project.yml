@@ -9,7 +9,9 @@ targets:
   Podium7:
     type: application
     platform: iOS
-    sources: [App]
+    sources:
+      - path: App
+        excludes: [Podium7.entitlements]
     dependencies:
       - package: Podium7Core
         product: Podium7Core
@@ -23,3 +25,5 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         CODE_SIGNING_ALLOWED: NO
+        CODE_SIGN_ENTITLEMENTS: App/Podium7.entitlements
+        INFOPLIST_KEY_LSApplicationQueriesSchemes: [stikdebug]

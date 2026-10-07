@@ -25,8 +25,9 @@ def patch(directory):
         raise ValueError(f"QEMU commit mismatch: {actual} != {PIN}")
     if subprocess.check_output(["git", "-C", str(directory), "status", "--porcelain"], text=True).strip():
         raise ValueError("refusing to patch a dirty QEMU checkout")
-    replace_once(directory / "target/arm/cpu.h", "typedef struct CPUArchState {",
-                 "typedef struct CPUArchState {\n    uint64_t podium7_aprr[4]; /* research latch state; not full APRR */")
+    # QEMU reserves fieldoffset=0 to mean no backing storage.
+    replace_once(directory / "target/arm/cpu.h", "    uint32_t regs[16];",
+                 "    uint32_t regs[16];\n    uint64_t podium7_aprr[4]; /* research latch state; not full APRR */")
     definitions = '''
 /* Podium7 research CPU. GPL-2.0-or-later.
  * APRR register latches permit bootstrap diagnosis only; no APRR page

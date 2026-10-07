@@ -52,6 +52,16 @@ static void podium7_research_initfn(Object *obj)
                  definitions + 'static const ARMCPUInfo aarch64_cpus[] = {\n    { .name = "podium7-research", .initfn = podium7_research_initfn },')
     replace_once(directory / "hw/arm/virt.c", '        ARM_CPU_TYPE_NAME("max"),',
                  '        ARM_CPU_TYPE_NAME("max"),\n        ARM_CPU_TYPE_NAME("podium7-research"),')
+    # Apple's implementation-defined encodings permit EL1 despite opc1=4.
+    # Narrow this exception to our explicitly named four research controls.
+    replace_once(directory / "target/arm/helper.c", '        assert((r->access & ~mask) == 0);',
+                 '''        if (r->opc0 == 3 && r->opc1 == 4 && r->crn == 15 &&
+            r->crm == 2 && (r->opc2 == 0 || r->opc2 == 1 ||
+                           r->opc2 == 6 || r->opc2 == 7) &&
+            g_str_has_prefix(r->name, "PODIUM7_APRR_LATCH_")) {
+            mask = PL1_RW;
+        }
+        assert((r->access & ~mask) == 0);''')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")
 

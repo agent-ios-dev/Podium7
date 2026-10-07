@@ -50,8 +50,9 @@ public final class AArch64CPU {
     public private(set) var carry = false
     public private(set) var overflow = false
     public let memory: any Memory64
-    public init(memory: any Memory64, entry: UInt64 = LabMemory.ramBase) {
-        self.memory = memory; self.pc = entry
+    public let researchAPRR: APRRResearchRegisters?
+    public init(memory: any Memory64, entry: UInt64 = LabMemory.ramBase, researchAPRR: APRRResearchRegisters? = nil) {
+        self.memory = memory; self.pc = entry; self.researchAPRR = researchAPRR
     }
     private func reg(_ index: Int) -> UInt64 { index == 31 ? 0 : registers[index] }
     private func set(_ index: Int, _ value: UInt64, wide: Bool) {
@@ -98,7 +99,12 @@ public final class AArch64CPU {
         case 0xd503201f: break // NOP
         case 0xd4200000: stopped = true // BRK #0 is the lab's explicit stop convention.
         default:
-            if op & 0xffffffe0 == 0xd5101080 { // MSR OSLAR_EL1, Xt
+            if op & 0xffdfff00 == 0xd51cf200, let researchAPRR {
+                let number = (op >> 5) & 7
+                guard let value = researchAPRR.read(number) else { throw MachineFault.unsupported(pc: pc, opcode: op) }
+                if op & 0x00200000 != 0 { set(rd, value, wide: true) }
+                else { researchAPRR.write(number, value: reg(rd)) }
+            } else if op & 0xffffffe0 == 0xd5101080 { // MSR OSLAR_EL1, Xt
                 debugOSLock = reg(rd) & 1 != 0
             } else if op & 0xfffff0ff == 0xd50340df { // MSR DAIFSet, #imm
                 interruptMask |= UInt8((op >> 8) & 15)

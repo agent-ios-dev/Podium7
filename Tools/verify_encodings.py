@@ -15,6 +15,8 @@ instructions = [
     ("ret", 0xd65f03c0),
     ("cmp x2, x3", 0xeb03005f),
     ("subs x0, x0, #1", 0xf1000400),
+    ("msr S3_4_C15_C2_1, x0", 0xd51cf220),
+    ("mrs x1, S3_4_C15_C2_1", 0xd53cf221),
 ]
 
 with tempfile.TemporaryDirectory() as temporary:

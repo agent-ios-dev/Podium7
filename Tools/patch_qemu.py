@@ -61,6 +61,10 @@ static const ARMCPRegInfo podium7_aprr_regs[] = {
       .opc0 = 3, .opc1 = 0, .crn = 15, .crm = 1, .opc2 = 0,
       .access = PL1_RW, .resetvalue = 0,
       .fieldoffset = offsetof(CPUARMState, podium7_aprr[8]) },
+    { .name = "PODIUM7_PMC0_LATCH", .state = ARM_CP_STATE_AA64,
+      .opc0 = 3, .opc1 = 2, .crn = 15, .crm = 0, .opc2 = 0,
+      .access = PL1_RW, .resetvalue = 0,
+      .fieldoffset = offsetof(CPUARMState, podium7_aprr[9]) },
 };
 static void podium7_research_initfn(Object *obj)
 {

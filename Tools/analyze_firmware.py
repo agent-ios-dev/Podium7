@@ -128,8 +128,9 @@ def macho(data):
     raise ValueError("entry not backed by segment bytes")
 
 
-def device_tree(data):
+def device_tree(data, *, clear_bootloader_flags=False):
     nodes = []
+    prepared = bytearray(data)
     def node(cursor, parent, depth):
         if depth > 64 or cursor + 8 > len(data) or len(nodes) > 10000:
             raise ValueError("device tree bounds/depth exceeded")
@@ -143,6 +144,8 @@ def device_tree(data):
                 raise ValueError("truncated device tree property")
             name = data[cursor:cursor + 32].split(b"\0")[0].decode("ascii")
             size = struct.unpack_from("<I", data, cursor + 32)[0] & 0x7fffffff
+            if clear_bootloader_flags:
+                struct.pack_into("<I", prepared, cursor + 32, size)
             cursor += 36
             if cursor + size > len(data):
                 raise ValueError("truncated property body")
@@ -157,7 +160,7 @@ def device_tree(data):
     consumed = node(0, "", 0)
     if consumed != len(data):
         raise ValueError("trailing device tree data")
-    return nodes
+    return bytes(prepared) if clear_bootloader_flags else nodes
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ import re
 import struct
 import subprocess
 import time
-from analyze_firmware import macho
+from analyze_firmware import macho, device_tree
 
 # Leave QEMU's own DTB/boot reservations intact at the start of virt RAM.
 PHYSICAL_BASE = 0x44000000  # 64 MiB aligned synthetic harness map, not T8010.
@@ -60,7 +60,11 @@ def elf_image(entry, segments):
 
 def make_probe(directory):
     kernel = (directory / "KernelCache.macho").read_bytes()
-    tree = (directory / "DeviceTree.bin").read_bytes()
+    original_tree = (directory / "DeviceTree.bin").read_bytes()
+    tree = device_tree(original_tree, clear_bootloader_flags=True)
+    (directory / "device-tree-preparation.json").write_text(json.dumps({
+        "bootloader_placeholder_flags_cleared": True, "original_bytes": len(original_tree),
+        "prepared_bytes": len(tree), "changed_bytes": sum(a != b for a, b in zip(original_tree, tree))}, indent=2))
     info = macho(kernel)
     regions = [x for x in info["segments"] if x["length"]]
     minimum = min(int(x["address"], 16) for x in regions)

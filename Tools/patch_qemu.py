@@ -478,19 +478,23 @@ static void podium7_wdt_create(MachineState *machine, MemoryRegion *memory)
 
 '''
     gpio = '''
-/* Minimal T8010 GPIO/pinmux/interrupt register bank.
- * The firmware maps the main gpio controller at 0x20f100000. Pin registers
- * are four-byte read/write values; interrupt status registers are W1C. This
- * does not model external pins or deliver GPIO interrupts to the AIC.
+/* Minimal T8010 GPIO/pinmux/interrupt register banks.
+ * Main GPIO has 208 pins at 0x20f100000; AOP GPIO has 42 pins at
+ * 0x2100f0000. Pin registers are four-byte read/write values; interrupt
+ * status registers are W1C. External pins and AIC delivery are not modeled.
  */
 typedef struct Podium7GPIO {
     MemoryRegion io;
+    uint64_t base;
+    unsigned pin_count;
+    unsigned bank_count;
     uint32_t pin_config[208];
     uint32_t irq_status[7][7];
     unsigned logged_accesses;
 } Podium7GPIO;
 
-static bool podium7_gpio_irq_index(hwaddr address, unsigned *group, unsigned *bank)
+static bool podium7_gpio_irq_index(Podium7GPIO *gpio, hwaddr address,
+                                   unsigned *group, unsigned *bank)
 {
     hwaddr offset;
     if (address < 0x800 || address > 0x998 || (address & 3)) {
@@ -499,7 +503,7 @@ static bool podium7_gpio_irq_index(hwaddr address, unsigned *group, unsigned *ba
     offset = address - 0x800;
     *group = offset / 0x40;
     *bank = (offset % 0x40) / 4;
-    return *group < 7 && *bank < 7 && (offset % 0x40) <= 0x18;
+    return *group < 7 && *bank < gpio->bank_count && (offset % 0x40) <= 0x18;
 }
 
 static uint64_t podium7_gpio_read(void *opaque, hwaddr address, unsigned size)
@@ -507,14 +511,14 @@ static uint64_t podium7_gpio_read(void *opaque, hwaddr address, unsigned size)
     Podium7GPIO *gpio = opaque;
     uint32_t value = 0;
     unsigned group, bank;
-    if (address < 208 * 4 && !(address & 3)) {
+    if (address < gpio->pin_count * 4 && !(address & 3)) {
         value = gpio->pin_config[address >> 2];
-    } else if (podium7_gpio_irq_index(address, &group, &bank)) {
+    } else if (podium7_gpio_irq_index(gpio, address, &group, &bank)) {
         value = gpio->irq_status[group][bank];
     }
     if (gpio->logged_accesses < 256) {
-        qemu_log("PODIUM7 GPIO read offset=%03" PRIx64 " value=%08" PRIx32 "\\n",
-                 (uint64_t)address, value);
+        qemu_log("PODIUM7 GPIO base=%016" PRIx64 " read offset=%03" PRIx64
+                 " value=%08" PRIx32 "\\n", gpio->base, (uint64_t)address, value);
         gpio->logged_accesses++;
     }
     return value;
@@ -526,14 +530,14 @@ static void podium7_gpio_write(void *opaque, hwaddr address, uint64_t data,
     Podium7GPIO *gpio = opaque;
     uint32_t value = (uint32_t)data;
     unsigned group, bank;
-    if (address < 208 * 4 && !(address & 3)) {
+    if (address < gpio->pin_count * 4 && !(address & 3)) {
         gpio->pin_config[address >> 2] = value;
-    } else if (podium7_gpio_irq_index(address, &group, &bank)) {
+    } else if (podium7_gpio_irq_index(gpio, address, &group, &bank)) {
         gpio->irq_status[group][bank] &= ~value; /* write-one-to-clear */
     }
     if (gpio->logged_accesses < 256) {
-        qemu_log("PODIUM7 GPIO write offset=%03" PRIx64 " value=%08" PRIx32 "\\n",
-                 (uint64_t)address, value);
+        qemu_log("PODIUM7 GPIO base=%016" PRIx64 " write offset=%03" PRIx64
+                 " value=%08" PRIx32 "\\n", gpio->base, (uint64_t)address, value);
         gpio->logged_accesses++;
     }
 }
@@ -544,12 +548,16 @@ static const MemoryRegionOps podium7_gpio_ops = {
     .valid = { .min_access_size = 4, .max_access_size = 4 },
 };
 
-static void podium7_gpio_create(MachineState *machine, MemoryRegion *memory)
+static void podium7_gpio_create(MachineState *machine, MemoryRegion *memory,
+                                hwaddr base, unsigned pin_count, const char *name)
 {
     Podium7GPIO *gpio = g_new0(Podium7GPIO, 1);
+    gpio->base = base;
+    gpio->pin_count = pin_count;
+    gpio->bank_count = (pin_count + 31) / 32;
     memory_region_init_io(&gpio->io, OBJECT(machine), &podium7_gpio_ops, gpio,
-                          "podium7-t8010-gpio-pinctrl", 0x100000);
-    memory_region_add_subregion(memory, 0x20f100000ULL, &gpio->io);
+                          name, 0x100000);
+    memory_region_add_subregion(memory, base, &gpio->io);
 }
 
 '''
@@ -565,7 +573,10 @@ static void podium7_gpio_create(MachineState *machine, MemoryRegion *memory)
         podium7_mcc_create(machine, sysmem);
         podium7_aic_create(machine, sysmem);
         podium7_wdt_create(machine, sysmem);
-        podium7_gpio_create(machine, sysmem);
+        podium7_gpio_create(machine, sysmem, 0x20f100000ULL, 208,
+                            "podium7-t8010-main-gpio");
+        podium7_gpio_create(machine, sysmem, 0x2100f0000ULL, 42,
+                            "podium7-t8010-aop-gpio");
     }''')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")

@@ -48,6 +48,33 @@ str w5, [x3, #0x820]
 ldr w4, [x3, #0x820]
 cmp w4, #0
 b.ne failure
+mov x3, #0x100f
+lsl x3, x3, #16
+movk x3, #2, lsl #32
+ldr w4, [x3]
+cmp w4, #0
+b.ne failure
+mov w5, #0x42
+str w5, [x3, #0xa4]
+ldr w4, [x3, #0xa4]
+cmp w4, w5
+b.ne failure
+ldr w4, [x3, #0xa8]
+cmp w4, #0
+b.ne failure
+str w5, [x3, #0xa8]
+ldr w4, [x3, #0xa8]
+cmp w4, #0
+b.ne failure
+mov w5, #0xffffffff
+str w5, [x3, #0x800]
+ldr w4, [x3, #0x800]
+cmp w4, #0
+b.ne failure
+str w5, [x3, #0x984]
+ldr w4, [x3, #0x984]
+cmp w4, #0
+b.ne failure
 mov x0, #0x20
 adr x1, success_exit
 hlt #0xf000
@@ -76,8 +103,10 @@ failure_exit:
                    "-monitor", "none", "-serial", "none", "-semihosting-config",
                    "enable=on,target=native", "-device", f"loader,file={image},cpu-num=0"]
         result = subprocess.run(command, capture_output=True, text=True, timeout=10)
-        checks = ["first and last T8010 pin configuration registers", "208-pin range boundary",
+        checks = ["main GPIO first/last pins and 208-pin boundary",
+                  "AOP GPIO first/last pins and 42-pin boundary",
                   "GPIO interrupt status write-one-to-clear for groups 0 and 6",
+                  "AOP GPIO interrupt status groups and reserved pin boundary",
                   "reserved interrupt register gap"]
         passed = result.returncode == 0
         report.write_text(json.dumps({"passed": passed,

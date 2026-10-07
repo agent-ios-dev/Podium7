@@ -29,6 +29,17 @@ def patch(directory):
     replace_once(directory / "target/arm/cpu.h", "    uint32_t regs[16];",
                  "    uint32_t regs[16];\n    uint64_t podium7_aprr[32]; /* fixed research register bank; not full Apple semantics */")
     definitions = '''
+#include "exec/exec-all.h"
+/* KTRR lower/upper are inclusive 16-KiB page bases; lock is sticky until reset. */
+static void podium7_ktrr_write(CPUARMState *env, const ARMCPRegInfo *ri,
+                              uint64_t value)
+{
+    if (env->podium7_aprr[18] & 1) { return; }
+    if (ri->opc2 == 2) { env->podium7_aprr[18] = value & 1; }
+    else if (ri->opc2 == 3) { env->podium7_aprr[16] = value & ~0x3fffULL; }
+    else if (ri->opc2 == 4) { env->podium7_aprr[17] = value & ~0x3fffULL; }
+    tlb_flush(env_cpu(env));
+}
 /* Podium7 research CPU. GPL-2.0-or-later.
  * APRR register latches permit bootstrap diagnosis only; no APRR page
  * permission enforcement yet. Do not describe this as a complete A10 CPU.
@@ -85,6 +96,13 @@ static const ARMCPRegInfo podium7_aprr_regs[] = {
       .access = PL1_RW, .resetvalue = 0,
       .fieldoffset = offsetof(CPUARMState, podium7_aprr[{11 + number}]) }},
 '''
+    for number, name, slot in [(3, "LOWER", 16), (4, "UPPER", 17), (2, "LOCK", 18)]:
+        definitions += f'''    {{ .name = "PODIUM7_KTRR_{name}", .state = ARM_CP_STATE_AA64,
+      .opc0 = 3, .opc1 = 4, .crn = 15, .crm = 2, .opc2 = {number},
+      .access = PL1_RW, .type = ARM_CP_IO | ARM_CP_OVERRIDE, .resetvalue = 0,
+      .writefn = podium7_ktrr_write,
+      .fieldoffset = offsetof(CPUARMState, podium7_aprr[{slot}]) }},
+'''
     definitions += '''};
 static void podium7_research_initfn(Object *obj)
 {
@@ -119,7 +137,30 @@ static void podium7_research_initfn(Object *obj)
             !strcmp(r->name, "PODIUM7_IPI_STATUS_SINGLE_CPU")) {
             mask = PL1_RW;
         }
+        if (r->opc0 == 3 && r->opc1 == 4 && r->crn == 15 &&
+            r->crm == 2 && r->opc2 >= 2 && r->opc2 <= 4 &&
+            g_str_has_prefix(r->name, "PODIUM7_KTRR_")) {
+            mask = PL1_RW;
+        }
         assert((r->access & ~mask) == 0);''')
+    replace_once(directory / "target/arm/ptw.c",
+        '    if (!(result->f.prot & (1 << access_type))) {\n        fi->type = ARMFault_Permission;\n        goto do_fault;\n    }\n\n    /* If FEAT_HAFDBS',
+        '''    if (aarch64 && el == 1 && !regime_is_user(env, mmu_idx) &&
+        (env->podium7_aprr[18] & 1)) {
+        uint64_t lower = env->podium7_aprr[16];
+        uint64_t upper = env->podium7_aprr[17];
+        uint64_t physical = result->f.phys_addr;
+        if (physical < lower || upper < lower ||
+            physical > (upper | 0x3fffULL)) {
+            result->f.prot &= ~PAGE_EXEC;
+        }
+    }
+    if (!(result->f.prot & (1 << access_type))) {
+        fi->type = ARMFault_Permission;
+        goto do_fault;
+    }
+
+    /* If FEAT_HAFDBS''')
     uart = '''
 /* Podium7 polling TX-only Samsung UART research device. GPL-2.0-or-later.
  * Address 0x20a0c0000 and 0x4000 span come from n112ap DeviceTree reg/ranges.

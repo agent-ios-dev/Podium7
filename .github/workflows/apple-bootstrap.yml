@@ -43,6 +43,9 @@ jobs:
       - name: Verify MCC register lock and protected RAM
         timeout-minutes: 1
         run: python3 Tools/check_mcc.py --qemu .qemu/build/qemu-system-aarch64
+      - name: Verify KTRR lock and EL1 instruction permission faults
+        timeout-minutes: 1
+        run: python3 Tools/check_ktrr.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify APRR latches using a real assembler-built guest
         run: python3 Tools/check_qemu_registers.py --qemu .qemu/build/qemu-system-aarch64
       - name: Disassemble the first genuine kernel fault
@@ -66,3 +69,5 @@ jobs:
             .firmware/device-tree-preparation.json
             .firmware/register-check-trace.txt
             .firmware/mcc-checks.json
+            .firmware/ktrr-checks.json
+            .firmware/ktrr-check-trace.txt

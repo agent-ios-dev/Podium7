@@ -30,6 +30,7 @@ def patch(directory):
                  "    uint32_t regs[16];\n    uint64_t podium7_aprr[32]; /* fixed research register bank; not full Apple semantics */")
     definitions = '''
 #include "exec/exec-all.h"
+#include "exec/cputlb.h"
 /* KTRR lower/upper are inclusive 16-KiB page bases; lock is sticky until reset. */
 static void podium7_ktrr_write(CPUARMState *env, const ARMCPRegInfo *ri,
                               uint64_t value)

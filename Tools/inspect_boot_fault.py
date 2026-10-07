@@ -2,9 +2,13 @@
 import pathlib
 import re
 import subprocess
+import sys
 from analyze_firmware import macho
 
 root = pathlib.Path(".firmware")
+if not (root / "qemu-trace.txt").exists():
+    print("No execution trace: backend did not start; inspect the earlier build step")
+    sys.exit(0)
 trace = (root / "qemu-trace.txt").read_text(errors="replace")
 first = re.search(r"Taking exception.*?with ELR (0x[0-9a-f]+)", trace, re.DOTALL)
 if first:

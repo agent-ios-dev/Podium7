@@ -6,6 +6,19 @@ import sys
 import json
 from analyze_firmware import macho
 
+
+def run_diagnostic(command, **kwargs):
+    """Run optional disassembly tools without hiding the primary boot result."""
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, **kwargs)
+        output = result.stdout + result.stderr
+        if result.returncode:
+            output += f"\n(disassembler exited with status {result.returncode})\n"
+        return output
+    except OSError as error:
+        return f"Disassembler unavailable: {error}\n"
+
+
 root = pathlib.Path(".firmware")
 if not (root / "qemu-trace.txt").exists():
     print("No execution trace: backend did not start; inspect the earlier build step")
@@ -62,13 +75,12 @@ if panic:
         code = kernel[source_offset:source_offset + window_end - window_start]
         encoded = "\n".join(" ".join(f"0x{byte:02x}" for byte in code[index:index + 4])
                             for index in range(0, len(code) - 3, 4)) + "\n"
-        result = subprocess.run(["xcrun", "llvm-mc", "--disassemble",
-            "--triple=arm64-apple-ios"], input=encoded, capture_output=True, text=True)
+        disassembly = run_diagnostic(["xcrun", "llvm-mc", "--disassemble",
+            "--triple=arm64-apple-ios"], input=encoded)
         text = (f"Code window starts at {hex(window_start)}; panic instruction at {hex(fault_pc)}\n" +
-                result.stdout + result.stderr)
+                disassembly)
         (root / "panic-disassembly.txt").write_text(text)
         print(text)
-        result.check_returncode()
 
 first = re.search(r"Taking exception.*?with ELR (0x[0-9a-f]+)", trace, re.DOTALL)
 if first:
@@ -94,17 +106,15 @@ if first:
     if address >= 0xfffffff000000000:
         command = ["xcrun", "llvm-objdump", "--disassemble", f"--start-address={hex(address - 64)}",
                    f"--stop-address={hex(address + 256)}", str(root / "KernelCache.macho")]
-        result = subprocess.run(command, capture_output=True, text=True)
-        (root / "first-fault-disassembly.txt").write_text(result.stdout + result.stderr)
-        print(result.stdout + result.stderr)
-        result.check_returncode()
+        disassembly = run_diagnostic(command)
+        (root / "first-fault-disassembly.txt").write_text(disassembly)
+        print(disassembly)
 else:
     print("No CPU exception captured; inspect the serial output and instruction trace")
     blocks = re.findall(r"^0x([0-9a-fA-F]+):", trace, re.MULTILINE)
     if blocks and int(blocks[-1], 16) >= 0xfffffff000000000:
         address = int(blocks[-1], 16)
-        result = subprocess.run(["xcrun", "llvm-objdump", "--disassemble",
+        disassembly = run_diagnostic(["xcrun", "llvm-objdump", "--disassemble",
             f"--start-address={hex(address - 64)}", f"--stop-address={hex(address + 192)}",
-            str(root / "KernelCache.macho")], capture_output=True, text=True)
-        (root / "last-block-disassembly.txt").write_text(result.stdout + result.stderr)
-        result.check_returncode()
+            str(root / "KernelCache.macho")])
+        (root / "last-block-disassembly.txt").write_text(disassembly)

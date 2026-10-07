@@ -52,3 +52,4 @@ jobs:
             .firmware/qemu-register-checks.json
             .firmware/first-fault-disassembly.txt
             .firmware/first-fault-strings.txt
+            .firmware/device-tree-preparation.json

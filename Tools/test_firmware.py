@@ -37,6 +37,16 @@ class FirmwareTests(unittest.TestCase):
             device_tree(struct.pack("<II", 1, 0))
         with self.assertRaises(ValueError):
             device_tree(bytes(9))
+    def test_kernel_handoff_removes_property_placeholder_flag_only(self):
+        prop = b"name" + bytes(28) + struct.pack("<I", 0x80000005) + b"root\0" + bytes(3)
+        original = struct.pack("<II", 1, 0) + prop
+        prepared = device_tree(original, clear_bootloader_flags=True)
+        self.assertEqual(len(original), len(prepared))
+        self.assertEqual(struct.unpack_from("<I", prepared, 40)[0], 5)
+        self.assertEqual(device_tree(original), device_tree(prepared))
+        self.assertEqual(prepared[:40], original[:40])
+        self.assertEqual(prepared[44:], original[44:])
+        self.assertEqual(device_tree(prepared, clear_bootloader_flags=True), prepared)
 
     def test_remote_zip_rejects_negative_seek(self):
         reader = RemoteZIP("https://example.invalid", 10)

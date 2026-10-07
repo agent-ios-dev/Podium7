@@ -619,13 +619,14 @@ static void podium7_aes_create(MachineState *machine, MemoryRegion *memory,
 
 '''
     thermal = '''
-/* Minimal T8010 SoCHot/thermal-sensor register window for XNU bring-up.
- * The DeviceTree aliases sochot1 and tempsensor3-5 onto 0x202f30000. A zeroed,
- * stateful bank allows register discovery only; it does not model temperatures,
- * sensor conversion, interrupts, or thermal policy.
+/* Minimal T8010 thermal register windows for XNU bring-up.
+ * sochot1 and tempsensor3-5 share 0x202f30000; tempsensor0-2 share 0x20e0bc000.
+ * Zeroed, stateful banks allow register discovery only; they do not model
+ * temperatures, sensor conversion, interrupts, or thermal policy.
  */
 typedef struct Podium7Thermal {
     MemoryRegion io;
+    uint64_t base;
     uint32_t registers[0x2000];
     unsigned logged_accesses;
 } Podium7Thermal;
@@ -635,9 +636,9 @@ static uint64_t podium7_thermal_read(void *opaque, hwaddr address, unsigned size
     Podium7Thermal *thermal = opaque;
     uint32_t value = thermal->registers[address >> 2];
     if (thermal->logged_accesses < 256) {
-        qemu_log("PODIUM7 THERMAL read offset=%04" PRIx64
+        qemu_log("PODIUM7 THERMAL base=%016" PRIx64 " read offset=%04" PRIx64
                  " size=%u value=%08" PRIx32 "\\n",
-                 (uint64_t)address, size, value);
+                 thermal->base, (uint64_t)address, size, value);
         thermal->logged_accesses++;
     }
     return value;
@@ -650,9 +651,9 @@ static void podium7_thermal_write(void *opaque, hwaddr address, uint64_t data,
     uint32_t value = (uint32_t)data;
     thermal->registers[address >> 2] = value;
     if (thermal->logged_accesses < 256) {
-        qemu_log("PODIUM7 THERMAL write offset=%04" PRIx64
+        qemu_log("PODIUM7 THERMAL base=%016" PRIx64 " write offset=%04" PRIx64
                  " size=%u value=%08" PRIx32 "\\n",
-                 (uint64_t)address, size, value);
+                 thermal->base, (uint64_t)address, size, value);
         thermal->logged_accesses++;
     }
 }
@@ -664,12 +665,23 @@ static const MemoryRegionOps podium7_thermal_ops = {
     .impl = { .min_access_size = 4, .max_access_size = 4 },
 };
 
-static void podium7_thermal_create(MachineState *machine, MemoryRegion *memory)
+static void podium7_thermal_bank_create(MachineState *machine, MemoryRegion *memory,
+                                        hwaddr base, const char *name)
 {
     Podium7Thermal *thermal = g_new0(Podium7Thermal, 1);
+    thermal->base = base;
     memory_region_init_io(&thermal->io, OBJECT(machine), &podium7_thermal_ops,
-                          thermal, "podium7-t8010-sochot-thermal", 0x8000);
-    memory_region_add_subregion(memory, 0x202f30000ULL, &thermal->io);
+                          thermal, name, 0x8000);
+    memory_region_add_subregion(memory, base, &thermal->io);
+}
+
+static void podium7_thermal_create(MachineState *machine, MemoryRegion *memory)
+{
+    podium7_thermal_bank_create(machine, memory, 0x202f30000ULL,
+                                "podium7-t8010-sochot-thermal");
+    /* tempsensor0-2 share this 0x8000-byte window in the iPod9,1 DeviceTree. */
+    podium7_thermal_bank_create(machine, memory, 0x20e0bc000ULL,
+                                "podium7-t8010-temperature-sensors");
 }
 
 '''

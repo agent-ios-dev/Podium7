@@ -1,4 +1,4 @@
-"""Exercise the T8010 SoCHot/thermal sensor window with an ARM64 guest."""
+"""Exercise T8010 SoCHot and iPod9,1 temperature sensor windows."""
 import argparse
 import json
 import pathlib
@@ -27,6 +27,22 @@ mov w5, #0x7f
 str x5, [x3, #0x7ff8]
 ldr x4, [x3, #0x7ff8]
 cmp x4, x5
+b.ne failure
+movz x3, #0xc000
+movk x3, #0x0e0b, lsl #16
+movk x3, #2, lsl #32
+ldr w4, [x3, #0x12c]
+cmp w4, #0
+b.ne failure
+mov w5, #0x5678
+str w5, [x3, #0x12c]
+ldr w4, [x3, #0x12c]
+cmp w4, w5
+b.ne failure
+mov w5, #0x7f
+str w5, [x3, #0x7ffc]
+ldr w4, [x3, #0x7ffc]
+cmp w4, w5
 b.ne failure
 mov x0, #0x20
 adr x1, success_exit
@@ -57,9 +73,11 @@ failure_exit:
             f"loader,file={image},cpu-num=0"], capture_output=True, text=True, timeout=10)
         passed = result.returncode == 0
         report.write_text(json.dumps({"passed": passed,
-            "model": "T8010 SoCHot/thermal register backing store",
-            "checks": ["64-bit read/write at failing offset 0x470",
-                       "64-bit read/write at end of 0x8000-byte window"],
+            "model": "T8010 SoCHot and shared temperature-sensor register banks",
+            "checks": ["SoCHot 64-bit read/write at offset 0x470",
+                       "SoCHot 64-bit read/write within its 0x8000-byte window",
+                       "tempsensor0-2 32-bit read/write at XNU fault offset 0x12c",
+                       "tempsensor0-2 32-bit read/write at end of its 0x8000-byte window"],
             "returncode": result.returncode, "stdout": result.stdout,
             "stderr": result.stderr}, indent=2))
         if not passed:
@@ -70,6 +88,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--qemu", required=True)
     parser.add_argument("--report", type=pathlib.Path,
-                        default=pathlib.Path(".firmware/sochot-checks.json"))
+                        default=pathlib.Path(".firmware/thermal-sensor-checks.json"))
     arguments = parser.parse_args()
     check(arguments.qemu, arguments.report)

@@ -46,7 +46,7 @@ jobs:
         run: python3 Tools/check_gpio.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify T8010 AES register windows
         run: python3 Tools/check_aes.py --qemu .qemu/build/qemu-system-aarch64
-      - name: Verify T8010 thermal sensor register window
+      - name: Verify T8010 SoCHot and temperature sensor register windows
         run: python3 Tools/check_sochot.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify T8010 OTG PHY register windows
         run: python3 Tools/check_usbphy.py --qemu .qemu/build/qemu-system-aarch64
@@ -87,7 +87,7 @@ jobs:
             .firmware/wdt-checks.json
             .firmware/gpio-checks.json
             .firmware/aes-checks.json
-            .firmware/sochot-checks.json
+            .firmware/thermal-sensor-checks.json
             .firmware/usbphy-checks.json
             .firmware/ktrr-checks.json
             .firmware/ktrr-check-trace.txt

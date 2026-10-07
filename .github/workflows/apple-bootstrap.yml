@@ -1,5 +1,11 @@
 name: Probe Apple bootstrap with explicit research register model
-on: [workflow_dispatch]
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Tools/**'
+      - '.github/workflows/apple-bootstrap.yml'
 jobs:
   bootstrap:
     runs-on: macos-15

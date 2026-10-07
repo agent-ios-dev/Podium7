@@ -24,9 +24,9 @@ ldr x4, [x3, #0x470]
 cmp x4, x5
 b.ne failure
 mov w5, #0x7f
-str w5, [x3, #0x7ffc]
-ldr w4, [x3, #0x7ffc]
-cmp w4, w5
+str x5, [x3, #0x7ff8]
+ldr x4, [x3, #0x7ff8]
+cmp x4, x5
 b.ne failure
 mov x0, #0x20
 adr x1, success_exit
@@ -59,7 +59,7 @@ failure_exit:
         report.write_text(json.dumps({"passed": passed,
             "model": "T8010 SoCHot/thermal register backing store",
             "checks": ["64-bit read/write at failing offset 0x470",
-                       "32-bit read/write at end of 0x8000-byte window"],
+                       "64-bit read/write at end of 0x8000-byte window"],
             "returncode": result.returncode, "stdout": result.stdout,
             "stderr": result.stderr}, indent=2))
         if not passed:

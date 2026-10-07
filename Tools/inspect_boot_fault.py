@@ -21,29 +21,53 @@ panic = re.search(r"panic\(cpu\s+(\d+).*?\):\s*(.*?)\s+at pc\s+(0x[0-9a-fA-F]+),
 if panic:
     fault_pc = int(panic.group(3), 16)
     state = panic.group("state")
-    values = {name.lower(): "0x" + value.lower() for name, value in
+    values = {name.lower(): value.lower() for name, value in
               re.findall(r"\b(x\d+|fp|lr|sp|pc|cpsr|esr|far):\s*(0x[0-9a-fA-F]+)", state)}
     kernel_path = root / "KernelCache.macho"
     report = {"cpu": int(panic.group(1)), "reason": panic.group(2),
               "panic_pc": hex(fault_pc), "panic_lr": panic.group(4).lower(),
               "registers": values}
     if kernel_path.exists():
-        segments = macho(kernel_path.read_bytes())["segments"]
+        kernel = kernel_path.read_bytes()
+        segments = macho(kernel)["segments"]
         for segment in segments:
             base = int(segment["address"], 16)
             if base <= fault_pc < base + segment["length"]:
                 report["segment"] = segment["name"]
                 report["segment_offset"] = hex(fault_pc - base)
                 report["file_backed"] = fault_pc < base + segment["file_size"]
+                if fault_pc < base + segment["file_size"]:
+                    file_offset = segment["offset"] + fault_pc - base
+                    word = int.from_bytes(kernel[file_offset:file_offset + 4], "little")
+                    report["instruction_word"] = hex(word)
+                    if word & 0xffe00c00 == 0xb8600800:
+                        rt, rn, rm = word & 31, (word >> 5) & 31, (word >> 16) & 31
+                        option, scaled = (word >> 13) & 7, (word >> 12) & 1
+                        extension = {2: "uxtw", 3: "uxtx", 6: "sxtw", 7: "sxtx"}
+                        modifier = f", #{(word >> 30) & 3}" if scaled else ""
+                        report["decoded_instruction"] = (
+                            f"ldr w{rt}, [x{rn}, {('w' if option in (2, 6) else 'x')}{rm}, "
+                            f"{extension.get(option, 'option-' + str(option))}{modifier}]"
+                        )
                 break
     (root / "panic-context.json").write_text(json.dumps(report, indent=2))
     print(json.dumps(report, indent=2))
-    if fault_pc >= 0xfffffff000000000:
-        result = subprocess.run(["xcrun", "llvm-objdump", "--disassemble",
-            f"--start-address={hex(fault_pc - 32)}", f"--stop-address={hex(fault_pc + 96)}",
-            str(kernel_path)], capture_output=True, text=True)
-        (root / "panic-disassembly.txt").write_text(result.stdout + result.stderr)
-        print(result.stdout + result.stderr)
+    if fault_pc >= 0xfffffff000000000 and kernel_path.exists() and "segment" in report:
+        segment = next(item for item in segments if item["name"] == report["segment"] and
+                       int(item["address"], 16) <= fault_pc < int(item["address"], 16) + item["length"])
+        base = int(segment["address"], 16)
+        window_start = max(base, fault_pc - 32) & ~3
+        window_end = min(base + segment["file_size"], fault_pc + 96) & ~3
+        source_offset = segment["offset"] + window_start - base
+        code = kernel[source_offset:source_offset + window_end - window_start]
+        encoded = "\n".join(" ".join(f"0x{byte:02x}" for byte in code[index:index + 4])
+                            for index in range(0, len(code) - 3, 4)) + "\n"
+        result = subprocess.run(["xcrun", "llvm-mc", "--disassemble",
+            "--triple=arm64-apple-ios"], input=encoded, capture_output=True, text=True)
+        text = (f"Code window starts at {hex(window_start)}; panic instruction at {hex(fault_pc)}\n" +
+                result.stdout + result.stderr)
+        (root / "panic-disassembly.txt").write_text(text)
+        print(text)
         result.check_returncode()
 
 first = re.search(r"Taking exception.*?with ELR (0x[0-9a-f]+)", trace, re.DOTALL)

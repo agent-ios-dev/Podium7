@@ -116,8 +116,10 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
         while process.poll() is None:
             deadline = time.monotonic() - start > 30
             full_trace = trace.exists() and trace.stat().st_size > 16 * 1024 * 1024
-            if deadline or full_trace:
-                stop = "30-second execution deadline reached" if deadline else "16-MiB trace limit reached"
+            panic_seen = b"panic(cpu " in serial.read_bytes()
+            if deadline or full_trace or panic_seen:
+                stop = ("XNU panic captured" if panic_seen else
+                        "30-second execution deadline reached" if deadline else "16-MiB trace limit reached")
                 process.terminate()
                 try:
                     process.wait(timeout=3)
@@ -129,13 +131,15 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
     trace_text = trace.read_text(errors="replace") if trace.exists() else ""
     entry_seen = any(int(address, 16) == kernel_entry for address in re.findall(r"^0x([0-9a-fA-F]+):", trace_text, re.MULTILINE))
     faults = [line for line in trace_text.splitlines() if "exception" in line.lower() or "unimplemented" in line.lower() or "unallocated" in line.lower() or "unsupported" in line.lower()]
+    out_of_ram_mappings = [line for line in trace_text.splitlines() if "PODIUM7 KVA-OUT-OF-RAM" in line]
     exception_tail = faults[-24:]
     summary = {"booted_ios": False, "kernel_entry_seen": entry_seen, "physical_kernel_entry": hex(kernel_entry),
                "last_translated_blocks": re.findall(r"^0x([0-9a-fA-F]+):", trace_text, re.MULTILINE)[-8:],
                "cpu_model": cpu, "aprr_permissions_enforced": False,
                "counter_frequency": COUNTER_FREQUENCY,
                "first_faults": faults[:12],
-               "exception_tail": exception_tail, "backend": version, "board": "QEMU virt bootstrap experiment, not T8010",
+               "exception_tail": exception_tail, "out_of_ram_kernel_mappings": out_of_ram_mappings,
+               "backend": version, "board": "QEMU virt bootstrap experiment, not T8010",
                "physical_ram_base": hex(PHYSICAL_BASE), "command": command, "stop": stop,
                "returncode": process.returncode, "seconds": time.monotonic() - start,
                "console_tail": serial.read_text(errors="replace")[-4096:],

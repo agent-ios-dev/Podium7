@@ -165,6 +165,19 @@ static void podium7_research_initfn(Object *obj)
     replace_once(directory / "target/arm/ptw.c",
         '    result->f.lg_page_size = ctz64(page_size);\n    return false;',
         '''    result->f.lg_page_size = ctz64(page_size);
+    /* Record only kernel-heap virtual mappings that leave this harness's RAM.
+     * This makes external aborts diagnosable without flooding the trace. */
+    static unsigned podium7_out_of_ram_mappings;
+    if ((env->podium7_aprr[18] & 1) &&
+        address >= 0xffffffe000000000ULL && address < 0xfffffff000000000ULL &&
+        (descaddr < 0x40000000ULL || descaddr >= 0xc0000000ULL) &&
+        podium7_out_of_ram_mappings < 512) {
+        qemu_log_mask(CPU_LOG_GUEST_ERROR,
+            "PODIUM7 KVA-OUT-OF-RAM va=%016" PRIx64 " pa=%016" PRIx64
+            " page-size=%" PRIu64 "\\n",
+            (uint64_t)address, (uint64_t)descaddr, (uint64_t)page_size);
+        podium7_out_of_ram_mappings++;
+    }
     if (aarch64 && el == 1 && !regime_is_user(env, mmu_idx) &&
         (env->podium7_aprr[18] & 1)) {
         result->f.lg_page_size = MIN(result->f.lg_page_size, 14);

@@ -1,9 +1,18 @@
 import struct
 import unittest
-from qemu_probe import boot_args, elf_image, PHYSICAL_BASE, RAM_SIZE
+from qemu_probe import boot_args, elf_image, PHYSICAL_BASE, RAM_SIZE, virtual_base_for_kernel
 
 
 class QEMUProbeTests(unittest.TestCase):
+    def test_kernel_base_covers_lower_prelinked_and_upper_text_segments(self):
+        base = virtual_base_for_kernel(0xfffffff0054e4000, 0xfffffff007dd0000)
+        self.assertEqual(base, 0xfffffff004000000)
+        for address in [0xfffffff005b0c500, 0xfffffff0071904e8]:
+            physical = PHYSICAL_BASE + address - base
+            self.assertEqual(physical & 0x1ffffff, address & 0x1ffffff)
+            self.assertEqual(base + physical - PHYSICAL_BASE, address)
+        with self.assertRaises(ValueError):
+            virtual_base_for_kernel(0xfffffff0054e4000, 0xfffffff007dd0000, 0x42000000)
     def test_boot_args_ios15_layout(self):
         args = boot_args(0xfffffff0054e4000, 0xfffffff007d00000, 1234, 0x48000000)
         self.assertEqual(len(args), 736)

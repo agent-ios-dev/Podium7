@@ -14,12 +14,22 @@ import time
 from analyze_firmware import macho
 
 # Leave QEMU's own DTB/boot reservations intact at the start of virt RAM.
-PHYSICAL_BASE = 0x42000000  # Synthetic harness map, deliberately not T8010.
-RAM_SIZE = 2 * 1024 * 1024 * 1024 - 0x02000000
+PHYSICAL_BASE = 0x44000000  # 64 MiB aligned synthetic harness map, not T8010.
+RAM_SIZE = 2 * 1024 * 1024 * 1024 - 0x04000000
 
 
 def align(value):
     return (value + 0x3fff) & ~0x3fff
+
+
+def virtual_base_for_kernel(minimum, maximum, physical_base=PHYSICAL_BASE):
+    if not 0 <= minimum < maximum <= 0xffffffffffffffff or physical_base <= 0:
+        raise ValueError("invalid kernel/RAM bounds")
+    alignment = physical_base & -physical_base
+    base = minimum & ~(alignment - 1)
+    if maximum - base > alignment:
+        raise ValueError("physical base alignment does not cover the kernel virtual span")
+    return base
 
 
 def boot_args(virtual_base, tree_address, tree_size, top):
@@ -55,10 +65,11 @@ def make_probe(directory):
     regions = [x for x in info["segments"] if x["length"]]
     minimum = min(int(x["address"], 16) for x in regions)
     maximum = max(int(x["address"], 16) + x["length"] for x in regions)
-    if maximum - minimum > RAM_SIZE // 2:
+    virtual_base = virtual_base_for_kernel(minimum, maximum)
+    if maximum - virtual_base > RAM_SIZE // 2:
         raise ValueError("kernel layout exceeds harness budget")
-    entry = int(info["entry"], 16) - minimum + PHYSICAL_BASE
-    stub_address = align(maximum - minimum + PHYSICAL_BASE)
+    entry = int(info["entry"], 16) - virtual_base + PHYSICAL_BASE
+    stub_address = align(maximum - virtual_base + PHYSICAL_BASE)
     args_address = stub_address + 0x4000
     tree_address = args_address + 0x4000
     top = align(tree_address + len(tree))
@@ -67,10 +78,10 @@ def make_probe(directory):
             0xd2800001 | ((entry & 0xffff) << 5),
             0xf2a00001 | (((entry >> 16) & 0xffff) << 5),
             0xd61f0020]  # mov x0, boot_args; mov x1, entry; br x1
-    segments = [(int(x["address"], 16) - minimum + PHYSICAL_BASE, x["length"],
+    segments = [(int(x["address"], 16) - virtual_base + PHYSICAL_BASE, x["length"],
                  kernel[x["offset"]:x["offset"] + x["file_size"]]) for x in regions]
     segments += [(stub_address, 0x4000, b"".join(struct.pack("<I", x) for x in stub)),
-                 (args_address, 0x4000, boot_args(minimum, minimum + tree_address - PHYSICAL_BASE, len(tree), top)),
+                 (args_address, 0x4000, boot_args(virtual_base, virtual_base + tree_address - PHYSICAL_BASE, len(tree), top)),
                  (tree_address, align(len(tree)), tree)]
     destination = directory / "qemu-kernel-probe.elf"
     destination.write_bytes(elf_image(stub_address, segments))

@@ -93,7 +93,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
     trace, serial = directory / "qemu-trace.txt", directory / "qemu-serial.txt"
     command = [executable, "-machine", "virt,secure=off,virtualization=off", "-cpu", cpu, "-accel", "tcg",
                "-m", "2048", "-smp", "1", "-display", "none", "-monitor", "none", "-serial", "stdio",
-               "-device", f"loader,file={image},cpu-num=0", "-d", "in_asm,int,guest_errors,unimp", "-D", str(trace)]
+               "-device", f"loader,file={image},cpu-num=0", "-d", "in_asm,cpu,int,guest_errors,unimp", "-D", str(trace)]
     version = subprocess.check_output([executable, "--version"], text=True).splitlines()[0]
     with serial.open("wb") as output:
         process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT)

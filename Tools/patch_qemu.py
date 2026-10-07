@@ -406,10 +406,72 @@ static void podium7_aic_create(MachineState *machine, MemoryRegion *memory)
 }
 
 '''
+    wdt = '''
+/* Minimal Apple SoC watchdog register bank for the T8010 bootstrap.
+ * The Apple watchdog has WD0/WD1/WD2 counter, bite-time, and control registers.
+ * Counters are intentionally inert in this bring-up model, so an incompletely
+ * emulated watchdog cannot reset the guest while the rest of the SoC is absent.
+ */
+typedef struct Podium7WDT {
+    MemoryRegion io;
+    uint32_t regs[12];
+    unsigned logged_accesses;
+} Podium7WDT;
+
+static uint64_t podium7_wdt_read(void *opaque, hwaddr address, unsigned size)
+{
+    Podium7WDT *wdt = opaque;
+    uint32_t value = 0;
+    if (address <= 0x2c && !(address & 3) && address != 0x18 && address != 0x28) {
+        value = wdt->regs[address >> 2];
+    }
+    if (wdt->logged_accesses < 256) {
+        qemu_log("PODIUM7 WDT1 read offset=%02" PRIx64 " value=%08" PRIx32 "\\n",
+                 (uint64_t)address, value);
+        wdt->logged_accesses++;
+    }
+    return value;
+}
+
+static void podium7_wdt_write(void *opaque, hwaddr address, uint64_t data,
+                              unsigned size)
+{
+    Podium7WDT *wdt = opaque;
+    uint32_t value = (uint32_t)data;
+    if (address <= 0x2c && !(address & 3) && address != 0x18 && address != 0x28) {
+        if (address == 0x0c || address == 0x1c || address == 0x2c) {
+            /* IRQ_STATUS is write-one-to-clear; only IRQ_EN and RESET_EN persist. */
+            wdt->regs[address >> 2] = value & 0x5;
+        } else {
+            wdt->regs[address >> 2] = value;
+        }
+    }
+    if (wdt->logged_accesses < 256) {
+        qemu_log("PODIUM7 WDT1 write offset=%02" PRIx64 " value=%08" PRIx32 "\\n",
+                 (uint64_t)address, value);
+        wdt->logged_accesses++;
+    }
+}
+
+static const MemoryRegionOps podium7_wdt_ops = {
+    .read = podium7_wdt_read, .write = podium7_wdt_write,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+    .valid = { .min_access_size = 4, .max_access_size = 4 },
+};
+
+static void podium7_wdt_create(MachineState *machine, MemoryRegion *memory)
+{
+    Podium7WDT *wdt = g_new0(Podium7WDT, 1);
+    memory_region_init_io(&wdt->io, OBJECT(machine), &podium7_wdt_ops, wdt,
+                          "podium7-apple-wdt-register-bank", 0x4000);
+    memory_region_add_subregion(memory, 0x2102b0000ULL, &wdt->io);
+}
+
+'''
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + "static void machvirt_init(MachineState *machine)")
     replace_once(directory / "hw/arm/virt.c",
                  "    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);",
                  '''    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);
@@ -417,6 +479,7 @@ static void podium7_aic_create(MachineState *machine, MemoryRegion *memory)
         podium7_uart_create(machine, sysmem);
         podium7_mcc_create(machine, sysmem);
         podium7_aic_create(machine, sysmem);
+        podium7_wdt_create(machine, sysmem);
     }''')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")

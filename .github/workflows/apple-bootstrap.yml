@@ -40,6 +40,8 @@ jobs:
           ninja qemu-system-aarch64
       - name: Verify T8010 AIC v1 MMIO model
         run: python3 Tools/check_aic.py --qemu .qemu/build/qemu-system-aarch64
+      - name: Verify Apple watchdog MMIO model
+        run: python3 Tools/check_wdt.py --qemu .qemu/build/qemu-system-aarch64
       - name: Execute original kernel and retain the next failure
         run: python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research
       - name: Verify MCC register lock and protected RAM
@@ -74,5 +76,6 @@ jobs:
             .firmware/register-check-trace.txt
             .firmware/mcc-checks.json
             .firmware/aic-checks.json
+            .firmware/wdt-checks.json
             .firmware/ktrr-checks.json
             .firmware/ktrr-check-trace.txt

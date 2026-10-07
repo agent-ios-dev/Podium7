@@ -1,0 +1,2 @@
+panic(cpu 0 caller 0xfffffff00780f260): arm_init: Unable to find 'dram-base' entry in the 'chosen' DT node @arm_init.c:645
+qemu-system-aarch64: terminating on signal 15 from pid 5684 (<unknown process>)

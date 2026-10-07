@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "checks": "reset, register independence and read/write, APRR, HID0/1/4/5, LSU_ERR_CTL, PMC0/1 and PMCR0..4 latches, UART TX",
+  "aprr_permissions_enforced": false,
+  "timed_out": false,
+  "returncode": 0,
+  "stdout": "Podium7 UART OK\n",
+  "stderr": ""
+}

@@ -56,6 +56,30 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
                 else:
                     properties[existing] = (properties[existing][0], encoded_value)
                 changes.append({"path": path, "property": name.decode(), "value": hex(value), "source": "QEMU virt RAM"})
+        # Minimal one-plane MCC model, using A10 RoRgn offsets documented by
+        # hardware research and the n112ap mcc physical aperture. This is not
+        # a claim that all real A10 memory planes/cache hardware are modeled.
+        handoff = {}
+        if path.endswith("/chosen/lock-regs/amcc"):
+            handoff = {"aperture-count": (1, 4), "aperture-size": (0x300000, 4),
+                "plane-count": (1, 4), "plane-stride": (0, 4),
+                "aperture-phys-addr": (0x200000000, 8), "cache-status-reg-offset": (0, 4),
+                "cache-status-reg-mask": (1, 4), "cache-status-reg-value": (0, 4)}
+        elif path.endswith("/chosen/lock-regs/amcc/amcc-ctrr-a"):
+            handoff = {"page-size-shift": (14, 4), "lower-limit-reg-offset": (0x7e4, 4),
+                "lower-limit-reg-mask": (0xffffffff, 4), "upper-limit-reg-offset": (0x7e8, 4),
+                "upper-limit-reg-mask": (0xffffffff, 4), "lock-reg-offset": (0x7ec, 4),
+                "lock-reg-mask": (1, 4), "lock-reg-value": (1, 4)}
+        for name, (value, width) in handoff.items():
+            raw_name = name.encode()
+            encoded_value = value.to_bytes(width, "little")
+            existing = next((i for i, (key, _) in enumerate(properties) if key.split(b"\0")[0] == raw_name), None)
+            if existing is None:
+                properties.append((raw_name.ljust(32, b"\0"), encoded_value))
+            else:
+                properties[existing] = (properties[existing][0], encoded_value)
+        if handoff:
+            changes.append({"path": path, "source": "minimal one-plane research MCC model", "properties": list(handoff)})
         encoded = [struct.pack("<II", len(properties), children)]
         for name, value in properties:
             encoded += [name, struct.pack("<I", len(value)), value, bytes((-len(value)) & 3)]

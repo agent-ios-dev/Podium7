@@ -148,6 +148,64 @@ static void podium7_uart_create(MachineState *machine, MemoryRegion *memory)
     memory_region_add_subregion(memory, 0x20a0c0000ULL, &uart->region);
 }
 
+/* Minimal one-plane A10 MCC RoRgn research model. GPL-2.0-or-later.
+ * Offsets: published A10 RoRgn base/end/lock. Aperture: n112ap mcc DT.
+ * No cache timing, multiple planes or CPU KTRR execute enforcement yet.
+ */
+typedef struct Podium7MCC {
+    MemoryRegion io, protected_alias;
+    MachineState *machine;
+    MemoryRegion *memory;
+    uint32_t lower, upper;
+    bool locked;
+} Podium7MCC;
+static uint64_t podium7_mcc_read(void *opaque, hwaddr address, unsigned size)
+{
+    Podium7MCC *mcc = opaque;
+    switch (address) {
+    case 0: return 0; /* cache disabled in this minimal controller */
+    case 0x7e4: return mcc->lower;
+    case 0x7e8: return mcc->upper;
+    case 0x7ec: return mcc->locked;
+    default: return 0;
+    }
+}
+static void podium7_mcc_write(void *opaque, hwaddr address, uint64_t value,
+                             unsigned size)
+{
+    Podium7MCC *mcc = opaque;
+    if (mcc->locked) { return; }
+    if (address == 0x7e4) { mcc->lower = value; }
+    else if (address == 0x7e8) { mcc->upper = value; }
+    else if (address == 0x7ec && (value & 1)) {
+        uint64_t offset = (uint64_t)mcc->lower << 14;
+        uint64_t end = ((uint64_t)mcc->upper + 1) << 14;
+        if (end <= offset || end > mcc->machine->ram_size) {
+            error_report("Podium7 MCC: invalid protected range; refusing lock");
+            return;
+        }
+        memory_region_init_alias(&mcc->protected_alias, OBJECT(mcc->machine),
+            "podium7-mcc-readonly", mcc->machine->ram, offset, end - offset);
+        memory_region_set_readonly(&mcc->protected_alias, true);
+        memory_region_add_subregion_overlap(mcc->memory, 0x40000000ULL + offset,
+            &mcc->protected_alias, 1);
+        mcc->locked = true;
+    }
+}
+static const MemoryRegionOps podium7_mcc_ops = {
+    .read = podium7_mcc_read, .write = podium7_mcc_write,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+    .valid = { .min_access_size = 4, .max_access_size = 4 },
+};
+static void podium7_mcc_create(MachineState *machine, MemoryRegion *memory)
+{
+    Podium7MCC *mcc = g_new0(Podium7MCC, 1);
+    mcc->machine = machine; mcc->memory = memory;
+    memory_region_init_io(&mcc->io, OBJECT(machine), &podium7_mcc_ops, mcc,
+        "podium7-mcc-one-plane", 0x300000);
+    memory_region_add_subregion(memory, 0x200000000ULL, &mcc->io);
+}
+
 '''
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
                  uart + "static void machvirt_init(MachineState *machine)")
@@ -156,6 +214,7 @@ static void podium7_uart_create(MachineState *machine, MemoryRegion *memory)
                  '''    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);
     if (!strcmp(machine->cpu_type, ARM_CPU_TYPE_NAME("podium7-research"))) {
         podium7_uart_create(machine, sysmem);
+        podium7_mcc_create(machine, sysmem);
     }''')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")

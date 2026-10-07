@@ -40,6 +40,9 @@ jobs:
           ninja qemu-system-aarch64
       - name: Execute original kernel and retain the next failure
         run: python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research
+      - name: Verify MCC register lock and protected RAM
+        timeout-minutes: 1
+        run: python3 Tools/check_mcc.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify APRR latches using a real assembler-built guest
         run: python3 Tools/check_qemu_registers.py --qemu .qemu/build/qemu-system-aarch64
       - name: Disassemble the first genuine kernel fault
@@ -62,3 +65,4 @@ jobs:
             .firmware/last-block-disassembly.txt
             .firmware/device-tree-preparation.json
             .firmware/register-check-trace.txt
+            .firmware/mcc-checks.json

@@ -172,7 +172,7 @@ static void podium7_research_initfn(Object *obj)
         address >= 0xffffffe000000000ULL && address < 0xfffffff000000000ULL &&
         (descaddr < 0x40000000ULL || descaddr >= 0xc0000000ULL) &&
         podium7_out_of_ram_mappings < 512) {
-        qemu_log_mask(CPU_LOG_UNIMP,
+        qemu_log(
             "PODIUM7 KVA-OUT-OF-RAM va=%016" PRIx64 " pa=%016" PRIx64
             " page-size=%" PRIu64 "\\n",
             (uint64_t)address, (uint64_t)descaddr, (uint64_t)page_size);

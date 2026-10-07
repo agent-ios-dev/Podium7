@@ -35,17 +35,23 @@ str w5, [x3, #0x3000]
 ldr w4, [x3, #0x3000]
 cmp w4, #1
 b.ne failure
-ldr w4, [x3, #0x4100]
+add x7, x3, #4, lsl #12
+add x7, x7, #0x100
+ldr w4, [x7]
 cmn w4, #1
 b.ne failure
-str w5, [x3, #0x4180]
-ldr w4, [x3, #0x4100]
+add x7, x7, #0x80
+str w5, [x7]
+sub x7, x7, #0x80
+ldr w4, [x7]
 mov w6, #0xfffe
 movk w6, #0xffff, lsl #16
 cmp w4, w6
 b.ne failure
-str w5, [x3, #0x4000]
-ldr w4, [x3, #0x4200]
+sub x7, x7, #0x100
+str w5, [x7]
+add x7, x7, #0x200
+ldr w4, [x7]
 cmp w4, #1
 b.ne failure
 ldr w4, [x3, #0x2004]
@@ -54,8 +60,10 @@ b.ne failure
 ldr w4, [x3, #0x2004]
 cmp w4, #0
 b.ne failure
-str w5, [x3, #0x4080]
-ldr w4, [x3, #0x4200]
+sub x7, x7, #0x180
+str w5, [x7]
+add x7, x7, #0x180
+ldr w4, [x7]
 cmp w4, #0
 b.ne failure
 mov x0, #0x20

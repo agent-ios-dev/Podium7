@@ -73,7 +73,16 @@ static const ARMCPRegInfo podium7_aprr_regs[] = {
       .opc0 = 3, .opc1 = 1, .crn = 15, .crm = 0, .opc2 = 0,
       .access = PL1_RW, .resetvalue = 0,
       .fieldoffset = offsetof(CPUARMState, podium7_aprr[11]) },
-};
+'''
+    # PMCR1 controls counting modes; PMCR2..4 are the companion controls
+    # documented by XNU's PMU setup and existing Apple CPU models.
+    for number in range(1, 5):
+        definitions += f'''    {{ .name = "PODIUM7_PMCR{number}_LATCH", .state = ARM_CP_STATE_AA64,
+      .opc0 = 3, .opc1 = 1, .crn = 15, .crm = {number}, .opc2 = 0,
+      .access = PL1_RW, .resetvalue = 0,
+      .fieldoffset = offsetof(CPUARMState, podium7_aprr[{11 + number}]) }},
+'''
+    definitions += '''};
 static void podium7_research_initfn(Object *obj)
 {
     aarch64_max_initfn(obj);

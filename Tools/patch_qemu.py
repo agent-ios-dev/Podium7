@@ -27,7 +27,7 @@ def patch(directory):
         raise ValueError("refusing to patch a dirty QEMU checkout")
     # QEMU reserves fieldoffset=0 to mean no backing storage.
     replace_once(directory / "target/arm/cpu.h", "    uint32_t regs[16];",
-                 "    uint32_t regs[16];\n    uint64_t podium7_aprr[9]; /* APRR, HID5/4/0/1, LSU_ERR_CTL; research */")
+                 "    uint32_t regs[16];\n    uint64_t podium7_aprr[32]; /* fixed research register bank; not full Apple semantics */")
     definitions = '''
 /* Podium7 research CPU. GPL-2.0-or-later.
  * APRR register latches permit bootstrap diagnosis only; no APRR page

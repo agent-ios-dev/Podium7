@@ -149,7 +149,7 @@ static void podium7_research_initfn(Object *obj)
         (env->podium7_aprr[18] & 1)) {
         uint64_t lower = env->podium7_aprr[16];
         uint64_t upper = env->podium7_aprr[17];
-        uint64_t physical = result->f.phys_addr;
+        uint64_t physical = descaddr; /* computed output; result is assigned below */
         if (physical < lower || upper < lower ||
             physical > (upper | 0x3fffULL)) {
             result->f.prot &= ~PAGE_EXEC;
@@ -161,6 +161,14 @@ static void podium7_research_initfn(Object *obj)
     }
 
     /* If FEAT_HAFDBS''')
+    replace_once(directory / "target/arm/ptw.c",
+        '    result->f.lg_page_size = ctz64(page_size);\n    return false;',
+        '''    result->f.lg_page_size = ctz64(page_size);
+    if (aarch64 && el == 1 && !regime_is_user(env, mmu_idx) &&
+        (env->podium7_aprr[18] & 1)) {
+        result->f.lg_page_size = MIN(result->f.lg_page_size, 14);
+    }
+    return false;''')
     uart = '''
 /* Podium7 polling TX-only Samsung UART research device. GPL-2.0-or-later.
  * Address 0x20a0c0000 and 0x4000 span come from n112ap DeviceTree reg/ranges.

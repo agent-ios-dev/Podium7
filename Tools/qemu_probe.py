@@ -12,6 +12,8 @@ import struct
 import subprocess
 import time
 from analyze_firmware import macho, device_tree
+from prepare_device_tree import prepare
+COUNTER_FREQUENCY = 24_000_000
 
 # Leave QEMU's own DTB/boot reservations intact at the start of virt RAM.
 PHYSICAL_BASE = 0x44000000  # 64 MiB aligned synthetic harness map, not T8010.
@@ -61,10 +63,10 @@ def elf_image(entry, segments):
 def make_probe(directory):
     kernel = (directory / "KernelCache.macho").read_bytes()
     original_tree = (directory / "DeviceTree.bin").read_bytes()
-    tree = device_tree(original_tree, clear_bootloader_flags=True)
+    tree, clocks = prepare(original_tree, COUNTER_FREQUENCY)
     (directory / "device-tree-preparation.json").write_text(json.dumps({
         "bootloader_placeholder_flags_cleared": True, "original_bytes": len(original_tree),
-        "prepared_bytes": len(tree), "changed_bytes": sum(a != b for a, b in zip(original_tree, tree))}, indent=2))
+        "prepared_bytes": len(tree), "cpu_clocks": clocks}, indent=2))
     info = macho(kernel)
     regions = [x for x in info["segments"] if x["length"]]
     minimum = min(int(x["address"], 16) for x in regions)
@@ -95,7 +97,7 @@ def make_probe(directory):
 def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
     image, kernel_entry = make_probe(directory)
     trace, serial = directory / "qemu-trace.txt", directory / "qemu-serial.txt"
-    command = [executable, "-machine", "virt,secure=off,virtualization=off", "-cpu", cpu, "-accel", "tcg",
+    command = [executable, "-machine", "virt,secure=off,virtualization=off", "-cpu", f"{cpu},cntfrq={COUNTER_FREQUENCY}", "-accel", "tcg",
                "-m", "2048", "-smp", "1", "-display", "none", "-monitor", "none", "-serial", "stdio",
                "-device", f"loader,file={image},cpu-num=0", "-d", "in_asm,cpu,int,guest_errors,unimp", "-D", str(trace)]
     version = subprocess.check_output([executable, "--version"], text=True).splitlines()[0]
@@ -120,6 +122,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
     exception_tail = faults[-24:]
     summary = {"booted_ios": False, "kernel_entry_seen": entry_seen, "physical_kernel_entry": hex(kernel_entry),
                "cpu_model": cpu, "aprr_permissions_enforced": False,
+               "counter_frequency": COUNTER_FREQUENCY,
                "first_faults": faults[:12],
                "exception_tail": exception_tail, "backend": version, "board": "QEMU virt bootstrap experiment, not T8010",
                "physical_ram_base": hex(PHYSICAL_BASE), "command": command, "stop": stop,

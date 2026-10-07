@@ -53,7 +53,10 @@ public final class AArch64BlockJIT {
         guard !words.isEmpty else { return 0 }
         let block: Block
         // Revalidate guest words on every entry so self-modifying code never uses stale native code.
-        if let cached = blocks[pc], cached.words == words { block = cached }
+        if let cached = blocks[pc], cached.words == words {
+            block = Block(words: words, code: cached.code, version: memory.codeVersion(address: pc, length: words.count * 4))
+            blocks[pc] = block
+        }
         else {
             code.append(0xd65f03c0)
             guard let native = code.withUnsafeBufferPointer({ p7_jit_emit(pool, $0.baseAddress, $0.count) }) else { return 0 }

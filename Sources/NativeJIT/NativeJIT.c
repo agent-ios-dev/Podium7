@@ -68,15 +68,23 @@ __attribute__((naked, noinline, optnone)) static void detach_script(void) {
 }
 static pthread_mutex_t protocol_lock = PTHREAD_MUTEX_INITIALIZER;
 static _Thread_local sigjmp_buf protocol_jump;
-static void trap_handler(int signal) { (void)signal; siglongjmp(protocol_jump, 1); }
+static _Thread_local bool protocol_active;
+static struct sigaction protocol_previous;
+static void trap_handler(int signal) {
+    if (protocol_active) siglongjmp(protocol_jump, 1);
+    /* Do not longjmp into an uninitialized context on another thread. */
+    sigaction(signal, &protocol_previous, NULL);
+    raise(signal);
+}
 static bool prepare_alias(P7JITPool *pool) {
     pthread_mutex_lock(&protocol_lock);
-    struct sigaction action = {0}, previous;
+    struct sigaction action = {0};
     action.sa_handler = trap_handler;
     sigemptyset(&action.sa_mask);
-    if (sigaction(SIGTRAP, &action, &previous) != 0) { pthread_mutex_unlock(&protocol_lock); return false; }
+    if (sigaction(SIGTRAP, &action, &protocol_previous) != 0) { pthread_mutex_unlock(&protocol_lock); return false; }
     bool ok = false;
     if (sigsetjmp(protocol_jump, 1) == 0) {
+        protocol_active = true;
         void *prepared = prepare_region(pool->rx, pool->size);
         if (prepared == pool->rx) {
             vm_address_t alias = 0;
@@ -91,7 +99,8 @@ static bool prepare_alias(P7JITPool *pool) {
             }
         }
     }
-    sigaction(SIGTRAP, &previous, NULL);
+    protocol_active = false;
+    sigaction(SIGTRAP, &protocol_previous, NULL);
     pthread_mutex_unlock(&protocol_lock);
     return ok;
 }

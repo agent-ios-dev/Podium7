@@ -27,7 +27,7 @@ def patch(directory):
         raise ValueError("refusing to patch a dirty QEMU checkout")
     # QEMU reserves fieldoffset=0 to mean no backing storage.
     replace_once(directory / "target/arm/cpu.h", "    uint32_t regs[16];",
-                 "    uint32_t regs[16];\n    uint64_t podium7_aprr[6]; /* APRR, HID5, HID4; research latches only */")
+                 "    uint32_t regs[16];\n    uint64_t podium7_aprr[7]; /* APRR, HID5, HID4, HID0; research only */")
     definitions = '''
 /* Podium7 research CPU. GPL-2.0-or-later.
  * APRR register latches permit bootstrap diagnosis only; no APRR page
@@ -49,6 +49,10 @@ static const ARMCPRegInfo podium7_aprr_regs[] = {
       .opc0 = 3, .opc1 = 0, .crn = 15, .crm = 4, .opc2 = 0,
       .access = PL1_RW, .resetvalue = 0,
       .fieldoffset = offsetof(CPUARMState, podium7_aprr[5]) },
+    { .name = "PODIUM7_HID0_LATCH", .state = ARM_CP_STATE_AA64,
+      .opc0 = 3, .opc1 = 0, .crn = 15, .crm = 0, .opc2 = 0,
+      .access = PL1_RW, .resetvalue = 0,
+      .fieldoffset = offsetof(CPUARMState, podium7_aprr[6]) },
 };
 static void podium7_research_initfn(Object *obj)
 {

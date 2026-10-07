@@ -618,10 +618,65 @@ static void podium7_aes_create(MachineState *machine, MemoryRegion *memory,
 }
 
 '''
+    thermal = '''
+/* Minimal T8010 SoCHot/thermal-sensor register window for XNU bring-up.
+ * The DeviceTree aliases sochot1 and tempsensor3-5 onto 0x202f30000. A zeroed,
+ * stateful bank allows register discovery only; it does not model temperatures,
+ * sensor conversion, interrupts, or thermal policy.
+ */
+typedef struct Podium7Thermal {
+    MemoryRegion io;
+    uint32_t registers[0x2000];
+    unsigned logged_accesses;
+} Podium7Thermal;
+
+static uint64_t podium7_thermal_read(void *opaque, hwaddr address, unsigned size)
+{
+    Podium7Thermal *thermal = opaque;
+    uint32_t value = thermal->registers[address >> 2];
+    if (thermal->logged_accesses < 256) {
+        qemu_log("PODIUM7 THERMAL read offset=%04" PRIx64
+                 " size=%u value=%08" PRIx32 "\\n",
+                 (uint64_t)address, size, value);
+        thermal->logged_accesses++;
+    }
+    return value;
+}
+
+static void podium7_thermal_write(void *opaque, hwaddr address, uint64_t data,
+                                  unsigned size)
+{
+    Podium7Thermal *thermal = opaque;
+    uint32_t value = (uint32_t)data;
+    thermal->registers[address >> 2] = value;
+    if (thermal->logged_accesses < 256) {
+        qemu_log("PODIUM7 THERMAL write offset=%04" PRIx64
+                 " size=%u value=%08" PRIx32 "\\n",
+                 (uint64_t)address, size, value);
+        thermal->logged_accesses++;
+    }
+}
+
+static const MemoryRegionOps podium7_thermal_ops = {
+    .read = podium7_thermal_read, .write = podium7_thermal_write,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+    .valid = { .min_access_size = 4, .max_access_size = 8 },
+    .impl = { .min_access_size = 4, .max_access_size = 4 },
+};
+
+static void podium7_thermal_create(MachineState *machine, MemoryRegion *memory)
+{
+    Podium7Thermal *thermal = g_new0(Podium7Thermal, 1);
+    memory_region_init_io(&thermal->io, OBJECT(machine), &podium7_thermal_ops,
+                          thermal, "podium7-t8010-sochot-thermal", 0x8000);
+    memory_region_add_subregion(memory, 0x202f30000ULL, &thermal->io);
+}
+
+'''
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + "static void machvirt_init(MachineState *machine)")
     replace_once(directory / "hw/arm/virt.c",
                  "    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);",
                  '''    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);
@@ -638,6 +693,7 @@ static void podium7_aes_create(MachineState *machine, MemoryRegion *memory,
                            "podium7-t8010-aes-primary");
         podium7_aes_create(machine, sysmem, 0x2102d0000ULL,
                            "podium7-t8010-aes-secondary");
+        podium7_thermal_create(machine, sysmem);
     }''')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")

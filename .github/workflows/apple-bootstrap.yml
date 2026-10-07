@@ -44,6 +44,8 @@ jobs:
         run: python3 Tools/check_wdt.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify T8010 GPIO MMIO model
         run: python3 Tools/check_gpio.py --qemu .qemu/build/qemu-system-aarch64
+      - name: Verify T8010 AES register windows
+        run: python3 Tools/check_aes.py --qemu .qemu/build/qemu-system-aarch64
       - name: Execute original kernel and retain the next failure
         run: python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research
       - name: Verify MCC register lock and protected RAM
@@ -80,5 +82,6 @@ jobs:
             .firmware/aic-checks.json
             .firmware/wdt-checks.json
             .firmware/gpio-checks.json
+            .firmware/aes-checks.json
             .firmware/ktrr-checks.json
             .firmware/ktrr-check-trace.txt

@@ -561,10 +561,67 @@ static void podium7_gpio_create(MachineState *machine, MemoryRegion *memory,
 }
 
 '''
+    aes = '''
+/* Minimal T8010 AES register windows for kernel bootstrap.
+ * AppleS8000AES maps both ranges as 0x4000-byte windows. This backing store
+ * only prevents unimplemented-MMIO aborts; it does not perform AES operations,
+ * model DMA, key slots, interrupts, or secure-enclave behavior.
+ */
+typedef struct Podium7AES {
+    MemoryRegion io;
+    uint64_t base;
+    uint32_t registers[0x1000];
+    unsigned logged_accesses;
+} Podium7AES;
+
+static uint64_t podium7_aes_read(void *opaque, hwaddr address, unsigned size)
+{
+    Podium7AES *aes = opaque;
+    uint32_t value = aes->registers[address >> 2];
+    if (aes->logged_accesses < 256) {
+        qemu_log("PODIUM7 AES base=%016" PRIx64 " read offset=%04" PRIx64
+                 " value=%08" PRIx32 "\\n",
+                 aes->base, (uint64_t)address, value);
+        aes->logged_accesses++;
+    }
+    return value;
+}
+
+static void podium7_aes_write(void *opaque, hwaddr address, uint64_t data,
+                              unsigned size)
+{
+    Podium7AES *aes = opaque;
+    uint32_t value = (uint32_t)data;
+    aes->registers[address >> 2] = value;
+    if (aes->logged_accesses < 256) {
+        qemu_log("PODIUM7 AES base=%016" PRIx64 " write offset=%04" PRIx64
+                 " value=%08" PRIx32 "\\n",
+                 aes->base, (uint64_t)address, value);
+        aes->logged_accesses++;
+    }
+}
+
+static const MemoryRegionOps podium7_aes_ops = {
+    .read = podium7_aes_read, .write = podium7_aes_write,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+    .valid = { .min_access_size = 4, .max_access_size = 4 },
+};
+
+static void podium7_aes_create(MachineState *machine, MemoryRegion *memory,
+                               hwaddr base, const char *name)
+{
+    Podium7AES *aes = g_new0(Podium7AES, 1);
+    aes->base = base;
+    memory_region_init_io(&aes->io, OBJECT(machine), &podium7_aes_ops, aes,
+                          name, 0x4000);
+    memory_region_add_subregion(memory, base, &aes->io);
+}
+
+'''
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + "static void machvirt_init(MachineState *machine)")
     replace_once(directory / "hw/arm/virt.c",
                  "    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);",
                  '''    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);
@@ -577,6 +634,10 @@ static void podium7_gpio_create(MachineState *machine, MemoryRegion *memory,
                             "podium7-t8010-main-gpio");
         podium7_gpio_create(machine, sysmem, 0x2100f0000ULL, 42,
                             "podium7-t8010-aop-gpio");
+        podium7_aes_create(machine, sysmem, 0x20a108000ULL,
+                           "podium7-t8010-aes-primary");
+        podium7_aes_create(machine, sysmem, 0x2102d0000ULL,
+                           "podium7-t8010-aes-secondary");
     }''')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")

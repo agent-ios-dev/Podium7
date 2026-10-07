@@ -4,13 +4,17 @@ Leaves non-clock properties and all devices intact. Frequencies must agree
 with the selected QEMU counter, not an invented boot-complete marker.
 """
 import struct
+import secrets
 from analyze_firmware import device_tree
 
 
-def prepare(data, counter_frequency):
+def prepare(data, counter_frequency, *, random_seed=None):
     if not 1_000_000 <= counter_frequency <= 1_000_000_000:
         raise ValueError("invalid counter frequency")
     device_tree(data)  # Fully validate bounds/depth before rewriting.
+    seed = secrets.token_bytes(64) if random_seed is None else random_seed
+    if len(seed) != 64:
+        raise ValueError("XNU requires 64 bootloader seed bytes")
     changes = []
     def node(cursor, parent):
         count, children = struct.unpack_from("<II", data, cursor)
@@ -33,6 +37,15 @@ def prepare(data, counter_frequency):
                 else:
                     properties[existing] = (properties[existing][0], value)
                 changes.append({"path": path, "property": clock.decode(), "frequency": counter_frequency})
+        if path.endswith("/chosen"):
+            name = b"random-seed"
+            existing = next((i for i, (raw_name, _) in enumerate(properties) if raw_name.split(b"\0")[0] == name), None)
+            if existing is None:
+                properties.append((name.ljust(32, b"\0"), seed))
+            else:
+                properties[existing] = (properties[existing][0], seed)
+            # Never put random seed material into diagnostics or the repository.
+            changes.append({"path": path, "property": "random-seed", "bytes": 64, "source": "host CSPRNG"})
         encoded = [struct.pack("<II", len(properties), children)]
         for name, value in properties:
             encoded += [name, struct.pack("<I", len(value)), value, bytes((-len(value)) & 3)]

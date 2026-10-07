@@ -86,6 +86,9 @@ static const ARMCPRegInfo podium7_aprr_regs[] = {
 static void podium7_research_initfn(Object *obj)
 {
     aarch64_max_initfn(obj);
+    /* Apple PMCR3 shares the encoding of Cortex CBAR_EL1. Apple has no
+     * inherited Cortex CBAR; do not reinstall it at ARM CPU realization. */
+    unset_feature(&ARM_CPU(obj)->env, ARM_FEATURE_CBAR_RO);
     define_arm_cp_regs(ARM_CPU(obj), podium7_aprr_regs);
 }
 

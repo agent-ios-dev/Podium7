@@ -27,7 +27,7 @@ def patch(directory):
         raise ValueError("refusing to patch a dirty QEMU checkout")
     # QEMU reserves fieldoffset=0 to mean no backing storage.
     replace_once(directory / "target/arm/cpu.h", "    uint32_t regs[16];",
-                 "    uint32_t regs[16];\n    uint64_t podium7_aprr[4]; /* research latch state; not full APRR */")
+                 "    uint32_t regs[16];\n    uint64_t podium7_aprr[5]; /* four APRR latches plus HID5; research only */")
     definitions = '''
 /* Podium7 research CPU. GPL-2.0-or-later.
  * APRR register latches permit bootstrap diagnosis only; no APRR page
@@ -41,7 +41,11 @@ static const ARMCPRegInfo podium7_aprr_regs[] = {
       .access = PL1_RW, .resetvalue = 0,
       .fieldoffset = offsetof(CPUARMState, podium7_aprr[{index}]) }},
 '''
-    definitions += '''};
+    definitions += '''    { .name = "PODIUM7_HID5_LATCH", .state = ARM_CP_STATE_AA64,
+      .opc0 = 3, .opc1 = 0, .crn = 15, .crm = 5, .opc2 = 0,
+      .access = PL1_RW, .resetvalue = 0,
+      .fieldoffset = offsetof(CPUARMState, podium7_aprr[4]) },
+};
 static void podium7_research_initfn(Object *obj)
 {
     aarch64_max_initfn(obj);
@@ -63,6 +67,51 @@ static void podium7_research_initfn(Object *obj)
             mask = PL1_RW;
         }
         assert((r->access & ~mask) == 0);''')
+    uart = '''
+/* Podium7 polling TX-only Samsung UART research device. GPL-2.0-or-later.
+ * Address 0x20a0c0000 and 0x4000 span come from n112ap DeviceTree reg/ranges.
+ * No RX, FIFO timing, interrupts or complete platform model yet.
+ */
+typedef struct Podium7UART {
+    MemoryRegion region;
+    uint32_t registers[64];
+} Podium7UART;
+static uint64_t podium7_uart_read(void *opaque, hwaddr address, unsigned size)
+{
+    Podium7UART *uart = opaque;
+    if (address == 0x10) { return 6; } /* TX buffer/shift register empty; RX empty */
+    if (address == 0x18 || address == 0x14 || address == 0x24) { return 0; }
+    return address < sizeof(uart->registers) ? uart->registers[address / 4] : 0;
+}
+static void podium7_uart_write(void *opaque, hwaddr address, uint64_t value,
+                              unsigned size)
+{
+    Podium7UART *uart = opaque;
+    if (address == 0x20) { putchar(value & 0xff); fflush(stdout); return; }
+    if (address < sizeof(uart->registers)) { uart->registers[address / 4] = value; }
+}
+static const MemoryRegionOps podium7_uart_ops = {
+    .read = podium7_uart_read, .write = podium7_uart_write,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+    .valid = { .min_access_size = 1, .max_access_size = 4 },
+};
+static void podium7_uart_create(MachineState *machine, MemoryRegion *memory)
+{
+    Podium7UART *uart = g_new0(Podium7UART, 1);
+    memory_region_init_io(&uart->region, OBJECT(machine), &podium7_uart_ops,
+                         uart, "podium7-uart-tx-only", 0x4000);
+    memory_region_add_subregion(memory, 0x20a0c0000ULL, &uart->region);
+}
+
+'''
+    replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
+                 uart + "static void machvirt_init(MachineState *machine)")
+    replace_once(directory / "hw/arm/virt.c",
+                 "    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);",
+                 '''    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);
+    if (!strcmp(machine->cpu_type, ARM_CPU_TYPE_NAME("podium7-research"))) {
+        podium7_uart_create(machine, sysmem);
+    }''')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")
 

@@ -40,6 +40,10 @@ def diagnostic():
     for index, number in enumerate([0, 1, 6, 7]):
         lines += [f"mov x0, #{0x1234 + index}", "movk x0, #0xabcd, lsl #48",
                   f"mrs x1, S3_4_C15_C2_{number}", "cmp x0, x1", "b.ne failure"]
+    lines += ["mov x0, #0x4321", "msr S3_0_C15_C5_0, x0", "mrs x1, S3_0_C15_C5_0", "cmp x0, x1", "b.ne failure",
+              "mov x3, #0", "movk x3, #0x0a0c, lsl #16", "movk x3, #2, lsl #32"]
+    for byte in b"Podium7 UART OK\n":
+        lines += [f"mov w0, #{byte}", "strb w0, [x3, #0x20]"]
     lines += ["mov x0, #0x20", "adr x1, success_exit", "hlt #0xf000", "b .",
               "failure:", "mov x0, #0x20", "adr x1, failure_exit", "hlt #0xf000", "b .",
               ".p2align 3", "success_exit:", ".quad 0x20026, 0", "failure_exit:", ".quad 0x20026, 1"]
@@ -58,11 +62,12 @@ def check(executable, destination):
                    "-accel", "tcg", "-m", "128", "-display", "none", "-monitor", "none", "-serial", "none",
                    "-semihosting-config", "enable=on,target=native", "-device", f"loader,file={image},cpu-num=0"]
         result = subprocess.run(command, capture_output=True, text=True, timeout=10)
-        report = {"passed": result.returncode == 0, "checks": "reset, 64-bit read/write, independent 0/1/6/7 controls",
+        passed = result.returncode == 0 and "Podium7 UART OK\n" in result.stdout
+        report = {"passed": passed, "checks": "reset, 64-bit read/write, independent 0/1/6/7 controls, HID5, UART TX",
                   "aprr_permissions_enforced": False, "returncode": result.returncode, "stderr": result.stderr}
         destination.write_text(json.dumps(report, indent=2))
         print(json.dumps(report, indent=2))
-        if result.returncode != 0:
+        if not passed:
             raise RuntimeError("guest APRR latch checks failed")
 
 

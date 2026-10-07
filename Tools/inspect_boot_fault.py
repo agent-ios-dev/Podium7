@@ -3,6 +3,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import json
 from analyze_firmware import macho
 
 root = pathlib.Path(".firmware")
@@ -10,6 +11,41 @@ if not (root / "qemu-trace.txt").exists():
     print("No execution trace: backend did not start; inspect the earlier build step")
     sys.exit(0)
 trace = (root / "qemu-trace.txt").read_text(errors="replace")
+serial_path = root / "qemu-serial.txt"
+serial = serial_path.read_text(errors="replace") if serial_path.exists() else ""
+
+# QEMU can report many recoverable exceptions before XNU prints a panic. Keep
+# the first-exception report above, but also disassemble the actual panic PC and
+# record the saved FAR/ESR/registers so later runs identify the fatal access.
+panic = re.search(r"panic\(cpu\s+(\d+).*?\):\s*(.*?)\s+at pc\s+(0x[0-9a-fA-F]+),\s*lr\s+(0x[0-9a-fA-F]+).*?\n(?P<state>(?:.*\n)*?\s*pc:\s*0x[0-9a-fA-F]+\s+cpsr:\s*0x[0-9a-fA-F]+\s+esr:\s*0x[0-9a-fA-F]+\s+far:\s*0x[0-9a-fA-F]+)", serial)
+if panic:
+    fault_pc = int(panic.group(3), 16)
+    state = panic.group("state")
+    values = {name.lower(): "0x" + value.lower() for name, value in
+              re.findall(r"\b(x\d+|fp|lr|sp|pc|cpsr|esr|far):\s*(0x[0-9a-fA-F]+)", state)}
+    kernel_path = root / "KernelCache.macho"
+    report = {"cpu": int(panic.group(1)), "reason": panic.group(2),
+              "panic_pc": hex(fault_pc), "panic_lr": panic.group(4).lower(),
+              "registers": values}
+    if kernel_path.exists():
+        segments = macho(kernel_path.read_bytes())["segments"]
+        for segment in segments:
+            base = int(segment["address"], 16)
+            if base <= fault_pc < base + segment["length"]:
+                report["segment"] = segment["name"]
+                report["segment_offset"] = hex(fault_pc - base)
+                report["file_backed"] = fault_pc < base + segment["file_size"]
+                break
+    (root / "panic-context.json").write_text(json.dumps(report, indent=2))
+    print(json.dumps(report, indent=2))
+    if fault_pc >= 0xfffffff000000000:
+        result = subprocess.run(["xcrun", "llvm-objdump", "--disassemble",
+            f"--start-address={hex(fault_pc - 32)}", f"--stop-address={hex(fault_pc + 96)}",
+            str(kernel_path)], capture_output=True, text=True)
+        (root / "panic-disassembly.txt").write_text(result.stdout + result.stderr)
+        print(result.stdout + result.stderr)
+        result.check_returncode()
+
 first = re.search(r"Taking exception.*?with ELR (0x[0-9a-f]+)", trace, re.DOTALL)
 if first:
     before = trace[:first.start()]

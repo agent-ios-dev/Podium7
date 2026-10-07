@@ -48,7 +48,7 @@ jobs:
         run: python3 Tools/check_ktrr.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify APRR latches using a real assembler-built guest
         run: python3 Tools/check_qemu_registers.py --qemu .qemu/build/qemu-system-aarch64
-      - name: Disassemble the first genuine kernel fault
+      - name: Disassemble the genuine XNU panic and first exception
         if: always()
         run: python3 Tools/inspect_boot_fault.py
       - uses: actions/upload-artifact@v4
@@ -65,6 +65,8 @@ jobs:
             .firmware/qemu-register-checks.json
             .firmware/first-fault-disassembly.txt
             .firmware/first-fault-strings.txt
+            .firmware/panic-context.json
+            .firmware/panic-disassembly.txt
             .firmware/last-block-disassembly.txt
             .firmware/device-tree-preparation.json
             .firmware/register-check-trace.txt

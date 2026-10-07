@@ -4,41 +4,71 @@ import json
 import pathlib
 import subprocess
 import tempfile
+from check_qemu_registers import text_section
+from qemu_probe import elf_image
 
 
 def check(executable, report):
     with tempfile.TemporaryDirectory() as temporary:
-        log = pathlib.Path(temporary) / "stderr.txt"
-        with log.open("w") as errors:
-            process = subprocess.Popen([executable, "-machine", "virt", "-cpu", "podium7-research",
-                "-m", "128", "-display", "none", "-monitor", "none", "-serial", "none",
-                "-qtest", "stdio", "-qtest-log", "/dev/null", "-S"],
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=errors, text=True)
-            def command(text):
-                process.stdin.write(text + "\n"); process.stdin.flush()
-                result = process.stdout.readline().strip()
-                if not result.startswith("OK"):
-                    raise RuntimeError(f"qtest rejected {text}: {result}; {log.read_text()}")
-                return result.split()[1:]
-            try:
-                command("writeb 0x44000000 0xa5")
-                assert int(command("readb 0x44000000")[0], 16) == 0xa5
-                command("writel 0x2000007e4 0x1000")
-                command("writel 0x2000007e8 0x1000")
-                command("writel 0x2000007ec 1")
-                assert int(command("readl 0x2000007ec")[0], 16) == 1
-                command("writel 0x2000007e4 0x1001")
-                assert int(command("readl 0x2000007e4")[0], 16) == 0x1000
-                command("writeb 0x44000000 0x5a")
-                assert int(command("readb 0x44000000")[0], 16) == 0xa5
-                command("writeb 0x44004000 0x5a")
-                assert int(command("readb 0x44004000")[0], 16) == 0x5a
-                report.write_text(json.dumps({"passed": True, "model": "minimal one-plane MCC",
-                    "checks": ["range lock", "locked registers immutable", "protected RAM write rejected", "adjacent RAM writable"]}, indent=2))
-            finally:
-                process.terminate()
-                try: process.wait(timeout=3)
-                except subprocess.TimeoutExpired: process.kill(); process.wait()
+        root = pathlib.Path(temporary)
+        assembly = '''.text
+mov x3, #2
+lsl x3, x3, #32
+mov x4, #0x44000000
+mov w5, #0xa5
+strb w5, [x4]
+mov w5, #0x1000
+str w5, [x3, #0x7e4]
+str w5, [x3, #0x7e8]
+mov w5, #1
+str w5, [x3, #0x7ec]
+ldr w6, [x3, #0x7ec]
+cmp w6, #1
+b.ne failure
+mov w5, #0x1001
+str w5, [x3, #0x7e4]
+ldr w6, [x3, #0x7e4]
+cmp w6, #0x1000
+b.ne failure
+mov w5, #0x5a
+strb w5, [x4]
+ldrb w6, [x4]
+cmp w6, #0xa5
+b.ne failure
+add x4, x4, #4, lsl #12
+strb w5, [x4]
+ldrb w6, [x4]
+cmp w6, #0x5a
+b.ne failure
+mov x0, #0x20
+adr x1, success_exit
+hlt #0xf000
+b .
+failure:
+mov x0, #0x20
+adr x1, failure_exit
+hlt #0xf000
+b .
+.p2align 3
+success_exit:
+.quad 0x20026, 0
+failure_exit:
+.quad 0x20026, 1
+'''
+        (root / "test.s").write_text(assembly)
+        subprocess.run(["xcrun", "clang", "-arch", "arm64", "-c", str(root / "test.s"), "-o", str(root / "test.o")], check=True)
+        code = text_section((root / "test.o").read_bytes())
+        image = root / "test.elf"
+        image.write_bytes(elf_image(0x45000000, [(0x45000000, len(code), code)]))
+        result = subprocess.run([executable, "-machine", "virt,secure=off,virtualization=off",
+            "-cpu", "podium7-research", "-m", "128", "-display", "none", "-monitor", "none", "-serial", "none",
+            "-semihosting-config", "enable=on,target=native", "-device", f"loader,file={image},cpu-num=0"],
+            capture_output=True, text=True, timeout=10)
+        report.write_text(json.dumps({"passed": result.returncode == 0, "model": "minimal one-plane MCC",
+            "checks": ["range lock", "locked registers immutable", "guest STRB write rejected", "adjacent guest RAM writable"],
+            "returncode": result.returncode, "stderr": result.stderr}, indent=2))
+        if result.returncode != 0:
+            raise RuntimeError("MCC guest memory-protection test failed")
 
 
 if __name__ == "__main__":

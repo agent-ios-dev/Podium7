@@ -73,6 +73,9 @@ static const ARMCPRegInfo podium7_aprr_regs[] = {
       .opc0 = 3, .opc1 = 1, .crn = 15, .crm = 0, .opc2 = 0,
       .access = PL1_RW, .resetvalue = 0,
       .fieldoffset = offsetof(CPUARMState, podium7_aprr[11]) },
+    { .name = "PODIUM7_IPI_STATUS_SINGLE_CPU", .state = ARM_CP_STATE_AA64,
+      .opc0 = 3, .opc1 = 5, .crn = 15, .crm = 10, .opc2 = 1,
+      .access = PL1_RW, .type = ARM_CP_CONST | ARM_CP_OVERRIDE, .resetvalue = 0 },
 '''
     # PMCR1 controls counting modes; PMCR2..4 are the companion controls
     # documented by XNU's PMU setup and existing Apple CPU models.
@@ -109,6 +112,11 @@ static void podium7_research_initfn(Object *obj)
             r->crm == 2 && (r->opc2 == 0 || r->opc2 == 1 ||
                            r->opc2 == 6 || r->opc2 == 7) &&
             g_str_has_prefix(r->name, "PODIUM7_APRR_LATCH_")) {
+            mask = PL1_RW;
+        }
+        if (r->opc0 == 3 && r->opc1 == 5 && r->crn == 15 &&
+            r->crm == 10 && r->opc2 == 1 &&
+            !strcmp(r->name, "PODIUM7_IPI_STATUS_SINGLE_CPU")) {
             mask = PL1_RW;
         }
         assert((r->access & ~mask) == 0);''')

@@ -15,7 +15,7 @@ if first:
         kernel = (root / "KernelCache.macho").read_bytes()
         segments = macho(kernel)["segments"]
         strings = []
-        for name in ["00", "05", "06", "10", "23"]:
+        for name in ["00", "01", "02", "03", "05", "06", "10", "11", "23"]:
             address = int(registers.get(name, "0"), 16)
             for segment in segments:
                 base = int(segment["address"], 16)

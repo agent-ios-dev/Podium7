@@ -67,13 +67,22 @@ def check(executable, destination):
         code = text_section((root / "test.o").read_bytes())
         image = root / "test.elf"
         image.write_bytes(elf_image(0x44000000, [(0x44000000, len(code), code)]))
+        trace = destination.with_name("register-check-trace.txt")
         command = [executable, "-machine", "virt,secure=off,virtualization=off", "-cpu", "podium7-research",
                    "-accel", "tcg", "-m", "128", "-display", "none", "-monitor", "none", "-serial", "none",
-                   "-semihosting-config", "enable=on,target=native", "-device", f"loader,file={image},cpu-num=0"]
-        result = subprocess.run(command, capture_output=True, text=True, timeout=10)
-        passed = result.returncode == 0 and "Podium7 UART OK\n" in result.stdout
+                   "-semihosting-config", "enable=on,target=native", "-device", f"loader,file={image},cpu-num=0",
+                   "-d", "in_asm,int,guest_errors,unimp", "-D", str(trace)]
+        timed_out = False
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, timeout=5)
+        except subprocess.TimeoutExpired as error:
+            timed_out = True
+            result = subprocess.CompletedProcess(command, -1,
+                (error.stdout or b"").decode(errors="replace"), (error.stderr or b"").decode(errors="replace"))
+        passed = not timed_out and result.returncode == 0 and "Podium7 UART OK\n" in result.stdout
         report = {"passed": passed, "checks": "reset, register independence and read/write, APRR, HID0/1/4/5, LSU_ERR_CTL, PMC0/1 and PMCR0..4 latches, UART TX",
-                  "aprr_permissions_enforced": False, "returncode": result.returncode, "stderr": result.stderr}
+                  "aprr_permissions_enforced": False, "timed_out": timed_out,
+                  "returncode": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
         destination.write_text(json.dumps(report, indent=2))
         print(json.dumps(report, indent=2))
         if not passed:

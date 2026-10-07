@@ -43,6 +43,7 @@ jobs:
       - name: Verify APRR latches using a real assembler-built guest
         run: python3 Tools/check_qemu_registers.py --qemu .qemu/build/qemu-system-aarch64
       - name: Disassemble the first genuine kernel fault
+        if: always()
         run: python3 Tools/inspect_boot_fault.py
       - uses: actions/upload-artifact@v4
         if: always()
@@ -59,3 +60,4 @@ jobs:
             .firmware/first-fault-disassembly.txt
             .firmware/first-fault-strings.txt
             .firmware/device-tree-preparation.json
+            .firmware/register-check-trace.txt

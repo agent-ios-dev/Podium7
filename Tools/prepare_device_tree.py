@@ -8,13 +8,15 @@ import secrets
 from analyze_firmware import device_tree
 
 
-def prepare(data, counter_frequency, *, random_seed=None):
+def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, dram_size=2 * 1024 * 1024 * 1024):
     if not 1_000_000 <= counter_frequency <= 1_000_000_000:
         raise ValueError("invalid counter frequency")
     device_tree(data)  # Fully validate bounds/depth before rewriting.
     seed = secrets.token_bytes(64) if random_seed is None else random_seed
     if len(seed) != 64:
         raise ValueError("XNU requires 64 bootloader seed bytes")
+    if dram_base < 0 or dram_size <= 0 or dram_base > 0xffffffffffffffff - dram_size:
+        raise ValueError("invalid DRAM range")
     changes = []
     def node(cursor, parent):
         count, children = struct.unpack_from("<II", data, cursor)
@@ -46,6 +48,14 @@ def prepare(data, counter_frequency, *, random_seed=None):
                 properties[existing] = (properties[existing][0], seed)
             # Never put random seed material into diagnostics or the repository.
             changes.append({"path": path, "property": "random-seed", "bytes": 64, "source": "host CSPRNG"})
+            for name, value in [(b"dram-base", dram_base), (b"dram-size", dram_size)]:
+                encoded_value = struct.pack("<Q", value)
+                existing = next((i for i, (raw_name, _) in enumerate(properties) if raw_name.split(b"\0")[0] == name), None)
+                if existing is None:
+                    properties.append((name.ljust(32, b"\0"), encoded_value))
+                else:
+                    properties[existing] = (properties[existing][0], encoded_value)
+                changes.append({"path": path, "property": name.decode(), "value": hex(value), "source": "QEMU virt RAM"})
         encoded = [struct.pack("<II", len(properties), children)]
         for name, value in properties:
             encoded += [name, struct.pack("<I", len(value)), value, bytes((-len(value)) & 3)]

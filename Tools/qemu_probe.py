@@ -14,10 +14,12 @@ import time
 from analyze_firmware import macho, device_tree
 from prepare_device_tree import prepare
 COUNTER_FREQUENCY = 24_000_000
+QEMU_RAM_BASE = 0x40000000
+QEMU_RAM_SIZE = 2 * 1024 * 1024 * 1024
 
 # Leave QEMU's own DTB/boot reservations intact at the start of virt RAM.
 PHYSICAL_BASE = 0x44000000  # 64 MiB aligned synthetic harness map, not T8010.
-RAM_SIZE = 2 * 1024 * 1024 * 1024 - 0x04000000
+RAM_SIZE = QEMU_RAM_SIZE - (PHYSICAL_BASE - QEMU_RAM_BASE)
 
 
 def align(value):
@@ -63,7 +65,7 @@ def elf_image(entry, segments):
 def make_probe(directory):
     kernel = (directory / "KernelCache.macho").read_bytes()
     original_tree = (directory / "DeviceTree.bin").read_bytes()
-    tree, clocks = prepare(original_tree, COUNTER_FREQUENCY)
+    tree, clocks = prepare(original_tree, COUNTER_FREQUENCY, dram_base=QEMU_RAM_BASE, dram_size=QEMU_RAM_SIZE)
     (directory / "device-tree-preparation.json").write_text(json.dumps({
         "bootloader_placeholder_flags_cleared": True, "original_bytes": len(original_tree),
         "prepared_bytes": len(tree), "cpu_clocks": clocks}, indent=2))

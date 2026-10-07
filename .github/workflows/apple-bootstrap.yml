@@ -27,6 +27,8 @@ jobs:
           ninja qemu-system-aarch64
       - name: Execute original kernel and retain the next failure
         run: python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research
+      - name: Verify APRR latches using a real assembler-built guest
+        run: python3 Tools/check_qemu_registers.py --qemu .qemu/build/qemu-system-aarch64
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -38,3 +40,4 @@ jobs:
             .firmware/qemu-probe.json
             .firmware/qemu-trace.txt
             .firmware/qemu-serial.txt
+            .firmware/qemu-register-checks.json

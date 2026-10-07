@@ -7,6 +7,14 @@ public enum MachineFault: Error, Equatable {
 public protocol Memory64: AnyObject {
     func read(_ address: UInt64) throws -> UInt8
     func write(_ address: UInt64, value: UInt8) throws
+    func codeVersion(address: UInt64, length: Int) -> CodeVersion?
+}
+public struct CodeVersion: Equatable {
+    let owner: UUID
+    let revision: UInt64
+}
+public extension Memory64 {
+    func codeVersion(address: UInt64, length: Int) -> CodeVersion? { nil }
 }
 
 /// Development board only. These are synthetic addresses, not an A10 memory map.
@@ -14,6 +22,8 @@ public final class LabMemory: Memory64 {
     public static let ramBase: UInt64 = 0x1_0000_0000
     public static let uart: UInt64 = 0x2_0000_0000
     private var bytes: [UInt8]
+    private let codeOwner = UUID()
+    private var revision: UInt64 = 0
     public private(set) var serial = ""
     public init(size: Int = 65536) { precondition(size > 0); bytes = .init(repeating: 0, count: size) }
     public func read(_ address: UInt64) throws -> UInt8 {
@@ -24,6 +34,12 @@ public final class LabMemory: Memory64 {
         if address == Self.uart { serial += String(UnicodeScalar(value)); return }
         guard address >= Self.ramBase, address - Self.ramBase < UInt64(bytes.count) else { throw MachineFault.unmapped(address) }
         bytes[Int(address - Self.ramBase)] = value
+        revision &+= 1
+    }
+    public func codeVersion(address: UInt64, length: Int) -> CodeVersion? {
+        guard length >= 0, address >= Self.ramBase, address - Self.ramBase <= UInt64(bytes.count),
+              UInt64(length) <= UInt64(bytes.count) - (address - Self.ramBase) else { return nil }
+        return CodeVersion(owner: codeOwner, revision: revision)
     }
     public func load(_ words: [UInt32], at address: UInt64 = LabMemory.ramBase) throws {
         // Validate the entire image before mutating memory.

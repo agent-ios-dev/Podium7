@@ -101,9 +101,11 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
             time.sleep(0.1)
     trace_text = trace.read_text(errors="replace") if trace.exists() else ""
     entry_seen = any(int(address, 16) == kernel_entry for address in re.findall(r"^0x([0-9a-fA-F]+):", trace_text, re.MULTILINE))
-    exception_tail = [line for line in trace_text.splitlines() if "exception" in line.lower() or "unimplemented" in line.lower() or "unallocated" in line.lower()][-24:]
+    faults = [line for line in trace_text.splitlines() if "exception" in line.lower() or "unimplemented" in line.lower() or "unallocated" in line.lower() or "unsupported" in line.lower()]
+    exception_tail = faults[-24:]
     summary = {"booted_ios": False, "kernel_entry_seen": entry_seen, "physical_kernel_entry": hex(kernel_entry),
                "cpu_model": cpu, "aprr_permissions_enforced": False,
+               "first_faults": faults[:12],
                "exception_tail": exception_tail, "backend": version, "board": "QEMU virt bootstrap experiment, not T8010",
                "physical_ram_base": hex(PHYSICAL_BASE), "command": command, "stop": stop,
                "returncode": process.returncode, "seconds": time.monotonic() - start,

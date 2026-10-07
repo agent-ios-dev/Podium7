@@ -11,7 +11,7 @@ targets:
     platform: iOS
     sources:
       - path: App
-        excludes: [Podium7.entitlements]
+        excludes: [Podium7.entitlements, Info.plist]
     dependencies:
       - package: Podium7Core
         product: Podium7Core
@@ -26,4 +26,4 @@ targets:
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         CODE_SIGNING_ALLOWED: NO
         CODE_SIGN_ENTITLEMENTS: App/Podium7.entitlements
-        INFOPLIST_KEY_LSApplicationQueriesSchemes: [stikdebug]
+        INFOPLIST_FILE: App/Info.plist

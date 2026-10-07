@@ -7,7 +7,7 @@ public enum JITError: Error { case unavailable(Int32) }
 /// One preallocated pool per backend, immutable native blocks, no guest code copied verbatim.
 public final class AArch64BlockJIT {
     private let pool: OpaquePointer
-    private struct Block { let words: [UInt32]; let code: UnsafeMutableRawPointer }
+    private struct Block { let words: [UInt32]; let code: UnsafeMutableRawPointer; let version: CodeVersion? }
     private var blocks: [UInt64: Block] = [:]
     public private(set) var executedInstructions: UInt64 = 0
     public init(capacity: Int = 1 << 20) throws {
@@ -36,6 +36,12 @@ public final class AArch64BlockJIT {
         return nil
     }
     func execute(memory: any Memory64, pc: UInt64, registers: inout [UInt64], limit: Int) -> Int {
+        if let block = blocks[pc], block.words.count <= limit,
+           let version = memory.codeVersion(address: pc, length: block.words.count * 4), version == block.version {
+            registers.withUnsafeMutableBufferPointer { p7_jit_call(block.code, $0.baseAddress) }
+            executedInstructions &+= UInt64(block.words.count)
+            return block.words.count
+        }
         var words: [UInt32] = [], code: [UInt32] = []
         for index in 0..<min(max(0, limit), 64) {
             var word: UInt32 = 0
@@ -51,7 +57,7 @@ public final class AArch64BlockJIT {
         else {
             code.append(0xd65f03c0)
             guard let native = code.withUnsafeBufferPointer({ p7_jit_emit(pool, $0.baseAddress, $0.count) }) else { return 0 }
-            block = Block(words: words, code: native); blocks[pc] = block
+            block = Block(words: words, code: native, version: memory.codeVersion(address: pc, length: words.count * 4)); blocks[pc] = block
         }
         registers.withUnsafeMutableBufferPointer { p7_jit_call(block.code, $0.baseAddress) }
         executedInstructions &+= UInt64(words.count)

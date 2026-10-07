@@ -18,6 +18,8 @@ jobs:
           xcodegen generate
       - name: Build iPhone app
         run: xcodebuild -project Podium7.xcodeproj -scheme Podium7 -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - name: Verify packaged StikDebug metadata
+        run: python3 -c 'import plistlib; p=plistlib.load(open("build/Build/Products/Release-iphoneos/Podium7.app/Info.plist", "rb")); assert p["LSApplicationQueriesSchemes"] == ["stikdebug"]; assert p["CFBundleIdentifier"] == "com.catyuragame.podium7"'
       - name: Package unsigned laboratory IPA
         run: |
           mkdir -p Payload

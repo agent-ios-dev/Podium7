@@ -7,6 +7,8 @@ public final class KernelProbeMemory: Memory64 {
     private struct Region { let base: UInt64; let size: UInt64; let data: Data }
     private var regions: [Region] = []
     private var writes: [UInt64: UInt8] = [:]
+    private let codeOwner = UUID()
+    private var revision: UInt64 = 0
     public init() {}
     public func map(base: UInt64, size: UInt64, data: Data) throws {
         guard size > 0, size <= 2 * 1024 * 1024 * 1024, UInt64(data.count) <= size,
@@ -15,6 +17,7 @@ public final class KernelProbeMemory: Memory64 {
             throw KernelImageError.invalid("invalid/overlapping segment")
         }
         regions.append(Region(base: base, size: size, data: data))
+        revision &+= 1
     }
     public func read(_ address: UInt64) throws -> UInt8 {
         guard let region = regions.first(where: { address >= $0.base && address - $0.base < $0.size }) else {
@@ -27,6 +30,12 @@ public final class KernelProbeMemory: Memory64 {
     public func write(_ address: UInt64, value: UInt8) throws {
         _ = try read(address)
         writes[address] = value
+        revision &+= 1
+    }
+    public func codeVersion(address: UInt64, length: Int) -> CodeVersion? {
+        guard length >= 0, address <= UInt64.max - UInt64(length),
+              regions.contains(where: { address >= $0.base && address - $0.base <= $0.size && UInt64(length) <= $0.size - (address - $0.base) }) else { return nil }
+        return CodeVersion(owner: codeOwner, revision: revision)
     }
 }
 

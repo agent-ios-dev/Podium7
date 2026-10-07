@@ -27,7 +27,7 @@ final class JITTests: XCTestCase {
         throw XCTSkip("Native execution requires ARM64 host")
         #endif
     }
-    func testSelfModifiedBlockIsRecompiledAndPoolFullFallsBack() throws {
+    func testSelfModifiedBlockIsRecompiled() throws {
         #if arch(arm64)
         let memory = LabMemory(); try memory.load([0xd2800020, 0xd4200000])
         let jit = try AArch64BlockJIT(capacity: 64)
@@ -35,6 +35,21 @@ final class JITTests: XCTestCase {
         try memory.load([0xd2800040, 0xd4200000])
         let second = AArch64CPU(memory: memory); second.jit = jit; try second.run()
         XCTAssertEqual(first.registers[0], 1); XCTAssertEqual(second.registers[0], 2)
+        #else
+        throw XCTSkip("Native execution requires ARM64 host")
+        #endif
+    }
+    func testExhaustedNativePoolFallsBackWithoutDroppingGuestInstructions() throws {
+        #if arch(arm64)
+        let memory = LabMemory()
+        let jit = try AArch64BlockJIT(capacity: 1)
+        for value in 0..<1300 {
+            try memory.load([0xd2800000 | UInt32(value << 5), 0xd4200000])
+            let cpu = AArch64CPU(memory: memory); cpu.jit = jit; try cpu.run()
+            XCTAssertEqual(cpu.registers[0], UInt64(value)); XCTAssertEqual(cpu.retired, 2)
+        }
+        XCTAssertGreaterThan(jit.executedInstructions, 0)
+        XCTAssertLessThan(jit.executedInstructions, 1300)
         #else
         throw XCTSkip("Native execution requires ARM64 host")
         #endif

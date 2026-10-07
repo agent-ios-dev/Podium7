@@ -44,6 +44,7 @@ def diagnostic():
         lines += [f"mov x0, #{0x4321 + number}", f"msr S3_0_C15_C{number}_0, x0",
                   f"mrs x1, S3_0_C15_C{number}_0", "cmp x0, x1", "b.ne failure"]
     lines += ["mov x3, #0", "movk x3, #0x0a0c, lsl #16", "movk x3, #2, lsl #32"]
+    lines += ["mov x0, #0x7654", "msr S3_3_C15_C1_0, x0", "mrs x1, S3_3_C15_C1_0", "cmp x0, x1", "b.ne failure"]
     for byte in b"Podium7 UART OK\n":
         lines += [f"mov w0, #{byte}", "strb w0, [x3, #0x20]"]
     lines += ["mov x0, #0x20", "adr x1, success_exit", "hlt #0xf000", "b .",
@@ -65,7 +66,7 @@ def check(executable, destination):
                    "-semihosting-config", "enable=on,target=native", "-device", f"loader,file={image},cpu-num=0"]
         result = subprocess.run(command, capture_output=True, text=True, timeout=10)
         passed = result.returncode == 0 and "Podium7 UART OK\n" in result.stdout
-        report = {"passed": passed, "checks": "reset, 64-bit read/write, independent 0/1/6/7 controls, HID0/4/5, UART TX",
+        report = {"passed": passed, "checks": "reset, 64-bit read/write, independent APRR controls, HID0/4/5, LSU_ERR_CTL, UART TX",
                   "aprr_permissions_enforced": False, "returncode": result.returncode, "stderr": result.stderr}
         destination.write_text(json.dumps(report, indent=2))
         print(json.dumps(report, indent=2))

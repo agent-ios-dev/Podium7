@@ -165,15 +165,15 @@ static void podium7_research_initfn(Object *obj)
     replace_once(directory / "target/arm/ptw.c",
         '    result->f.lg_page_size = ctz64(page_size);\n    return false;',
         '''    result->f.lg_page_size = ctz64(page_size);
-    /* Record only kernel-heap virtual mappings that leave this harness's RAM.
-     * This makes external aborts diagnosable without flooding the trace. */
+    /* Record kernel-heap virtual mappings outside the harness RAM. These can
+     * be legitimate MMIO mappings; an out-of-RAM address alone is not a fault. */
     static unsigned podium7_out_of_ram_mappings;
     if ((env->podium7_aprr[18] & 1) &&
         address >= 0xffffffe000000000ULL && address < 0xfffffff000000000ULL &&
         (descaddr < 0x40000000ULL || descaddr >= 0xc0000000ULL) &&
         podium7_out_of_ram_mappings < 512) {
         qemu_log(
-            "PODIUM7 KVA-OUT-OF-RAM va=%016" PRIx64 " pa=%016" PRIx64
+            "PODIUM7 KVA-OUTSIDE-HARNESS-RAM va=%016" PRIx64 " pa=%016" PRIx64
             " page-size=%" PRIu64 "\\n",
             (uint64_t)address, (uint64_t)descaddr, (uint64_t)page_size);
         podium7_out_of_ram_mappings++;
@@ -278,14 +278,143 @@ static void podium7_mcc_create(MachineState *machine, MemoryRegion *memory)
 }
 
 '''
+    aic = '''
+/* Minimal Apple AIC v1 research model for the T8010 bootstrap.
+ * Register layout and 896 IRQ count follow the public Linux apple-aic driver.
+ * External device wiring and timer FIQ delivery are not modeled yet.
+ */
+typedef struct Podium7AIC {
+    MemoryRegion io;
+    uint32_t config;
+    uint32_t target_cpu[1024];
+    uint32_t irq_mask[32];
+    uint32_t irq_state[32];
+    uint32_t ipi_pending;
+    uint32_t ipi_mask;
+    unsigned logged_accesses;
+} Podium7AIC;
+
+static uint32_t podium7_aic_event(Podium7AIC *aic)
+{
+    unsigned irq;
+    for (irq = 0; irq < 896; irq++) {
+        uint32_t bit = 1U << (irq & 31);
+        if ((aic->target_cpu[irq] & 1) &&
+            (aic->irq_state[irq >> 5] & bit) &&
+            !(aic->irq_mask[irq >> 5] & bit)) {
+            aic->irq_mask[irq >> 5] |= bit; /* AIC auto-masks on event read */
+            return 0x10000U | irq;          /* type=IRQ, die=0 */
+        }
+    }
+    if ((aic->ipi_pending & 0x80000000U) && !(aic->ipi_mask & 0x80000000U)) {
+        aic->ipi_mask |= 0x80000000U;
+        return 0x40002U; /* self IPI */
+    }
+    if ((aic->ipi_pending & 1) && !(aic->ipi_mask & 1)) {
+        aic->ipi_mask |= 1;
+        return 0x40001U; /* other IPI */
+    }
+    return 0; /* spurious / no pending event */
+}
+
+static uint64_t podium7_aic_read(void *opaque, hwaddr address, unsigned size)
+{
+    Podium7AIC *aic = opaque;
+    uint32_t value = 0;
+    if (address >= 0x5000 && address < 0x5080) {
+        address = address - 0x5000 + 0x2000; /* explicit CPU 0 register view */
+    }
+    switch (address) {
+    case 0x0004: value = 896; break; /* AIC_INFO: implemented IRQ count */
+    case 0x0010: value = aic->config; break;
+    case 0x2000: value = 0; break; /* AIC_WHOAMI: CPU 0 */
+    case 0x2004: value = podium7_aic_event(aic); break; /* AIC_EVENT */
+    case 0x200c: value = aic->ipi_pending; break; /* AIC_IPI_ACK */
+    default:
+        if (address >= 0x3000 && address < 0x4000) {
+            value = aic->target_cpu[(address - 0x3000) >> 2];
+        } else if (address >= 0x4000 && address < 0x4080) {
+            value = aic->irq_state[(address - 0x4000) >> 2];
+        } else if (address >= 0x4100 && address < 0x4180) {
+            value = aic->irq_mask[(address - 0x4100) >> 2];
+        } else if (address >= 0x4180 && address < 0x4200) {
+            value = aic->irq_mask[(address - 0x4180) >> 2];
+        } else if (address >= 0x4200 && address < 0x4280) {
+            value = aic->irq_state[(address - 0x4200) >> 2];
+        }
+        break;
+    }
+    if (aic->logged_accesses < 512) {
+        qemu_log("PODIUM7 AIC1 read offset=%05" PRIx64 " value=%08" PRIx32 "\\n",
+                 (uint64_t)address, value);
+        aic->logged_accesses++;
+    }
+    return value;
+}
+
+static void podium7_aic_write(void *opaque, hwaddr address, uint64_t data,
+                              unsigned size)
+{
+    Podium7AIC *aic = opaque;
+    uint32_t value = (uint32_t)data;
+    if (address >= 0x5000 && address < 0x5080) {
+        address = address - 0x5000 + 0x2000;
+    }
+    switch (address) {
+    case 0x0010: aic->config = value; break;
+    case 0x2008: aic->ipi_pending |= value & 0x80000001U; break;
+    case 0x200c: aic->ipi_pending &= ~(value & 0x80000001U); break;
+    case 0x2024: aic->ipi_mask |= value & 0x80000001U; break;
+    case 0x2028: aic->ipi_mask &= ~(value & 0x80000001U); break;
+    default:
+        if (address >= 0x3000 && address < 0x4000) {
+            aic->target_cpu[(address - 0x3000) >> 2] = value;
+        } else if (address >= 0x4000 && address < 0x4080) {
+            aic->irq_state[(address - 0x4000) >> 2] |= value;
+        } else if (address >= 0x4080 && address < 0x4100) {
+            aic->irq_state[(address - 0x4080) >> 2] &= ~value;
+        } else if (address >= 0x4100 && address < 0x4180) {
+            aic->irq_mask[(address - 0x4100) >> 2] |= value;
+        } else if (address >= 0x4180 && address < 0x4200) {
+            aic->irq_mask[(address - 0x4180) >> 2] &= ~value;
+        }
+        break;
+    }
+    if (aic->logged_accesses < 512) {
+        qemu_log("PODIUM7 AIC1 write offset=%05" PRIx64 " value=%08" PRIx32 "\\n",
+                 (uint64_t)address, value);
+        aic->logged_accesses++;
+    }
+}
+
+static const MemoryRegionOps podium7_aic_ops = {
+    .read = podium7_aic_read, .write = podium7_aic_write,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+    .valid = { .min_access_size = 4, .max_access_size = 4 },
+};
+
+static void podium7_aic_create(MachineState *machine, MemoryRegion *memory)
+{
+    Podium7AIC *aic = g_new0(Podium7AIC, 1);
+    memset(aic->irq_mask, 0xff, sizeof(aic->irq_mask));
+    aic->ipi_mask = 0x80000001U;
+    memory_region_init_io(&aic->io, OBJECT(machine), &podium7_aic_ops, aic,
+                          "podium7-aic-v1-research", 0x100000);
+    memory_region_add_subregion(memory, 0x20e100000ULL, &aic->io);
+}
+
+'''
+    replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
+                 '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + "static void machvirt_init(MachineState *machine)")
     replace_once(directory / "hw/arm/virt.c",
                  "    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);",
                  '''    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);
     if (!strcmp(machine->cpu_type, ARM_CPU_TYPE_NAME("podium7-research"))) {
         podium7_uart_create(machine, sysmem);
         podium7_mcc_create(machine, sysmem);
+        podium7_aic_create(machine, sysmem);
     }''')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")

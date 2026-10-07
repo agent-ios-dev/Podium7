@@ -673,10 +673,75 @@ static void podium7_thermal_create(MachineState *machine, MemoryRegion *memory)
 }
 
 '''
+    usbphy = '''
+/* Minimal T8010 OTG PHY register windows for XNU bootstrap.
+ * DeviceTree maps a 0x20-byte control range at 0x20c000030 and a 0x1000-byte
+ * PHY range at 0x20e0d8000. Registers are zeroed and stateful only; clocks,
+ * reset sequencing, USB signaling, DMA, and interrupts are not modeled.
+ */
+typedef struct Podium7USBPHYBank {
+    MemoryRegion io;
+    uint64_t base;
+    uint32_t registers[0x400];
+    unsigned logged_accesses;
+} Podium7USBPHYBank;
+
+static uint64_t podium7_usbphy_read(void *opaque, hwaddr address, unsigned size)
+{
+    Podium7USBPHYBank *bank = opaque;
+    uint32_t value = bank->registers[address >> 2];
+    if (bank->logged_accesses < 256) {
+        qemu_log("PODIUM7 USBPHY base=%016" PRIx64 " read offset=%04" PRIx64
+                 " value=%08" PRIx32 "\\n",
+                 bank->base, (uint64_t)address, value);
+        bank->logged_accesses++;
+    }
+    return value;
+}
+
+static void podium7_usbphy_write(void *opaque, hwaddr address, uint64_t data,
+                                 unsigned size)
+{
+    Podium7USBPHYBank *bank = opaque;
+    uint32_t value = (uint32_t)data;
+    bank->registers[address >> 2] = value;
+    if (bank->logged_accesses < 256) {
+        qemu_log("PODIUM7 USBPHY base=%016" PRIx64 " write offset=%04" PRIx64
+                 " value=%08" PRIx32 "\\n",
+                 bank->base, (uint64_t)address, value);
+        bank->logged_accesses++;
+    }
+}
+
+static const MemoryRegionOps podium7_usbphy_ops = {
+    .read = podium7_usbphy_read, .write = podium7_usbphy_write,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+    .valid = { .min_access_size = 4, .max_access_size = 4 },
+};
+
+static void podium7_usbphy_bank_create(MachineState *machine, MemoryRegion *memory,
+                                       hwaddr base, hwaddr size, const char *name)
+{
+    Podium7USBPHYBank *bank = g_new0(Podium7USBPHYBank, 1);
+    bank->base = base;
+    memory_region_init_io(&bank->io, OBJECT(machine), &podium7_usbphy_ops, bank,
+                          name, size);
+    memory_region_add_subregion(memory, base, &bank->io);
+}
+
+static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
+{
+    podium7_usbphy_bank_create(machine, memory, 0x20c000030ULL, 0x20,
+                               "podium7-t8010-otgphy-control");
+    podium7_usbphy_bank_create(machine, memory, 0x20e0d8000ULL, 0x1000,
+                               "podium7-t8010-otgphy-registers");
+}
+
+'''
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + "static void machvirt_init(MachineState *machine)")
     replace_once(directory / "hw/arm/virt.c",
                  "    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);",
                  '''    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);
@@ -694,6 +759,7 @@ static void podium7_thermal_create(MachineState *machine, MemoryRegion *memory)
         podium7_aes_create(machine, sysmem, 0x2102d0000ULL,
                            "podium7-t8010-aes-secondary");
         podium7_thermal_create(machine, sysmem);
+        podium7_usbphy_create(machine, sysmem);
     }''')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")

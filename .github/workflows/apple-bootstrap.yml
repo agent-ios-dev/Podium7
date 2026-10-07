@@ -48,6 +48,8 @@ jobs:
         run: python3 Tools/check_aes.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify T8010 thermal sensor register window
         run: python3 Tools/check_sochot.py --qemu .qemu/build/qemu-system-aarch64
+      - name: Verify T8010 OTG PHY register windows
+        run: python3 Tools/check_usbphy.py --qemu .qemu/build/qemu-system-aarch64
       - name: Execute original kernel and retain the next failure
         run: python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research
       - name: Verify MCC register lock and protected RAM
@@ -86,5 +88,6 @@ jobs:
             .firmware/gpio-checks.json
             .firmware/aes-checks.json
             .firmware/sochot-checks.json
+            .firmware/usbphy-checks.json
             .firmware/ktrr-checks.json
             .firmware/ktrr-check-trace.txt

@@ -139,6 +139,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
     gpio_transactions = [line for line in trace_text.splitlines() if "PODIUM7 GPIO " in line]
     aes_transactions = [line for line in trace_text.splitlines() if "PODIUM7 AES " in line]
     thermal_transactions = [line for line in trace_text.splitlines() if "PODIUM7 THERMAL " in line]
+    usbphy_transactions = [line for line in trace_text.splitlines() if "PODIUM7 USBPHY " in line]
     exception_tail = faults[-24:]
     summary = {"booted_ios": False, "kernel_entry_seen": entry_seen, "physical_kernel_entry": hex(kernel_entry),
                "last_translated_blocks": re.findall(r"^0x([0-9a-fA-F]+):", trace_text, re.MULTILINE)[-8:],
@@ -153,6 +154,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
                "gpio_transactions": gpio_transactions[:128],
                "aes_transactions": aes_transactions[:128],
                "thermal_transactions": thermal_transactions[:128],
+               "usbphy_transactions": usbphy_transactions[:128],
                "backend": version, "board": "QEMU virt bootstrap experiment, not T8010",
                "physical_ram_base": hex(PHYSICAL_BASE), "command": command, "stop": stop,
                "returncode": process.returncode, "seconds": time.monotonic() - start,

@@ -16,3 +16,4 @@ __pycache__/
 *.elf
 artifacts/
 /evidence/bootstrap-probe/
+.qemu/

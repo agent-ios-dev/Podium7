@@ -1,0 +1,36 @@
+name: Probe Apple bootstrap with explicit research register model
+on: [workflow_dispatch]
+jobs:
+  bootstrap:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s Tools -p 'test_*.py'
+      - run: python3 Tools/fetch_firmware.py
+      - run: python3 Tools/analyze_firmware.py
+      - name: Install build dependencies
+        run: brew install glib pixman ninja pkgconf
+      - name: Prepare pinned QEMU with opt-in APRR register latches
+        run: |
+          git clone --depth 1 --branch v10.0.0 https://github.com/qemu/qemu.git .qemu
+          python3 Tools/patch_qemu.py .qemu
+      - name: Build external research CPU backend
+        run: |
+          mkdir .qemu/build
+          cd .qemu/build
+          ../configure --target-list=aarch64-softmmu --disable-docs --disable-tools --disable-guest-agent --disable-slirp --disable-hvf --disable-cocoa --disable-vnc --disable-sdl --disable-gtk --disable-curses
+          ninja qemu-system-aarch64
+      - name: Execute original kernel and retain the next failure
+        run: python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: apple-bootstrap-evidence
+          include-hidden-files: true
+          path: |
+            .firmware/firmware.json
+            .firmware/analysis.json
+            .firmware/qemu-probe.json
+            .firmware/qemu-trace.txt
+            .firmware/qemu-serial.txt

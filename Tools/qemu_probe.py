@@ -77,10 +77,10 @@ def make_probe(directory):
     return destination, entry
 
 
-def run_probe(directory, executable="qemu-system-aarch64"):
+def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
     image, kernel_entry = make_probe(directory)
     trace, serial = directory / "qemu-trace.txt", directory / "qemu-serial.txt"
-    command = [executable, "-machine", "virt,secure=off,virtualization=off", "-cpu", "max", "-accel", "tcg",
+    command = [executable, "-machine", "virt,secure=off,virtualization=off", "-cpu", cpu, "-accel", "tcg",
                "-m", "2048", "-smp", "1", "-display", "none", "-monitor", "none", "-serial", "stdio",
                "-device", f"loader,file={image},cpu-num=0", "-d", "in_asm,int,guest_errors,unimp", "-D", str(trace)]
     version = subprocess.check_output([executable, "--version"], text=True).splitlines()[0]
@@ -103,6 +103,7 @@ def run_probe(directory, executable="qemu-system-aarch64"):
     entry_seen = any(int(address, 16) == kernel_entry for address in re.findall(r"^0x([0-9a-fA-F]+):", trace_text, re.MULTILINE))
     exception_tail = [line for line in trace_text.splitlines() if "exception" in line.lower() or "unimplemented" in line.lower() or "unallocated" in line.lower()][-24:]
     summary = {"booted_ios": False, "kernel_entry_seen": entry_seen, "physical_kernel_entry": hex(kernel_entry),
+               "cpu_model": cpu, "aprr_permissions_enforced": False,
                "exception_tail": exception_tail, "backend": version, "board": "QEMU virt bootstrap experiment, not T8010",
                "physical_ram_base": hex(PHYSICAL_BASE), "command": command, "stop": stop,
                "returncode": process.returncode, "seconds": time.monotonic() - start,
@@ -119,5 +120,7 @@ def run_probe(directory, executable="qemu-system-aarch64"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--directory", type=pathlib.Path, default=pathlib.Path(".firmware"))
+    parser.add_argument("--qemu", default="qemu-system-aarch64")
+    parser.add_argument("--cpu", choices=["max", "podium7-research"], default="max")
     args = parser.parse_args()
-    run_probe(args.directory)
+    run_probe(args.directory, executable=args.qemu, cpu=args.cpu)

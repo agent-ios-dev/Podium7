@@ -25,6 +25,31 @@ def patch(directory):
         raise ValueError(f"QEMU commit mismatch: {actual} != {PIN}")
     if subprocess.check_output(["git", "-C", str(directory), "status", "--porcelain"], text=True).strip():
         raise ValueError("refusing to patch a dirty QEMU checkout")
+    # Runtime-only diagnostic for the unpatched 19H422 ACC decoder. No register
+    # values, instruction bytes or branch decisions are modified by this helper.
+    with (directory / "target/arm/helper.h").open("a") as output:
+        output.write("\n#ifdef TARGET_AARCH64\nDEF_HELPER_2(podium7_acc_trace, void, env, i64)\n#endif\n")
+    with (directory / "target/arm/tcg/helper-a64.c").open("a") as output:
+        output.write(r'''
+void HELPER(podium7_acc_trace)(CPUARMState *env, uint64_t pc)
+{
+    static unsigned logged;
+    if (logged++ < 128) {
+        qemu_log("PODIUM7 ACC-ARG pc=%016" PRIx64 " x0=%016" PRIx64
+                 " x1=%016" PRIx64 " x19=%016" PRIx64 " x20=%016" PRIx64
+                 " fp=%016" PRIx64 " lr=%016" PRIx64 "\n",
+                 pc, env->xregs[0], env->xregs[1], env->xregs[19], env->xregs[20],
+                 env->xregs[29], env->xregs[30]);
+    }
+}
+''')
+    replace_once(directory / "target/arm/tcg/translate-a64.c",
+                 "    s->insn = insn;\n    s->base.pc_next = pc + 4;",
+                 '''    s->insn = insn;
+    s->base.pc_next = pc + 4;
+    if (pc == 0xfffffff0069459f4ULL || pc == 0xfffffff006945b6cULL) {
+        gen_helper_podium7_acc_trace(tcg_env, tcg_constant_i64(pc));
+    }''')
     # QEMU reserves fieldoffset=0 to mean no backing storage.
     replace_once(directory / "target/arm/cpu.h", "    uint32_t regs[16];",
                  "    uint32_t regs[16];\n    uint64_t podium7_aprr[32]; /* fixed research register bank; not full Apple semantics */")

@@ -1,5 +1,6 @@
 """Read a stopped QEMU CPU snapshot; no guest-success heuristics."""
 import json
+import re
 import socket
 
 
@@ -33,5 +34,7 @@ def capture(path):
             request("stop")
             result = {"cpus": request("query-cpus-fast"),
                       "registers": request("human-monitor-command", {"command-line": "info registers"})}
-            result["stack"] = request("human-monitor-command", {"command-line": "x/256gx $sp"})
+            sp = re.search(r"\bSP=([0-9a-fA-F]{16})\b", result["registers"])
+            result["stack"] = (request("human-monitor-command", {"command-line": f"x/256gx 0x{sp.group(1)}"})
+                               if sp else "Stack capture unavailable: SP missing from CPU registers")
             return result

@@ -79,7 +79,7 @@ class ResearchBridgeHandoffTests(unittest.TestCase):
         self.assertEqual(original["voltage-states1"], bytes(128).hex())
         clocks = next(n["properties"] for n in device_tree(prepared) if n["path"] == "/device-tree/arm-io")
         self.assertEqual(bytes.fromhex(clocks["clock-frequencies"]), struct.pack("<I", 24000000) * 96)
-        self.assertEqual(clocks["clock-frequencies-nclk"], bytes(384).hex())
+        self.assertEqual(bytes.fromhex(clocks["clock-frequencies-nclk"]), struct.pack("<I", 2) * 96)
         self.assertFalse(next(c for c in changes if c.get("source") == "synthetic research bridge model")["authentic_iboot_handoff"])
 
     def test_other_platforms_rejected(self):

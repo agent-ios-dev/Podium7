@@ -60,7 +60,7 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
             frequencies = names.get(b"clock-frequencies")
             if frequencies is not None and len(frequencies) == 384 and not any(frequencies):
                 # AppleARMIO consumes matched arrays of UInt32 frequencies and
-                # clock classes. Class 0 is nclk. TCG clocks are fixed nominal
+                # clock classes. Class 2 selects nclk. TCG clocks are fixed nominal
                 # sources, not recovered physical A10 PLL programming.
                 count = len(frequencies) // 4
                 replacement = struct.pack("<I", counter_frequency) * count
@@ -69,7 +69,7 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
                 properties[position] = (properties[position][0], replacement)
                 key = b"clock-frequencies-nclk"
                 if key not in names:
-                    properties.append((key.ljust(32, b"\0"), bytes(len(frequencies))))
+                    properties.append((key.ljust(32, b"\0"), struct.pack("<I", 2) * count))
                 changes.append({"path": path, "property": "clock-frequencies",
                                 "source": "synthetic fixed-frequency virtual clock sources",
                                 "frequency": counter_frequency, "count": count,

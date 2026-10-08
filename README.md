@@ -105,6 +105,6 @@ After PMGR state windows were modeled, the experiment reached
 `clock-frequencies` contains 384 zero placeholder bytes and lacks the matched
 `clock-frequencies-nclk` clock-class array. Original AppleARMIO code at
 `0xfffffff005b8f83c` consumes matching UInt32 arrays. The research handoff
-fills only this all-zero placeholder with nominal 24 MHz sources and class 0
+fills only this all-zero placeholder with nominal 24 MHz sources and class 2
 (nclk); these are virtual sources, not physical A10 PLL values. The baseline
 probe preserves the IPSW values. No successful iOS boot has been observed.

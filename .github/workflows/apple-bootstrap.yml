@@ -58,6 +58,8 @@ jobs:
         run: python3 Tools/check_dwi.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify original MCA banks and reset registers
         run: python3 Tools/check_mca.py --qemu .qemu/build/qemu-system-aarch64
+      - name: Verify original MIPI-DSIM register window
+        run: python3 Tools/check_mipi_dsim.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify T8010 AOP I2S routing register
         run: python3 Tools/check_i2s_switch.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify all PMGR bridge register windows with original DeviceTree
@@ -130,6 +132,7 @@ jobs:
             .firmware/usbphy-checks.json
             .firmware/dwi-checks.json
             .firmware/mca-checks.json
+            .firmware/mipi-dsim-checks.json
             .firmware/i2s-switch-checks.json
             .firmware/ktrr-checks.json
             .firmware/ktrr-check-trace.txt

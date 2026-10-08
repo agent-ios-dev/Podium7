@@ -1,3 +1,15 @@
+## Verified MCA progress: run 37827850041
+
+All three MCA banks and reset-register guest checks pass. XNU moves on to a
+read fault at physical 0x206600000, PC 0xfffffff0065dc9cc. The original tree
+identifies mipi-dsim reg[0], size 1 MiB. The next backing model covers that
+exact range with dynamically sized storage and a real ARM64 guest test of
+initial reads, independent registers and the final register. Panel signaling,
+PLL timing and display output are not implemented by these latches. Boot
+remains incomplete; root mounting, launchd and SpringBoard are not confirmed.
+
+---
+
 ## Verified DWI progress: run 37827170433
 
 The DWI initialization/boundary guest test passes. XNU reaches a new 32-bit

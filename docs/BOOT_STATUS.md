@@ -1,3 +1,20 @@
+## Genuine root filesystem mount: run 37832777803
+
+After the MCA reset-completion fix, original XNU selects md0 and prints:
+`hfs: mounted SkyUpdate19H422.arm64CustomerRamDisk on device b(3, 0)`.
+This confirms the real Apple restore HFSX root volume mounted in the guest.
+The 120-second run captured no panic. It does not confirm launchd or a home
+screen; restore userland is distinct from an ordinary iOS desktop.
+
+Next diagnostics trace the actual IOSecureBSDRoot entry and its SecureRootName
+platform call/return at 0xfffffff0077b9084/0xfffffff0077b9108/0xfffffff0077b910c.
+The original Apple source calls this immediately after mountroot. The helper
+only logs registers and never changes guest instructions or return values.
+The goal is to distinguish security/resource waiting from userland execution
+failure, using actual runtime evidence. The backend is still external to IPA.
+
+---
+
 ## Two minutes without panic; MCA reset stall: run 37831773255
 
 The genuine PMGR boundary setter now receives count 4, P-core-lowest 2.

@@ -200,7 +200,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
     faults = [line for line in trace_text.splitlines() if "exception" in line.lower() or "unimplemented" in line.lower() or "unallocated" in line.lower() or "unsupported" in line.lower()]
     outside_harness_ram_mappings = [line for line in trace_text.splitlines()
                                     if "PODIUM7 KVA-OUTSIDE-HARNESS-RAM" in line]
-    acc_arguments = [line for line in trace_text.splitlines() if "PODIUM7 ACC-ARG " in line]
+    acc_arguments = [line for line in trace_text.splitlines() if "PODIUM7 ACC-ARG " in line or "PODIUM7 BOOT-ARG " in line]
     timer_fiq_transactions = [line for line in trace_text.splitlines() if "PODIUM7 TIMER-FIQ " in line]
     aic_transactions = [line for line in trace_text.splitlines() if "PODIUM7 AIC1 " in line]
     mcc_transactions = [line for line in trace_text.splitlines() if "PODIUM7 MCC " in line]

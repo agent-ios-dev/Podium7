@@ -34,11 +34,14 @@ def patch(directory):
 void HELPER(podium7_acc_trace)(CPUARMState *env, uint64_t pc)
 {
     static unsigned logged;
-    if (logged++ < 256 || pc == 0xfffffff0069445c4ULL) {
-        qemu_log("PODIUM7 ACC-ARG pc=%016" PRIx64 " x0=%016" PRIx64
-                 " x1=%016" PRIx64 " x2=%016" PRIx64 " x19=%016" PRIx64 " x20=%016" PRIx64
+    if (logged++ < 256 || pc == 0xfffffff0069445c4ULL ||
+        (pc >= 0xfffffff0077b9084ULL && pc <= 0xfffffff0077b910cULL)) {
+        qemu_log("PODIUM7 BOOT-ARG pc=%016" PRIx64 " x0=%016" PRIx64
+                 " x1=%016" PRIx64 " x2=%016" PRIx64 " x3=%016" PRIx64
+                 " x8=%016" PRIx64 " x19=%016" PRIx64 " x20=%016" PRIx64
                  " fp=%016" PRIx64 " lr=%016" PRIx64 "\n",
-                 pc, env->xregs[0], env->xregs[1], env->xregs[2], env->xregs[19], env->xregs[20],
+                 pc, env->xregs[0], env->xregs[1], env->xregs[2], env->xregs[3],
+                 env->xregs[8], env->xregs[19], env->xregs[20],
                  env->xregs[29], env->xregs[30]);
     }
 }
@@ -47,7 +50,9 @@ void HELPER(podium7_acc_trace)(CPUARMState *env, uint64_t pc)
                  "    s->insn = insn;\n    s->base.pc_next = pc + 4;",
                  '''    s->insn = insn;
     s->base.pc_next = pc + 4;
-    if (pc == 0xfffffff0069459f4ULL || pc == 0xfffffff006945b6cULL || pc == 0xfffffff0069445c4ULL) {
+    if (pc == 0xfffffff0069459f4ULL || pc == 0xfffffff006945b6cULL || pc == 0xfffffff0069445c4ULL ||
+        pc == 0xfffffff0077b9084ULL || pc == 0xfffffff0077b9108ULL ||
+        pc == 0xfffffff0077b910cULL) {
         gen_helper_podium7_acc_trace(tcg_env, tcg_constant_i64(pc));
     }''')
     # QEMU reserves fieldoffset=0 to mean no backing storage.

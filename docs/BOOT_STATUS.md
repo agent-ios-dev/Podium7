@@ -1,3 +1,15 @@
+## Verified USB-complex progress: run 37826471006
+
+The USB-complex parent control test passes and XNU proceeds past its control
+write. The next fault is a 32-bit write at physical 0x20e200000 from PC
+0xfffffff006507514. The original DeviceTree identifies dwi,t8010/dwi,s8000,
+IRQ 5, with a 16-KiB register range. The observed initialization writes offsets
+0, 0xd0, 4, 0x84 and 0x80. A separate DWI backing-store model and ARM64 guest
+initialization/boundary test are added next. DWI bus transfers and IRQ delivery
+are unimplemented; no root mount, launchd or SpringBoard is confirmed.
+
+---
+
 ## Verified ACC page progress: run 37825946490
 
 The observed ACC control page test passes and XNU progresses past its former

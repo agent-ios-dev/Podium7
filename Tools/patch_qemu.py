@@ -779,6 +779,9 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
                                "podium7-t8010-otgphy-control");
     podium7_usbphy_bank_create(machine, memory, 0x20e0d8000ULL, 0x1000,
                                "podium7-t8010-otgphy-registers");
+    /* Original n112ap usb-complex parent range, independently of OTG PHY. */
+    podium7_usbphy_bank_create(machine, memory, 0x20c900000ULL, 0xa0,
+                               "podium7-t8010-usb-complex-control");
 }
 
 '''

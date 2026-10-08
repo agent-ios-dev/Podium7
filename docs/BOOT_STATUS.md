@@ -1,3 +1,16 @@
+## Verified ACC page progress: run 37825946490
+
+The observed ACC control page test passes and XNU progresses past its former
+store fault. The next failure is a 32-bit write of 0x108 at physical
+0x20c90001c, PC 0xfffffff006d0f600. This resolves to the original DeviceTree's
+usb-complex parent control range, base 0x20c900000, size 0xa0. The next patch
+adds that exact range using independent backing registers and a guest test
+of the observed write and last register. USB host/device signaling, DMA and
+interrupt delivery are still not implemented. No root mount or userland is
+confirmed.
+
+---
+
 ## Verified CPU performance fix: run 37825327929
 
 The real guest CPU performance tests pass. The original kernel no longer

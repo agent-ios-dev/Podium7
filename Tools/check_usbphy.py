@@ -33,6 +33,22 @@ str w5, [x3, #0xffc]
 ldr w4, [x3, #0xffc]
 cmp w4, w5
 b.ne failure
+// The original XNU USB-complex driver writes 0x108 at offset 0x1c.
+movz x3, #0
+movk x3, #0x0c90, lsl #16
+movk x3, #2, lsl #32
+ldr w4, [x3, #0x1c]
+cbnz w4, failure
+mov w5, #0x108
+str w5, [x3, #0x1c]
+ldr w4, [x3, #0x1c]
+cmp w4, w5
+b.ne failure
+mov w5, #0x5678
+str w5, [x3, #0x9c]
+ldr w4, [x3, #0x9c]
+cmp w4, w5
+b.ne failure
 mov x0, #0x20
 adr x1, success_exit
 hlt #0xf000
@@ -64,7 +80,8 @@ failure_exit:
         report.write_text(json.dumps({"passed": passed,
             "model": "T8010 OTG PHY register-window backing stores",
             "checks": ["control window read/write and 0x20-byte boundary",
-                       "PHY window read/write and 0x1000-byte boundary"],
+                       "PHY window read/write and 0x1000-byte boundary",
+                       "USB-complex 0x108 control write and 0xa0-byte boundary"],
             "returncode": result.returncode, "stdout": result.stdout,
             "stderr": result.stderr}, indent=2))
         if not passed:

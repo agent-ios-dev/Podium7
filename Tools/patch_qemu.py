@@ -758,31 +758,35 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
 
 '''
     i2s_switch = '''
-/* The n112ap DeviceTree exposes one 32-bit AOP I2S routing register.
+/* n112ap exposes a 4-KiB AOP I2S bank and one 32-bit routing register.
  * Retain guest routing writes for bootstrap. No PCM/DMA/audio output yet.
  */
 typedef struct Podium7I2SSwitch {
     MemoryRegion io;
-    uint32_t routing;
+    uint64_t base;
+    uint32_t registers[0x400];
     unsigned logged_accesses;
 } Podium7I2SSwitch;
 
 static uint64_t podium7_i2s_switch_read(void *opaque, hwaddr address, unsigned size)
 {
     Podium7I2SSwitch *s = opaque;
+    uint32_t value = s->registers[address >> 2];
     if (s->logged_accesses++ < 64) {
-        qemu_log("PODIUM7 I2S-SWITCH read value=%08" PRIx32 "\\n", s->routing);
+        qemu_log("PODIUM7 I2S-SWITCH base=%016" PRIx64 " read offset=%04" PRIx64
+                 " value=%08" PRIx32 "\\n", s->base, (uint64_t)address, value);
     }
-    return s->routing;
+    return value;
 }
 
 static void podium7_i2s_switch_write(void *opaque, hwaddr address, uint64_t value,
                                      unsigned size)
 {
     Podium7I2SSwitch *s = opaque;
-    s->routing = (uint32_t)value;
+    s->registers[address >> 2] = (uint32_t)value;
     if (s->logged_accesses++ < 64) {
-        qemu_log("PODIUM7 I2S-SWITCH write value=%08" PRIx32 "\\n", s->routing);
+        qemu_log("PODIUM7 I2S-SWITCH base=%016" PRIx64 " write offset=%04" PRIx64
+                 " value=%08" PRIx32 "\\n", s->base, (uint64_t)address, (uint32_t)value);
     }
 }
 
@@ -793,12 +797,23 @@ static const MemoryRegionOps podium7_i2s_switch_ops = {
     .impl = { .min_access_size = 4, .max_access_size = 4 },
 };
 
-static void podium7_i2s_switch_create(MachineState *machine, MemoryRegion *memory)
+static void podium7_i2s_switch_bank_create(MachineState *machine,
+                                          MemoryRegion *memory, hwaddr base,
+                                          hwaddr size, const char *name)
 {
     Podium7I2SSwitch *s = g_new0(Podium7I2SSwitch, 1);
+    s->base = base;
     memory_region_init_io(&s->io, OBJECT(machine), &podium7_i2s_switch_ops,
-                          s, "podium7-t8010-aop-i2s-switch", 4);
-    memory_region_add_subregion(memory, 0x210000600ULL, &s->io);
+                          s, name, size);
+    memory_region_add_subregion(memory, base, &s->io);
+}
+
+static void podium7_i2s_switch_create(MachineState *machine, MemoryRegion *memory)
+{
+    podium7_i2s_switch_bank_create(machine, memory, 0x210540000ULL, 0x1000,
+                                   "podium7-t8010-aop-i2s-bank");
+    podium7_i2s_switch_bank_create(machine, memory, 0x210000600ULL, 4,
+                                   "podium7-t8010-aop-i2s-routing");
 }
 
 '''

@@ -32,6 +32,31 @@ str w5, [x3]
 ldr w4, [x3]
 cmp w4, w5
 b.ne failure
+movz x3, #0
+movk x3, #0x1054, lsl #16
+movk x3, #2, lsl #32
+ldr w4, [x3, #0xffc]
+cmp w4, #0
+b.ne failure
+mov w5, #0x4321
+str w5, [x3, #0xffc]
+ldr w4, [x3, #0xffc]
+cmp w4, w5
+b.ne failure
+ldr w4, [x3]
+cmp w4, #0
+b.ne failure
+mov w5, #0x1234
+str w5, [x3]
+ldr w4, [x3]
+cmp w4, w5
+b.ne failure
+movz x3, #0x600
+movk x3, #0x1000, lsl #16
+movk x3, #2, lsl #32
+ldr w4, [x3]
+cmp w4, #0
+b.ne failure
 mov x0, #0x20
 adr x1, success_exit
 hlt #0xf000
@@ -63,7 +88,9 @@ failure_exit:
         report.write_text(json.dumps({"passed": passed,
             "model": "T8010 AOP I2S routing register backing store",
             "checks": ["zero reset value", "XNU routing write 8 persists",
-                       "all routing bits round-trip", "routing can be cleared"],
+                       "all routing bits round-trip", "routing can be cleared",
+                       "4-KiB bank read/write at both boundaries",
+                       "routing and register bank are independent"],
             "returncode": result.returncode, "stdout": result.stdout,
             "stderr": result.stderr}, indent=2))
         if not passed:

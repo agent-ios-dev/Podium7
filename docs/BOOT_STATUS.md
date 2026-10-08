@@ -1,3 +1,22 @@
+## Confirmed post-mount block: run 37834592824
+
+Original HFS root mounting repeats successfully. Runtime tracing reaches
+IOSecureBSDRoot entry and the SecureRootName platform dispatch, but never
+records its return within 120 seconds. This isolates the next dependency.
+
+An explicitly separate restore-userland experiment now accepts
+--research-ramdisk-root. It changes only the IOSecureBSDRoot entry instruction
+in the generated ELF to RET. The original kernel file is untouched. The edit
+requires exact kernel SHA-256 115489dd3e2adbe3e0d646413adb9397cfaf1c47f7b5d03620f78dd7d9371814
+and a matching 24-byte function signature; other kernels are rejected.
+Both hashes and the exact edit are recorded in guest-patches.json. This is an
+unauthenticated, modified-kernel research test to isolate userland startup,
+not a completed virtual secure-boot implementation or an ordinary iOS desktop.
+The unpatched restore test remains separate. No launchd execution is yet
+confirmed. Local patch guards/regressions pass (37 Python tests total).
+
+---
+
 ## Genuine root filesystem mount: run 37832777803
 
 After the MCA reset-completion fix, original XNU selects md0 and prints:

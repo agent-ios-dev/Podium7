@@ -31,5 +31,7 @@ def capture(path):
                 raise ValueError("QMP reply missing after 100 events")
             request("qmp_capabilities")
             request("stop")
-            return {"cpus": request("query-cpus-fast"),
-                    "registers": request("human-monitor-command", {"command-line": "info registers"})}
+            result = {"cpus": request("query-cpus-fast"),
+                      "registers": request("human-monitor-command", {"command-line": "info registers"})}
+            result["stack"] = request("human-monitor-command", {"command-line": "x/256gx $sp"})
+            return result

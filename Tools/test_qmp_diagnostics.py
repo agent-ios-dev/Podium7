@@ -22,7 +22,8 @@ class QMPTests(unittest.TestCase):
             {"QMP": {}}, {"id": "qmp_capabilities", "return": {}},
             {"event": "STOP"}, {"id": "stop", "return": {}},
             {"id": "query-cpus-fast", "return": [{"cpu-index": 0}]},
-            {"id": "human-monitor-command", "return": "PC=fffffff0071904e8"}])
+            {"id": "human-monitor-command", "return": "PC=fffffff0071904e8"},
+            {"id": "human-monitor-command", "return": "ffffffe000001000: 0x1234"}])
         connection = MagicMock()
         connection.__enter__.return_value = connection
         connection.makefile.return_value = stream
@@ -30,8 +31,9 @@ class QMPTests(unittest.TestCase):
             result = capture("local.sock")
         self.assertEqual(result["registers"], "PC=fffffff0071904e8")
         self.assertEqual(result["cpus"][0]["cpu-index"], 0)
+        self.assertIn("0x1234", result["stack"])
         self.assertEqual([item["execute"] for item in stream.sent],
-                         ["qmp_capabilities", "stop", "query-cpus-fast", "human-monitor-command"])
+                         ["qmp_capabilities", "stop", "query-cpus-fast", "human-monitor-command", "human-monitor-command"])
 
     def test_server_error_is_not_reported_as_successful_snapshot(self):
         stream = Stream([{"QMP": {}}, {"id": "qmp_capabilities", "error": {"desc": "denied"}}])

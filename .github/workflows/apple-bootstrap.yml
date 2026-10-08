@@ -104,6 +104,7 @@ jobs:
             .firmware/pmgr-power-checks.json
             .firmware/cpu-snapshot.json
             .firmware/cpu-snapshot.txt
+            .firmware/cpu-stack.txt
             .firmware/qemu-probe.json
             .firmware/qemu-trace.txt
             .firmware/qemu-serial.txt

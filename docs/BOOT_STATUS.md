@@ -1,3 +1,13 @@
+## Verified FIQ progress: run 37816744771
+
+Physical and virtual timer FIQ delivery passed the real guest test. Original
+XNU then progressed beyond the scheduler stall and stopped at a new assertion:
+AppleT8010PMGR::readACCReg64(UInt32):1195 REQUIRE failed: 0. This is not a full
+iOS boot. The next diagnostic captures the guest stack to recover the ACC read
+argument and its caller. Root mounting, launchd and SpringBoard are unconfirmed.
+
+---
+
 ## Timer interrupt diagnosis after the extended probe
 
 Run 37815576973 completed the genuine 120-second restore experiment. It did

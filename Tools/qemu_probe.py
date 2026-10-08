@@ -181,6 +181,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                 try:
                     snapshot = capture_cpu(monitor_path)
                     (directory / "cpu-snapshot.txt").write_text(snapshot["registers"])
+                    (directory / "cpu-stack.txt").write_text(snapshot["stack"])
                     (directory / "cpu-snapshot.json").write_text(json.dumps(snapshot, indent=2))
                 except (OSError, ValueError) as error:
                     snapshot = {"capture_error": str(error)}

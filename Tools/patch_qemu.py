@@ -34,11 +34,11 @@ def patch(directory):
 void HELPER(podium7_acc_trace)(CPUARMState *env, uint64_t pc)
 {
     static unsigned logged;
-    if (logged++ < 128) {
+    if (logged++ < 256 || pc == 0xfffffff0069445c4ULL) {
         qemu_log("PODIUM7 ACC-ARG pc=%016" PRIx64 " x0=%016" PRIx64
-                 " x1=%016" PRIx64 " x19=%016" PRIx64 " x20=%016" PRIx64
+                 " x1=%016" PRIx64 " x2=%016" PRIx64 " x19=%016" PRIx64 " x20=%016" PRIx64
                  " fp=%016" PRIx64 " lr=%016" PRIx64 "\n",
-                 pc, env->xregs[0], env->xregs[1], env->xregs[19], env->xregs[20],
+                 pc, env->xregs[0], env->xregs[1], env->xregs[2], env->xregs[19], env->xregs[20],
                  env->xregs[29], env->xregs[30]);
     }
 }
@@ -47,7 +47,7 @@ void HELPER(podium7_acc_trace)(CPUARMState *env, uint64_t pc)
                  "    s->insn = insn;\n    s->base.pc_next = pc + 4;",
                  '''    s->insn = insn;
     s->base.pc_next = pc + 4;
-    if (pc == 0xfffffff0069459f4ULL || pc == 0xfffffff006945b6cULL) {
+    if (pc == 0xfffffff0069459f4ULL || pc == 0xfffffff006945b6cULL || pc == 0xfffffff0069445c4ULL) {
         gen_helper_podium7_acc_trace(tcg_env, tcg_constant_i64(pc));
     }''')
     # QEMU reserves fieldoffset=0 to mean no backing storage.
@@ -1099,6 +1099,11 @@ static void podium7_pmgr_raw_create(MachineState *machine, MemoryRegion *memory)
         s->registers = g_new0(uint32_t, banks[i].size / 4);
         if (s->base == 0x202f20000ULL) {
             s->registers[0x20 / 4] = 2; /* first valid virtual CPU state */
+        }
+        if (s->base == 0x202f80000ULL) {
+            /* XNU reads state records at encoded index * 0x20. Bit 23
+             * distinguishes P-core records. State 0 is E, state 1 is P. */
+            s->registers[0x60 / 4] = 1U << 23;
         }
         memory_region_init_io(&s->io, OBJECT(machine), &podium7_pmgr_raw_ops,
                               s, "podium7-t8010-pmgr-raw", banks[i].size);

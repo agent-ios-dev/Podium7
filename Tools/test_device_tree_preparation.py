@@ -59,6 +59,7 @@ class ResearchBridgeHandoffTests(unittest.TestCase):
         cpu = node([("name", b"cpu0\0"), ("device_type", b"cpu\0")])
         pmgr = node([("name", b"pmgr\0"), ("compatible", compatible),
                      ("#bridges", struct.pack("<I", 14)),
+                     ("ecore-static-vvfc", struct.pack("<II", 396 << 16, 114 << 16)),
                      ("optional-bridge-mask", struct.pack("<I", 0x2000)),
                      ("bridge-settings-3", bytes(range(8))), ("voltage-states1", levels), ("mcx-fast-cpu-frequency", struct.pack("<I", 1644))])
         return node([("name", b"device-tree\0")], [node([("name", b"cpus\0")], [cpu]),
@@ -75,10 +76,12 @@ class ResearchBridgeHandoffTests(unittest.TestCase):
         self.assertEqual(properties["bridge-settings-3"], bytes(range(8)).hex())
         self.assertEqual(properties["optional-bridge-mask"], "00200000")
         self.assertNotIn("bridge-settings-version", properties)
-        self.assertEqual(bytes.fromhex(properties["voltage-states1"]), struct.pack("<II", (1000 << 16) // 1644, 0) + bytes(120))
+        self.assertEqual(bytes.fromhex(properties["voltage-states1"]), struct.pack("<4I", (1000 << 16) // 396, 0, (1000 << 16) // 1644, 0) + bytes(112))
         self.assertEqual(original["voltage-states1"], bytes(128).hex())
         period = struct.unpack_from("<I", bytes.fromhex(properties["voltage-states1"]))[0]
-        self.assertEqual((1000 << 16) // period, 1644)
+        self.assertEqual((1000 << 16) // period, 396)
+        performance_period = struct.unpack_from("<I", bytes.fromhex(properties["voltage-states1"]), 8)[0]
+        self.assertEqual((1000 << 16) // performance_period, 1644)
         clocks = next(n["properties"] for n in device_tree(prepared) if n["path"] == "/device-tree/arm-io")
         self.assertEqual(bytes.fromhex(clocks["clock-frequencies"]), struct.pack("<I", 24000000) * 96)
         self.assertEqual(bytes.fromhex(clocks["clock-frequencies-nclk"]), struct.pack("<I", 2) * 96)

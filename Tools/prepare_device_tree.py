@@ -90,7 +90,7 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
                     properties.append((key.ljust(32, b"\0"), b""))
                     added.append(key.decode())
             # CPU performance table is an all-zero iBoot placeholder in 19H422.
-            # Model one fixed nominal state for TCG, not physical CPU voltages.
+            # Model E/P nominal states for TCG, not physical CPU voltages.
             levels = names.get(b"voltage-states1")
             if levels is not None and len(levels) == 128 and not any(levels):
                 requested = names.get(b"mcx-fast-cpu-frequency")
@@ -104,13 +104,24 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
                 period = (1000 << 16) // frequency_mhz
                 if (1000 << 16) // period != frequency_mhz:
                     raise ValueError("nominal CPU frequency is not exactly representable")
-                value = struct.pack("<II", period, 0) + bytes(120)
+                ecore = names.get(b"ecore-static-vvfc", b"")
+                if not ecore or len(ecore) % 8:
+                    raise ValueError("synthetic CPU domain requires ecore-static-vvfc")
+                efficiency_mhz = struct.unpack_from("<I", ecore)[0] >> 16
+                if not 0 < efficiency_mhz < frequency_mhz:
+                    raise ValueError("invalid efficiency/performance CPU ordering")
+                efficiency_period = (1000 << 16) // efficiency_mhz
+                if (1000 << 16) // efficiency_period != efficiency_mhz:
+                    raise ValueError("efficiency CPU frequency is not exactly representable")
+                value = struct.pack("<4I", efficiency_period, 0, period, 0) + bytes(112)
                 position = next(i for i, (key, _) in enumerate(properties)
                                 if key.split(b"\0")[0] == b"voltage-states1")
                 properties[position] = (properties[position][0], value)
                 changes.append({"path": path, "property": "voltage-states1",
-                                "source": "synthetic fixed-frequency TCG performance domain",
-                                "nominal_frequency_mhz": frequency_mhz, "encoded_period": period, "states": 1,
+                                "source": "synthetic E/P nominal TCG performance domain",
+                                "nominal_frequency_mhz": frequency_mhz, "encoded_period": period, "states": 2,
+                                "efficiency_frequency_mhz": efficiency_mhz,
+                                "efficiency_encoded_period": efficiency_period,
                                 "authentic_iboot_handoff": False})
             changes.append({"path": path, "source": "synthetic research bridge model",
                             "properties": added, "bytes_per_property": 0,

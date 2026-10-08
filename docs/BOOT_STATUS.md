@@ -1,3 +1,21 @@
+## Verified SGX/GFX mapping progress: run 37829444239
+
+SGX/GFX bank checks pass and the former GPU-control store fault is gone.
+The next original-kernel assertion is _statePcoreLowest > 0 at
+AppleT8010PMGR.cpp:602. A single synthetic state is insufficient to express
+both efficiency and performance classes. The next explicit research handoff
+uses two nominal states: 396 MHz from the original ecore-static-vvfc, and
+1644 MHz from mcx-fast-cpu-frequency. Their period encodings remain type-1
+PMGR periods. The modeled ACC state records classify state 0 as E and state 1
+as P using bit 23, which the original method reads at 0xfffffff006943678.
+
+This is synthetic nominal metadata and immediate transitions, not recovered
+iBoot voltages or physical DVFS. Nonzero original tables remain untouched.
+Runtime tracing also captures the P-core boundary setter arguments so the
+next kernel run can verify its actual result. Root/userland are unconfirmed.
+
+---
+
 ## Verified MIPI-DSIM progress: run 37828651313
 
 The MIPI-DSIM range guest test passes and XNU progresses past its initial

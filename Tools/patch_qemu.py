@@ -758,7 +758,7 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
 
 '''
     i2s_switch = '''
-/* n112ap exposes a 4-KiB AOP I2S bank and one 32-bit routing register.
+/* n112ap exposes 4-KiB main/AOP I2S banks and a 32-bit routing register.
  * Retain guest routing writes for bootstrap. No PCM/DMA/audio output yet.
  */
 typedef struct Podium7I2SSwitch {
@@ -810,6 +810,8 @@ static void podium7_i2s_switch_bank_create(MachineState *machine,
 
 static void podium7_i2s_switch_create(MachineState *machine, MemoryRegion *memory)
 {
+    podium7_i2s_switch_bank_create(machine, memory, 0x20a004000ULL, 0x1000,
+                                   "podium7-t8010-main-i2s-bank");
     podium7_i2s_switch_bank_create(machine, memory, 0x210540000ULL, 0x1000,
                                    "podium7-t8010-aop-i2s-bank");
     podium7_i2s_switch_bank_create(machine, memory, 0x210000600ULL, 4,

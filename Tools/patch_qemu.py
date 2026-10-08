@@ -937,7 +937,7 @@ static const MemoryRegionOps podium7_pmgr_power_ops = {
 };
 
 
-/* Backing store for the two DeviceTree PMGR apertures. Specific power,
+/* Backing store for DeviceTree PMGR control apertures reg[0..9]. Specific power,
  * thermal and AES models retain higher priority and their own semantics.
  * Other control registers are latches only, with accesses explicitly logged.
  */
@@ -973,19 +973,25 @@ static void podium7_pmgr_raw_write(void *opaque, hwaddr address,
 static const MemoryRegionOps podium7_pmgr_raw_ops = {
     .read = podium7_pmgr_raw_read, .write = podium7_pmgr_raw_write,
     .endianness = DEVICE_LITTLE_ENDIAN,
-    .valid = { .min_access_size = 4, .max_access_size = 4, .unaligned = false },
+    .valid = { .min_access_size = 4, .max_access_size = 8, .unaligned = false },
     .impl = { .min_access_size = 4, .max_access_size = 4, .unaligned = false },
 };
 
 static void podium7_pmgr_raw_create(MachineState *machine, MemoryRegion *memory)
 {
-    static const hwaddr bases[] = { 0x20e000000ULL, 0x210200000ULL };
-    for (unsigned i = 0; i < ARRAY_SIZE(bases); i++) {
+    static const struct { hwaddr base; hwaddr size; } banks[] = {
+        { 0x20e000000ULL, 0x100000 }, { 0x210200000ULL, 0x100000 },
+        { 0x202f20000ULL, 0x11000 }, { 0x210004000ULL, 0x1000 },
+        { 0x202f40000ULL, 0x10000 }, { 0x202f50000ULL, 0x1000 },
+        { 0x202f80000ULL, 0x1000 }, { 0x202050000ULL, 0xa000 },
+        { 0x202150000ULL, 0xa000 }, { 0x20e308000ULL, 0x1000 },
+    };
+    for (unsigned i = 0; i < ARRAY_SIZE(banks); i++) {
         Podium7PMGRRaw *s = g_new0(Podium7PMGRRaw, 1);
-        s->base = bases[i];
-        s->registers = g_new0(uint32_t, 0x100000 / 4);
+        s->base = banks[i].base;
+        s->registers = g_new0(uint32_t, banks[i].size / 4);
         memory_region_init_io(&s->io, OBJECT(machine), &podium7_pmgr_raw_ops,
-                              s, "podium7-t8010-pmgr-raw", 0x100000);
+                              s, "podium7-t8010-pmgr-raw", banks[i].size);
         memory_region_add_subregion_overlap(memory, s->base, &s->io, -1);
     }
 }

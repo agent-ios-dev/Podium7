@@ -73,6 +73,30 @@ str w5, [x3]
 ldr w4, [x3]
 cmp w4, w5
 b.ne failure
+// XNU performs 64-bit accesses in PMGR aperture 6.
+movz x3, #0x40
+movk x3, #0x02f8, lsl #16
+movk x3, #2, lsl #32
+ldr x4, [x3]
+cbnz x4, failure
+movz x5, #0xabcd
+movk x5, #0x1234, lsl #16
+movk x5, #0x5678, lsl #32
+movk x5, #0x9876, lsl #48
+str x5, [x3]
+ldr x4, [x3]
+cmp x4, x5
+b.ne failure
+ldr w4, [x3]
+movz w6, #0xabcd
+movk w6, #0x1234, lsl #16
+cmp w4, w6
+b.ne failure
+ldr w4, [x3, #4]
+movz w6, #0x5678
+movk w6, #0x9876, lsl #16
+cmp w4, w6
+b.ne failure
 mov x0, #0x20
 adr x1, success_exit
 hlt #0xf000
@@ -107,7 +131,8 @@ failure_exit:
                        "control bits survive", "actual field cannot be forged",
                        "power-off and power-on", "masked slot has no state handshake",
                        "raw aperture round-trip", "power-state overlay has priority",
-                       "AP and AOP aperture storage are independent"],
+                       "AP and AOP aperture storage are independent",
+                       "64-bit aperture 6 round-trip and little-endian halves"],
             "returncode": result.returncode, "stdout": result.stdout,
             "stderr": result.stderr}, indent=2))
         if not passed:

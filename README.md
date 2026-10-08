@@ -122,3 +122,10 @@ The research single-state table now encodes a period matching the original
 `mcx-fast-cpu-frequency` (1644 MHz) exactly. This fixes the earlier synthetic
 field encoding; it does not change the 24 MHz architectural timer or claim
 that TCG executes 1644 million instructions per second.
+
+With the corrected period, XNU passed the MCX performance-state check and
+reached a 64-bit PMGR aperture-6 read at `0x202f80040` (PC `0xfffffff0066ee830`).
+All PMGR control apertures reg[0..9] now have low-priority backing latches;
+32-bit and aligned 64-bit access are accepted. A 64-bit guest round-trip
+checks the little-endian halves. Counter increment, clock lock and other
+side effects still require separate semantic models.

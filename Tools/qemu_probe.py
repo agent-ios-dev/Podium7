@@ -13,6 +13,7 @@ import subprocess
 import time
 from analyze_firmware import macho, device_tree
 from prepare_device_tree import prepare
+from ramdisk_handoff import attach_ramdisk, validate_hfs
 COUNTER_FREQUENCY = 24_000_000
 QEMU_RAM_BASE = 0x40000000
 QEMU_RAM_SIZE = 2 * 1024 * 1024 * 1024
@@ -36,12 +37,12 @@ def virtual_base_for_kernel(minimum, maximum, physical_base=PHYSICAL_BASE):
     return base
 
 
-def boot_args(virtual_base, tree_address, tree_size, top):
+def boot_args(virtual_base, tree_address, tree_size, top, *, ramdisk=False):
     args = bytearray(736)
     struct.pack_into("<HH", args, 0, 2, 2)
     struct.pack_into("<4Q", args, 8, virtual_base, PHYSICAL_BASE, RAM_SIZE, top)
     struct.pack_into("<QI", args, 96, tree_address, tree_size)
-    command = b"-v serial=3 debug=0x8"
+    command = b"-v serial=3 debug=0x8" + (b" rd=md0" if ramdisk else b"")
     args[108:108 + len(command)] = command
     struct.pack_into("<Q", args, 728, RAM_SIZE)
     return bytes(args)
@@ -62,15 +63,11 @@ def elf_image(entry, segments):
     return header + b"".join(headers) + b"".join(bodies)
 
 
-def make_probe(directory, *, research_bridge_handoff=False):
+def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None):
     kernel = (directory / "KernelCache.macho").read_bytes()
     original_tree = (directory / "DeviceTree.bin").read_bytes()
     tree, clocks = prepare(original_tree, COUNTER_FREQUENCY, dram_base=QEMU_RAM_BASE, dram_size=QEMU_RAM_SIZE,
                            research_bridge_handoff=research_bridge_handoff)
-    (directory / "device-tree-preparation.json").write_text(json.dumps({
-        "bootloader_placeholder_flags_cleared": True, "original_bytes": len(original_tree),
-        "prepared_bytes": len(tree), "device_tree_changes": clocks}, indent=2))
-    (directory / "PreparedDeviceTree.bin").write_bytes(tree)
     info = macho(kernel)
     regions = [x for x in info["segments"] if x["length"]]
     minimum = min(int(x["address"], 16) for x in regions)
@@ -82,7 +79,31 @@ def make_probe(directory, *, research_bridge_handoff=False):
     stub_address = align(maximum - virtual_base + PHYSICAL_BASE)
     args_address = stub_address + 0x4000
     tree_address = args_address + 0x4000
-    top = align(tree_address + len(tree))
+    disk = ramdisk.read_bytes() if ramdisk is not None else None
+    if disk is not None:
+        disk_info = validate_hfs(disk)
+        disk += bytes((-len(disk)) & 4095)
+        disk_info["reserved_bytes"] = len(disk)
+        sized_tree = attach_ramdisk(tree, 0, len(disk))
+        disk_address = align(tree_address + len(sized_tree))
+        top = align(disk_address + len(disk))
+        if top > PHYSICAL_BASE + RAM_SIZE:
+            raise ValueError("ramdisk exceeds harness RAM")
+        tree = attach_ramdisk(tree, disk_address, len(disk))
+        disk_info.update(physical_address=hex(disk_address), reserved_top=hex(top),
+                         root_device="md0", guest_mount_confirmed=False)
+        (directory / "ramdisk-handoff.json").write_text(json.dumps(disk_info, indent=2))
+        (directory / "PreparedDeviceTree.bin").write_bytes(tree)
+    else:
+        top = align(tree_address + len(tree))
+    if disk is not None:
+        clocks.append({"path": "/device-tree/chosen/memory-map", "property": "RAMDisk",
+                       "physical_address": hex(disk_address), "bytes": len(disk),
+                       "source": "official IPSW restore ramdisk, reserved in harness RAM"})
+    (directory / "device-tree-preparation.json").write_text(json.dumps({
+        "bootloader_placeholder_flags_cleared": True, "original_bytes": len(original_tree),
+        "prepared_bytes": len(tree), "device_tree_changes": clocks}, indent=2))
+    (directory / "PreparedDeviceTree.bin").write_bytes(tree)
     stub = [0xd2800000 | ((args_address & 0xffff) << 5),
             0xf2a00000 | (((args_address >> 16) & 0xffff) << 5),
             0xd2800001 | ((entry & 0xffff) << 5),
@@ -91,8 +112,10 @@ def make_probe(directory, *, research_bridge_handoff=False):
     segments = [(int(x["address"], 16) - virtual_base + PHYSICAL_BASE, x["length"],
                  kernel[x["offset"]:x["offset"] + x["file_size"]]) for x in regions]
     segments += [(stub_address, 0x4000, b"".join(struct.pack("<I", x) for x in stub)),
-                 (args_address, 0x4000, boot_args(virtual_base, virtual_base + tree_address - PHYSICAL_BASE, len(tree), top)),
+                 (args_address, 0x4000, boot_args(virtual_base, virtual_base + tree_address - PHYSICAL_BASE, len(tree), top, ramdisk=disk is not None)),
                  (tree_address, align(len(tree)), tree)]
+    if disk is not None:
+        segments.append((disk_address, align(len(disk)), disk))
     destination = directory / "qemu-kernel-probe.elf"
     destination.write_bytes(elf_image(stub_address, segments))
     readonly_low = min(int(x["address"], 16) for x in regions if x["name"] == "__PRELINK_TEXT") - virtual_base + PHYSICAL_BASE
@@ -117,10 +140,10 @@ def panic_capture_complete(serial_bytes):
         serial_bytes[header:]) is not None
 
 
-def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, research_bridge_handoff=False):
+def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, research_bridge_handoff=False, ramdisk=None):
     if research_bridge_handoff and cpu != "podium7-research":
         raise ValueError("synthetic bridge handoff requires the research bridge model")
-    image, kernel_entry, rorgn = make_probe(directory, research_bridge_handoff=research_bridge_handoff)
+    image, kernel_entry, rorgn = make_probe(directory, research_bridge_handoff=research_bridge_handoff, ramdisk=ramdisk)
     trace, serial = directory / "qemu-trace.txt", directory / "qemu-serial.txt"
     command = [executable, "-machine", "virt,secure=off,virtualization=off", "-cpu", f"{cpu},cntfrq={COUNTER_FREQUENCY}", "-accel", "tcg",
                "-m", "2048", "-smp", "1", "-display", "none", "-monitor", "none", "-serial", "stdio",
@@ -197,6 +220,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                "pmgr_bridge_transactions": pmgr_transactions[:128],
                "pmgr_power_transactions": pmgr_power_transactions[:128],
                "pmgr_raw_transactions": pmgr_raw_transactions[:128],
+               "restore_ramdisk_requested": ramdisk is not None,
                "backend": version, "board": "QEMU virt bootstrap experiment, not T8010",
                "physical_ram_base": hex(PHYSICAL_BASE), "command": command, "stop": stop,
                "returncode": process.returncode, "seconds": time.monotonic() - start,
@@ -217,6 +241,7 @@ if __name__ == "__main__":
     parser.add_argument("--cpu", choices=["max", "podium7-research"], default="max")
     parser.add_argument("--research-bridge-handoff", action="store_true",
                         help="Synthetic empty tuning lists for modeled bridges; not authentic iBoot settings")
+    parser.add_argument("--ramdisk", type=pathlib.Path, help="Raw HFS restore disk, reserved in harness RAM; root md0")
     args = parser.parse_args()
     run_probe(args.directory, executable=args.qemu, cpu=args.cpu,
-              research_bridge_handoff=args.research_bridge_handoff)
+              research_bridge_handoff=args.research_bridge_handoff, ramdisk=args.ramdisk)

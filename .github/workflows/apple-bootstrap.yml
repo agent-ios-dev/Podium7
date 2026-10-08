@@ -24,7 +24,7 @@ jobs:
           key: qemu10-arm64-research-v1-${{ github.sha }}
           restore-keys: qemu10-arm64-research-v1-
       - run: python3 -m unittest discover -s Tools -p 'test_*.py'
-      - run: python3 Tools/fetch_firmware.py
+      - run: python3 Tools/fetch_firmware.py --restore-ramdisk
       - run: python3 Tools/analyze_firmware.py
       - name: Audit PMGR bootloader bridge settings
         run: python3 Tools/inspect_pmgr_handoff.py
@@ -66,6 +66,13 @@ jobs:
           cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/bridge-experiment/
           python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/bridge-experiment --research-bridge-handoff
           python3 Tools/inspect_boot_fault.py --directory .firmware/bridge-experiment
+      - name: Probe genuine restore ramdisk root device separately
+        run: |
+          mkdir .firmware/ramdisk-experiment
+          cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/ramdisk-experiment/
+          python3 -c "from pathlib import Path; import sys; sys.path.insert(0, 'Tools'); from analyze_firmware import payload, decompress; Path('.firmware/RestoreRamDisk.payload').write_bytes(decompress(payload(Path('.firmware/RestoreRamDisk.im4p').read_bytes(), b'rdsk')))"
+          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/ramdisk-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload
+          python3 Tools/inspect_boot_fault.py --directory .firmware/ramdisk-experiment
       - name: Verify MCC register lock and protected RAM
         timeout-minutes: 1
         run: python3 Tools/check_mcc.py --qemu .qemu/build/qemu-system-aarch64
@@ -83,6 +90,8 @@ jobs:
           name: apple-bootstrap-evidence
           include-hidden-files: true
           path: |
+            .firmware/ramdisk-experiment/*.json
+            .firmware/ramdisk-experiment/*.txt
             .firmware/bridge-experiment/*.json
             .firmware/bridge-experiment/*.txt
             .firmware/firmware.json

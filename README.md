@@ -129,3 +129,13 @@ All PMGR control apertures reg[0..9] now have low-priority backing latches;
 32-bit and aligned 64-bit access are accepted. A 64-bit guest round-trip
 checks the little-endian halves. Counter increment, clock lock and other
 side effects still require separate semantic models.
+
+
+The research probe accepts `--ramdisk PATH` for a raw HFS+/HFSX restore
+volume. Fetch it with `Tools/fetch_firmware.py --restore-ramdisk`, then unwrap
+its `rdsk` IM4P payload. The probe reserves the disk after the prepared device
+tree, advances `topOfKernelData`, and supplies `/chosen/memory-map/RAMDisk`
+plus `rd=md0`, following Apple's XNU IOKitBSDInit.cpp. Host validation and ELF
+construction do not prove a guest mount or launchd startup. The workflow keeps
+this experiment separate from the no-disk baseline and does not redistribute
+Apple firmware in its diagnostic artifacts.

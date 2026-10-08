@@ -1,3 +1,33 @@
+## October 8, 2026: no iOS desktop confirmed
+
+The external QEMU v10 research backend executes the original iPod9,1
+kernelcache (iOS 15.8.8, 19H422). It is not yet integrated in the IPA.
+The unchanged DeviceTree stops at ApplePMGR.cpp:1148 because iBoot bridge
+settings are absent. The separate opt-in experiment supplies explicitly
+synthetic bridge tuning lists and fixed clocks, not recovered iBoot settings.
+
+That experiment passed CPU0, PLL and MCX performance-state checks. The last
+completed run, 37809829401, faulted on a 64-bit read at 0x202f80040, PMGR reg[6].
+The next change adds the remaining control apertures and 64-bit accesses,
+with a genuine guest test. Run 37810433515 was still queued when recorded;
+the kernel execution of that fix is not yet confirmed.
+
+The probe now accepts --ramdisk for the official IPSW's raw HFSX restore disk.
+It supplies /chosen/memory-map/RAMDisk and rd=md0, reserving the image below
+boot_args.topOfKernelData. Local construction of the ELF was verified with
+113845760 image bytes at 0x47dfc000, reserved top 0x4ea90000. Host validation
+is not a successful guest mount. CI keeps the ramdisk experiment separate.
+
+32 local Python tests pass. A green bootstrap workflow means the next fault
+was captured and register tests passed, not that iOS booted. Mounting md0,
+launchd and SpringBoard remain unconfirmed. Restore userland would also be
+an intermediate milestone, not the ordinary iOS home screen.
+
+Apple's ramdisk handoff source:
+https://github.com/apple-oss-distributions/xnu/blob/xnu-8019.80.24/iokit/bsddev/IOKitBSDInit.cpp
+
+---
+
 # Состояние запуска iOS
 
 Цель: загрузить iOS на модели iPod touch 7 / T8010 / n112ap. Цель пока не достигнута: корневой том, launchd и SpringBoard ещё не подтверждены. Настоящий вывод XNU уже получен через UART.

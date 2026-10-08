@@ -105,23 +105,32 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
                 if (1000 << 16) // period != frequency_mhz:
                     raise ValueError("nominal CPU frequency is not exactly representable")
                 ecore = names.get(b"ecore-static-vvfc", b"")
-                if not ecore or len(ecore) % 8:
-                    raise ValueError("synthetic CPU domain requires ecore-static-vvfc")
-                efficiency_mhz = struct.unpack_from("<I", ecore)[0] >> 16
-                if not 0 < efficiency_mhz < frequency_mhz:
-                    raise ValueError("invalid efficiency/performance CPU ordering")
-                efficiency_period = (1000 << 16) // efficiency_mhz
-                if (1000 << 16) // efficiency_period != efficiency_mhz:
-                    raise ValueError("efficiency CPU frequency is not exactly representable")
-                value = struct.pack("<4I", efficiency_period, 0, period, 0) + bytes(112)
+                pcore = names.get(b"pcore-static-vvfc", b"")
+                if not ecore or len(ecore) % 8 or not pcore or len(pcore) % 8:
+                    raise ValueError("synthetic CPU domain requires E/P static VFC tables")
+                efficiency = [record[0] >> 16 for record in struct.iter_unpack("<II", ecore)]
+                performance = [record[0] >> 16 for record in struct.iter_unpack("<II", pcore)]
+                frequencies = [efficiency[0], efficiency[-1], performance[0], frequency_mhz]
+                if not (0 < frequencies[0] < frequencies[1] and
+                        0 < frequencies[2] < frequencies[1] and frequencies[2] < frequencies[3]):
+                    raise ValueError("virtual CPU groups must expose the XNU E/P frequency drop")
+                periods = [(1000 << 16) // frequency for frequency in frequencies]
+                if any((1000 << 16) // encoded != frequency for encoded, frequency in zip(periods, frequencies)):
+                    raise ValueError("CPU frequency is not exactly representable")
+                # Generic PMGR detects the first decreasing frequency as P-core
+                # boundary, at 0x0066e0018. Nominal voltage is virtual metadata,
+                # not a physical rail: nonzero permits its V^2 power calculation.
+                value = b"".join(struct.pack("<II", encoded, 900) for encoded in periods) + bytes(96)
                 position = next(i for i, (key, _) in enumerate(properties)
                                 if key.split(b"\0")[0] == b"voltage-states1")
                 properties[position] = (properties[position][0], value)
                 changes.append({"path": path, "property": "voltage-states1",
                                 "source": "synthetic E/P nominal TCG performance domain",
-                                "nominal_frequency_mhz": frequency_mhz, "encoded_period": period, "states": 2,
-                                "efficiency_frequency_mhz": efficiency_mhz,
-                                "efficiency_encoded_period": efficiency_period,
+                                "nominal_frequency_mhz": frequency_mhz, "encoded_period": period, "states": 4,
+                                "frequencies_mhz": frequencies, "pcore_boundary": 2,
+                                "nominal_virtual_voltage": 900,
+                                "efficiency_frequency_mhz": efficiency[0],
+                                "efficiency_encoded_period": periods[0],
                                 "authentic_iboot_handoff": False})
             changes.append({"path": path, "source": "synthetic research bridge model",
                             "properties": added, "bytes_per_property": 0,

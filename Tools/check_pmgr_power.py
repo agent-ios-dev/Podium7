@@ -123,13 +123,15 @@ ldr w4, [x3]
 and w4, w4, #15
 cmp w4, #3
 b.ne failure
-// The second virtual CPU record is P-core; the first is E-core.
+// Two virtual records are E-core, followed by two P-core records.
 movz x3, #0x40
 movk x3, #0x02f8, lsl #16
 movk x3, #2, lsl #32
 ldr x4, [x3]
 cbnz x4, failure
 ldr x4, [x3, #0x20]
+cbnz x4, failure
+ldr x4, [x3, #0x40]
 mov x5, #0x800000
 cmp x4, x5
 b.ne failure
@@ -209,7 +211,7 @@ failure_exit:
                        "64-bit aperture 6 round-trip and little-endian halves",
                        "CPU state starts at encoded 2 and survives initialization",
                        "CPU request completes, clears BUSY and rejects invalid zero",
-                       "E/P CPU record classification matches two nominal states",
+                       "E/P CPU record classification matches four nominal states",
                        "observed ACC control page 0x202f38008 accepts 64-bit kernel store"],
             "returncode": result.returncode, "stdout": result.stdout,
             "stderr": result.stderr}, indent=2))

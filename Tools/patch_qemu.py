@@ -194,7 +194,7 @@ static void podium7_research_initfn(Object *obj)
      * be legitimate MMIO mappings; an out-of-RAM address alone is not a fault. */
     static unsigned podium7_out_of_ram_mappings;
     if ((env->podium7_aprr[18] & 1) &&
-        address >= 0xffffffe000000000ULL && address < 0xfffffff000000000ULL &&
+        address >= 0xffffffe000000000ULL &&
         (descaddr < 0x40000000ULL || descaddr >= 0xc0000000ULL) &&
         podium7_out_of_ram_mappings < 512) {
         qemu_log(
@@ -847,6 +847,22 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
 '''
     gfx = gfx.replace("0x100000-byte GFX range at 0x206600000",
                       "original SGX/GFX control ranges; the shared bank is created once")
+    clpc = mipi.replace("MIPI-DSIM", "CPU-CLPC").replace("mipi_dsim", "cpu_clpc")
+    clpc = clpc.replace("Podium7MIPIDSIMBank", "Podium7CPUCLPCBank")
+    start = clpc.index("static void podium7_cpu_clpc_create(")
+    clpc = clpc[:start] + '''static void podium7_cpu_clpc_create(MachineState *machine, MemoryRegion *memory)
+{
+    static const hwaddr banks[] = {
+        0x202010000ULL, 0x202030000ULL, 0x202110000ULL, 0x202130000ULL,
+    };
+    for (unsigned i = 0; i < ARRAY_SIZE(banks); i++) {
+        podium7_cpu_clpc_bank_create(machine, memory, banks[i], 0x10000,
+                                     "podium7-t8010-cpu-clpc-control");
+    }
+}
+'''
+    clpc = clpc.replace("0x100000-byte CPU-CLPC range at 0x206600000",
+                        "original four CPU-debug/CLPC register ranges")
     i2s_switch = '''
 /* n112ap exposes 4-KiB main/AOP I2S banks and a 32-bit routing register.
  * Retain guest routing writes for bootstrap. No PCM/DMA/audio output yet.
@@ -1102,8 +1118,9 @@ static void podium7_pmgr_raw_create(MachineState *machine, MemoryRegion *memory)
         }
         if (s->base == 0x202f80000ULL) {
             /* XNU reads state records at encoded index * 0x20. Bit 23
-             * distinguishes P-core records. State 0 is E, state 1 is P. */
-            s->registers[0x60 / 4] = 1U << 23;
+             * distinguishes P-core records. States 0/1 are E, 2/3 are P. */
+            s->registers[0x80 / 4] = 1U << 23;
+            s->registers[0xa0 / 4] = 1U << 23;
         }
         memory_region_init_io(&s->io, OBJECT(machine), &podium7_pmgr_raw_ops,
                               s, "podium7-t8010-pmgr-raw", banks[i].size);
@@ -1131,7 +1148,7 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
     timer_fiq = r'''
 /* Research A10 EL1 timers arrive as FIQ, not GIC PPIs. External AIC device
  * interrupts and Apple EL2 timer-enable controls are not modeled here. */
@@ -1199,6 +1216,7 @@ static void podium7_timer_fiq_set(void *opaque, int input, int level)
         podium7_mca_create(machine, sysmem);
         podium7_mipi_dsim_create(machine, sysmem);
         podium7_gfx_create(machine, sysmem);
+        podium7_cpu_clpc_create(machine, sysmem);
         podium7_i2s_switch_create(machine, sysmem);
         podium7_pmgr_bridges_create(machine, sysmem);
         podium7_pmgr_raw_create(machine, sysmem);

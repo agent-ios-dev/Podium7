@@ -1,3 +1,24 @@
+## CPU group ordering and debug-map diagnosis: run 37830662740
+
+The P-core boundary setter still received zero with ascending E/P frequencies.
+Original generic PMGR at 0xfffffff0066e0018 detects a group boundary when the
+frequency decreases. The revised research table therefore uses 396/1092 MHz
+E states followed by 756/1644 MHz P states, directly from the original static
+VFC endpoints. The single drop occurs at index 2. Nominal virtual voltage
+metadata is 900 so the kernel's V-squared power calculation is nonzero; it is
+not a recovered iBoot voltage or simulated physical rail. ACC records 2/3
+are classified P; records 0/1 are E.
+
+The actual next fault was a kernel debug-map store of the CoreSight access
+key 0xc5acce55 at 0x202010fb0 (PC 0xfffffff0072dc118). Four original CLPC
+register ranges at 0x202010000/0x202030000/0x202110000/0x202130000, each 64 KiB,
+are now backed for bootstrap with a guest access/boundary test. This does not
+emulate CPU debug or profiling machinery. Out-of-RAM translation diagnostics
+now also cover static kernel VAs, which the former heap-only filter missed.
+Kernel validation of these changes is pending; root/userland are unconfirmed.
+
+---
+
 ## Verified SGX/GFX mapping progress: run 37829444239
 
 SGX/GFX bank checks pass and the former GPU-control store fault is gone.

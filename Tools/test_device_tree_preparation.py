@@ -59,7 +59,8 @@ class ResearchBridgeHandoffTests(unittest.TestCase):
         cpu = node([("name", b"cpu0\0"), ("device_type", b"cpu\0")])
         pmgr = node([("name", b"pmgr\0"), ("compatible", compatible),
                      ("#bridges", struct.pack("<I", 14)),
-                     ("ecore-static-vvfc", struct.pack("<II", 396 << 16, 114 << 16)),
+                     ("ecore-static-vvfc", struct.pack("<4I", 396 << 16, 114 << 16, 1092 << 16, 387 << 16)),
+                     ("pcore-static-vvfc", struct.pack("<4I", 756 << 16, 1390 << 16, 1644 << 16, 5260 << 16)),
                      ("optional-bridge-mask", struct.pack("<I", 0x2000)),
                      ("bridge-settings-3", bytes(range(8))), ("voltage-states1", levels), ("mcx-fast-cpu-frequency", struct.pack("<I", 1644))])
         return node([("name", b"device-tree\0")], [node([("name", b"cpus\0")], [cpu]),
@@ -76,12 +77,14 @@ class ResearchBridgeHandoffTests(unittest.TestCase):
         self.assertEqual(properties["bridge-settings-3"], bytes(range(8)).hex())
         self.assertEqual(properties["optional-bridge-mask"], "00200000")
         self.assertNotIn("bridge-settings-version", properties)
-        self.assertEqual(bytes.fromhex(properties["voltage-states1"]), struct.pack("<4I", (1000 << 16) // 396, 0, (1000 << 16) // 1644, 0) + bytes(112))
+        self.assertEqual(bytes.fromhex(properties["voltage-states1"]), b"".join(struct.pack("<II", (1000 << 16) // mhz, 900) for mhz in [396, 1092, 756, 1644]) + bytes(96))
         self.assertEqual(original["voltage-states1"], bytes(128).hex())
         period = struct.unpack_from("<I", bytes.fromhex(properties["voltage-states1"]))[0]
         self.assertEqual((1000 << 16) // period, 396)
-        performance_period = struct.unpack_from("<I", bytes.fromhex(properties["voltage-states1"]), 8)[0]
+        performance_period = struct.unpack_from("<I", bytes.fromhex(properties["voltage-states1"]), 24)[0]
         self.assertEqual((1000 << 16) // performance_period, 1644)
+        state_frequencies = [(1000 << 16) // struct.unpack_from("<I", bytes.fromhex(properties["voltage-states1"]), offset)[0] for offset in range(0, 32, 8)]
+        self.assertEqual([i for i in range(1, len(state_frequencies)) if state_frequencies[i] < state_frequencies[i-1]], [2])
         clocks = next(n["properties"] for n in device_tree(prepared) if n["path"] == "/device-tree/arm-io")
         self.assertEqual(bytes.fromhex(clocks["clock-frequencies"]), struct.pack("<I", 24000000) * 96)
         self.assertEqual(bytes.fromhex(clocks["clock-frequencies-nclk"]), struct.pack("<I", 2) * 96)

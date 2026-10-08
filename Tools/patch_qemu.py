@@ -757,10 +757,55 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
 }
 
 '''
+    i2s_switch = '''
+/* The n112ap DeviceTree exposes one 32-bit AOP I2S routing register.
+ * Retain guest routing writes for bootstrap. No PCM/DMA/audio output yet.
+ */
+typedef struct Podium7I2SSwitch {
+    MemoryRegion io;
+    uint32_t routing;
+    unsigned logged_accesses;
+} Podium7I2SSwitch;
+
+static uint64_t podium7_i2s_switch_read(void *opaque, hwaddr address, unsigned size)
+{
+    Podium7I2SSwitch *s = opaque;
+    if (s->logged_accesses++ < 64) {
+        qemu_log("PODIUM7 I2S-SWITCH read value=%08" PRIx32 "\\n", s->routing);
+    }
+    return s->routing;
+}
+
+static void podium7_i2s_switch_write(void *opaque, hwaddr address, uint64_t value,
+                                     unsigned size)
+{
+    Podium7I2SSwitch *s = opaque;
+    s->routing = (uint32_t)value;
+    if (s->logged_accesses++ < 64) {
+        qemu_log("PODIUM7 I2S-SWITCH write value=%08" PRIx32 "\\n", s->routing);
+    }
+}
+
+static const MemoryRegionOps podium7_i2s_switch_ops = {
+    .read = podium7_i2s_switch_read, .write = podium7_i2s_switch_write,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+    .valid = { .min_access_size = 4, .max_access_size = 4 },
+    .impl = { .min_access_size = 4, .max_access_size = 4 },
+};
+
+static void podium7_i2s_switch_create(MachineState *machine, MemoryRegion *memory)
+{
+    Podium7I2SSwitch *s = g_new0(Podium7I2SSwitch, 1);
+    memory_region_init_io(&s->io, OBJECT(machine), &podium7_i2s_switch_ops,
+                          s, "podium7-t8010-aop-i2s-switch", 4);
+    memory_region_add_subregion(memory, 0x210000600ULL, &s->io);
+}
+
+'''
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + i2s_switch + "static void machvirt_init(MachineState *machine)")
     replace_once(directory / "hw/arm/virt.c",
                  "    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);",
                  '''    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);
@@ -779,6 +824,7 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
                            "podium7-t8010-aes-secondary");
         podium7_thermal_create(machine, sysmem);
         podium7_usbphy_create(machine, sysmem);
+        podium7_i2s_switch_create(machine, sysmem);
     }''')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")

@@ -167,7 +167,10 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
     usbphy_transactions = [line for line in trace_text.splitlines() if "PODIUM7 USBPHY " in line]
     i2s_switch_transactions = [line for line in trace_text.splitlines() if "PODIUM7 I2S-SWITCH " in line]
     exception_tail = faults[-24:]
-    summary = {"booted_ios": False, "kernel_entry_seen": entry_seen, "physical_kernel_entry": hex(kernel_entry),
+    from inspect_pmgr_handoff import inspect_tree
+    handoff = inspect_tree((directory / "DeviceTree.bin").read_bytes())
+    (directory / "pmgr-handoff.json").write_text(json.dumps(handoff, indent=2))
+    summary = {"pmgr_handoff": handoff, "booted_ios": False, "kernel_entry_seen": entry_seen, "physical_kernel_entry": hex(kernel_entry),
                "last_translated_blocks": re.findall(r"^0x([0-9a-fA-F]+):", trace_text, re.MULTILINE)[-8:],
                "cpu_model": cpu, "aprr_permissions_enforced": False,
                "counter_frequency": COUNTER_FREQUENCY,

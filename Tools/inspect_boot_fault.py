@@ -91,6 +91,14 @@ if not panic:
                   "reason": assertion.group(3), "kind": "assertion", "registers": {}}
         (root / "panic-context.json").write_text(json.dumps(report, indent=2))
         print(json.dumps(report, indent=2))
+        kernel_path = root / "KernelCache.macho"
+        if kernel_path.exists():
+            # The reported caller is the return address of a noreturn panic
+            # call. Save its thunk, incoming calls and conditional predecessors.
+            from disassemble_assertion import assertion_evidence
+            evidence = assertion_evidence(kernel_path.read_bytes(), int(assertion.group(2), 16))
+            (root / "panic-disassembly.txt").write_text(evidence)
+            print(evidence)
 
 first = re.search(r"Taking exception.*?with ELR (0x[0-9a-f]+)", trace, re.DOTALL)
 if first:

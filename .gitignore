@@ -18,3 +18,4 @@ artifacts/
 /evidence/bootstrap-probe/
 .qemu/
 .ccache/
+/.tools/

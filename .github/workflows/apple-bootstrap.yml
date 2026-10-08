@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install distlib==0.3.9
+      - run: python -m pip install distlib==0.3.9 capstone==5.0.9
       - uses: actions/cache@v4
         with:
           path: .ccache
@@ -26,6 +26,8 @@ jobs:
       - run: python3 -m unittest discover -s Tools -p 'test_*.py'
       - run: python3 Tools/fetch_firmware.py
       - run: python3 Tools/analyze_firmware.py
+      - name: Audit PMGR bootloader bridge settings
+        run: python3 Tools/inspect_pmgr_handoff.py
       - name: Install build dependencies
         run: brew install glib pixman ninja pkgconf ccache
       - name: Prepare pinned QEMU with opt-in APRR register latches
@@ -74,6 +76,7 @@ jobs:
             .firmware/firmware.json
             .firmware/analysis.json
             .firmware/DeviceTree.bin
+            .firmware/pmgr-handoff.json
             .firmware/qemu-probe.json
             .firmware/qemu-trace.txt
             .firmware/qemu-serial.txt

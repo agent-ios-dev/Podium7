@@ -51,3 +51,20 @@ python3 Tools/qemu_probe.py
 - Apple, характеристики iPod touch 7 (A10): https://support.apple.com/en-us/111961
 - QEMU t8030 (модель iPhone 11, другая платформа; здесь код не используется): https://github.com/TrungNguyen1909/qemu-t8030
 - Спецификация ISA Arm: https://developer.arm.com/documentation/ddi0602/latest
+
+### PMGR handoff blocker (19H422)
+
+The original kernel reaches ApplePMGR::initDriver and requires missing
+`bridge-settings-0` through `bridge-settings-12`. The original optional mask
+`0x2000` allows only bridge 13 to be absent. The missing `bridge-settings-version`
+defaults to 0; `bridge-counter-version=1` is a separate property.
+Original code checks these at `0xfffffff0066df9a8` (property lookup),
+`0xfffffff0066dfa58` (optional mask), and `0xfffffff0066e40b8` (panic call).
+
+`Tools/inspect_pmgr_handoff.py` records `pmgr-handoff.json`. The bootstrap
+workflow also preserves assertion branch disassembly. This identifies the
+missing iBoot handoff stage; it does not fix the boot. The next task is to
+recover n112ap bridge configuration and model its hardware semantics.
+Changing the optional mask or adding empty properties would not establish
+correct emulation. The extracted iBoot component is encrypted and was not
+used to fabricate settings.

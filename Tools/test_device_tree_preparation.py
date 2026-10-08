@@ -52,3 +52,31 @@ class DeviceTreePreparationTests(unittest.TestCase):
         encoded_property = b"ipid-mask".ljust(32, b"\0") + struct.pack("<I", len(mask)) + mask
         self.assertIn(encoded_property, prepared)
         self.assertFalse(any(x.get("property") == "ipid-mask" for x in changes))
+
+
+class ResearchBridgeHandoffTests(unittest.TestCase):
+    def make_tree(self, compatible=b"pmgr1,t8010\0"):
+        cpu = node([("name", b"cpu0\0"), ("device_type", b"cpu\0")])
+        pmgr = node([("name", b"pmgr\0"), ("compatible", compatible),
+                     ("#bridges", struct.pack("<I", 14)),
+                     ("optional-bridge-mask", struct.pack("<I", 0x2000)),
+                     ("bridge-settings-3", bytes(range(8)))])
+        return node([("name", b"device-tree\0")], [node([("name", b"cpus\0")], [cpu]),
+                         node([("name", b"arm-io\0")], [pmgr])])
+
+    def test_opt_in_preserves_real_settings_and_mask(self):
+        tree = self.make_tree()
+        unchanged, _ = prepare(tree, 24000000, random_seed=bytes(64))
+        original = device_tree(unchanged)[-1]["properties"]
+        self.assertNotIn("bridge-settings-0", original)
+        prepared, changes = prepare(tree, 24000000, random_seed=bytes(64), research_bridge_handoff=True)
+        properties = device_tree(prepared)[-1]["properties"]
+        self.assertEqual(properties["bridge-settings-0"], "")
+        self.assertEqual(properties["bridge-settings-3"], bytes(range(8)).hex())
+        self.assertEqual(properties["optional-bridge-mask"], "00200000")
+        self.assertNotIn("bridge-settings-version", properties)
+        self.assertFalse(next(c for c in changes if c.get("source") == "synthetic research bridge model")["authentic_iboot_handoff"])
+
+    def test_other_platforms_rejected(self):
+        with self.assertRaises(ValueError):
+            prepare(self.make_tree(b"pmgr,t8103\0"), 24000000, random_seed=bytes(64), research_bridge_handoff=True)

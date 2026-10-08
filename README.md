@@ -75,3 +75,10 @@ from the original DeviceTree and executes boundary/isolation checks in an
 ARM64 guest. The second arm-io translation places bridge 11 at `0x600010000`,
 not `0x800010000`. These banks preserve 32-bit register writes only; bridge
 counters, power transitions and iBoot bridge tuning remain unimplemented.
+
+An additional `--research-bridge-handoff` probe tests synthetic empty tuning
+lists for the existing register-backing bridge model. This is deliberately
+separate from the original-metadata probe. It does not recover real iBoot
+settings, implement bridge tuning, or prove working power management.
+Existing settings, the optional mask and settings version remain unchanged.
+Both traces and explicit provenance are retained in the CI artifact.

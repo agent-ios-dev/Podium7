@@ -62,13 +62,15 @@ def elf_image(entry, segments):
     return header + b"".join(headers) + b"".join(bodies)
 
 
-def make_probe(directory):
+def make_probe(directory, *, research_bridge_handoff=False):
     kernel = (directory / "KernelCache.macho").read_bytes()
     original_tree = (directory / "DeviceTree.bin").read_bytes()
-    tree, clocks = prepare(original_tree, COUNTER_FREQUENCY, dram_base=QEMU_RAM_BASE, dram_size=QEMU_RAM_SIZE)
+    tree, clocks = prepare(original_tree, COUNTER_FREQUENCY, dram_base=QEMU_RAM_BASE, dram_size=QEMU_RAM_SIZE,
+                           research_bridge_handoff=research_bridge_handoff)
     (directory / "device-tree-preparation.json").write_text(json.dumps({
         "bootloader_placeholder_flags_cleared": True, "original_bytes": len(original_tree),
         "prepared_bytes": len(tree), "device_tree_changes": clocks}, indent=2))
+    (directory / "PreparedDeviceTree.bin").write_bytes(tree)
     info = macho(kernel)
     regions = [x for x in info["segments"] if x["length"]]
     minimum = min(int(x["address"], 16) for x in regions)
@@ -115,8 +117,10 @@ def panic_capture_complete(serial_bytes):
         serial_bytes[header:]) is not None
 
 
-def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
-    image, kernel_entry, rorgn = make_probe(directory)
+def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, research_bridge_handoff=False):
+    if research_bridge_handoff and cpu != "podium7-research":
+        raise ValueError("synthetic bridge handoff requires the research bridge model")
+    image, kernel_entry, rorgn = make_probe(directory, research_bridge_handoff=research_bridge_handoff)
     trace, serial = directory / "qemu-trace.txt", directory / "qemu-serial.txt"
     command = [executable, "-machine", "virt,secure=off,virtualization=off", "-cpu", f"{cpu},cntfrq={COUNTER_FREQUENCY}", "-accel", "tcg",
                "-m", "2048", "-smp", "1", "-display", "none", "-monitor", "none", "-serial", "stdio",
@@ -169,9 +173,10 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
     pmgr_transactions = [line for line in trace_text.splitlines() if "PODIUM7 PMGR-BRIDGE " in line]
     exception_tail = faults[-24:]
     from inspect_pmgr_handoff import inspect_tree
-    handoff = inspect_tree((directory / "DeviceTree.bin").read_bytes())
+    handoff = inspect_tree((directory / "PreparedDeviceTree.bin").read_bytes())
     (directory / "pmgr-handoff.json").write_text(json.dumps(handoff, indent=2))
-    summary = {"pmgr_handoff": handoff, "booted_ios": False, "kernel_entry_seen": entry_seen, "physical_kernel_entry": hex(kernel_entry),
+    summary = {"research_bridge_handoff": research_bridge_handoff,
+               "authentic_iboot_handoff": False, "pmgr_handoff": handoff, "booted_ios": False, "kernel_entry_seen": entry_seen, "physical_kernel_entry": hex(kernel_entry),
                "last_translated_blocks": re.findall(r"^0x([0-9a-fA-F]+):", trace_text, re.MULTILINE)[-8:],
                "cpu_model": cpu, "aprr_permissions_enforced": False,
                "counter_frequency": COUNTER_FREQUENCY,
@@ -206,5 +211,8 @@ if __name__ == "__main__":
     parser.add_argument("--directory", type=pathlib.Path, default=pathlib.Path(".firmware"))
     parser.add_argument("--qemu", default="qemu-system-aarch64")
     parser.add_argument("--cpu", choices=["max", "podium7-research"], default="max")
+    parser.add_argument("--research-bridge-handoff", action="store_true",
+                        help="Synthetic empty tuning lists for modeled bridges; not authentic iBoot settings")
     args = parser.parse_args()
-    run_probe(args.directory, executable=args.qemu, cpu=args.cpu)
+    run_probe(args.directory, executable=args.qemu, cpu=args.cpu,
+              research_bridge_handoff=args.research_bridge_handoff)

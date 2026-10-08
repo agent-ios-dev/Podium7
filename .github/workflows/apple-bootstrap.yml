@@ -58,6 +58,12 @@ jobs:
         run: python3 Tools/check_pmgr_bridges.py --qemu .qemu/build/qemu-system-aarch64
       - name: Execute original kernel and retain the next failure
         run: python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research
+      - name: Probe synthetic bridge handoff separately from original metadata
+        run: |
+          mkdir .firmware/bridge-experiment
+          cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/bridge-experiment/
+          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/bridge-experiment --research-bridge-handoff
+          python3 Tools/inspect_boot_fault.py --directory .firmware/bridge-experiment
       - name: Verify MCC register lock and protected RAM
         timeout-minutes: 1
         run: python3 Tools/check_mcc.py --qemu .qemu/build/qemu-system-aarch64
@@ -75,6 +81,8 @@ jobs:
           name: apple-bootstrap-evidence
           include-hidden-files: true
           path: |
+            .firmware/bridge-experiment/*.json
+            .firmware/bridge-experiment/*.txt
             .firmware/firmware.json
             .firmware/analysis.json
             .firmware/DeviceTree.bin

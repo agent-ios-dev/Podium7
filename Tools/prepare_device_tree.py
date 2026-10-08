@@ -8,7 +8,7 @@ import secrets
 from analyze_firmware import device_tree
 
 
-def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, dram_size=2 * 1024 * 1024 * 1024):
+def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, dram_size=2 * 1024 * 1024 * 1024, research_bridge_handoff=False):
     if not 1_000_000 <= counter_frequency <= 1_000_000_000:
         raise ValueError("invalid counter frequency")
     device_tree(data)  # Fully validate bounds/depth before rewriting.
@@ -56,6 +56,24 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
                 else:
                     properties[existing] = (properties[existing][0], encoded_value)
                 changes.append({"path": path, "property": name.decode(), "value": hex(value), "source": "QEMU virt RAM"})
+        if research_bridge_handoff and path == "/device-tree/arm-io/pmgr":
+            # Synthetic board metadata, not recovered iBoot register tuning.
+            # The modeled bridges have no tuning parameters. Keep real settings
+            # when present; declare an empty setting list only for absent ones.
+            if names.get(b"compatible", b"").rstrip(b"\0") != b"pmgr1,t8010":
+                raise ValueError("research bridge handoff requires T8010 PMGR")
+            count = names.get(b"#bridges", b"")
+            if count != struct.pack("<I", 14):
+                raise ValueError("research bridge handoff requires 14 n112ap bridges")
+            added = []
+            for index in range(14):
+                key = f"bridge-settings-{index}".encode()
+                if key not in names:
+                    properties.append((key.ljust(32, b"\0"), b""))
+                    added.append(key.decode())
+            changes.append({"path": path, "source": "synthetic research bridge model",
+                            "properties": added, "bytes_per_property": 0,
+                            "authentic_iboot_handoff": False})
         # Minimal one-plane MCC model, using A10 RoRgn offsets documented by
         # hardware research and the n112ap mcc physical aperture. This is not
         # a claim that all real A10 memory planes/cache hardware are modeled.
@@ -90,5 +108,7 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
     prepared, end = node(0, "")
     if end != len(data) or not changes:
         raise ValueError("missing CPU nodes or trailing tree data")
+    if research_bridge_handoff and not any(c.get("source") == "synthetic research bridge model" for c in changes):
+        raise ValueError("missing T8010 PMGR node for research bridge handoff")
     device_tree(prepared)
     return prepared, changes

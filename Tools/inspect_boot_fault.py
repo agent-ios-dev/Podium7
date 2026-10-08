@@ -19,7 +19,10 @@ def run_diagnostic(command, **kwargs):
         return f"Disassembler unavailable: {error}\n"
 
 
-root = pathlib.Path(".firmware")
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("--directory", type=pathlib.Path, default=pathlib.Path(".firmware"))
+root = parser.parse_args().directory
 if not (root / "qemu-trace.txt").exists():
     print("No execution trace: backend did not start; inspect the earlier build step")
     sys.exit(0)

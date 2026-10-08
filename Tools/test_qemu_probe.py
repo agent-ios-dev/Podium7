@@ -13,6 +13,11 @@ class QEMUProbeTests(unittest.TestCase):
         self.assertFalse(panic_capture_complete(header + state[:-1]))
         self.assertTrue(panic_capture_complete(header + state))
 
+    def test_assertion_panic_completes_without_watchdog_saved_state(self):
+        header = b'panic(cpu 0 caller 0xfffffff006705ac8): "REQUIRE failed" @ApplePMGR.cpp:1148'
+        self.assertFalse(panic_capture_complete(header))
+        self.assertTrue(panic_capture_complete(header + b"\n"))
+
     def test_kernel_base_covers_lower_prelinked_and_upper_text_segments(self):
         base = virtual_base_for_kernel(0xfffffff0054e4000, 0xfffffff007dd0000)
         self.assertEqual(base, 0xfffffff004000000)

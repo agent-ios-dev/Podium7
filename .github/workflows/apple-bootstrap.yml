@@ -73,6 +73,7 @@ jobs:
           path: |
             .firmware/firmware.json
             .firmware/analysis.json
+            .firmware/DeviceTree.bin
             .firmware/qemu-probe.json
             .firmware/qemu-trace.txt
             .firmware/qemu-serial.txt

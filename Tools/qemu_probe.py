@@ -102,7 +102,14 @@ def make_probe(directory):
 def panic_capture_complete(serial_bytes):
     """Wait for the first panic's saved PC/ESR/FAR, not just its header."""
     header = serial_bytes.find(b"panic(cpu ")
-    return header >= 0 and re.search(
+    if header < 0:
+        return False
+    line = serial_bytes[header:].split(b"\n", 1)
+    # Driver REQUIRE/assertion panics end at @Source.cpp:line and do not emit
+    # a primary saved state. Only data-abort panics need the PC/ESR/FAR line.
+    if len(line) == 2 and re.search(rb"@[^\r\n]+:\d+\r?$", line[0]):
+        return True
+    return re.search(
         rb"pc:\s*0x[0-9a-fA-F]+\s+cpsr:\s*0x[0-9a-fA-F]+"
         rb"\s+esr:\s*0x[0-9a-fA-F]+\s+far:\s*0x[0-9a-fA-F]+[\r\n]",
         serial_bytes[header:]) is not None

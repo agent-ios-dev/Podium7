@@ -82,6 +82,16 @@ if panic:
         (root / "panic-disassembly.txt").write_text(text)
         print(text)
 
+# Assertion panics carry a source location instead of the data-abort saved
+# state. Do not mistake a later watchdog failure for the original cause.
+if not panic:
+    assertion = re.search(r'panic\(cpu\s+(\d+)\s+caller\s+(0x[0-9a-fA-F]+)\):\s*(.*)', serial)
+    if assertion:
+        report = {"cpu": int(assertion.group(1)), "panic_caller": assertion.group(2),
+                  "reason": assertion.group(3), "kind": "assertion", "registers": {}}
+        (root / "panic-context.json").write_text(json.dumps(report, indent=2))
+        print(json.dumps(report, indent=2))
+
 first = re.search(r"Taking exception.*?with ELR (0x[0-9a-f]+)", trace, re.DOTALL)
 if first:
     before = trace[:first.start()]

@@ -40,6 +40,8 @@ jobs:
           cd .qemu/build
           ../configure --python="$(python -c 'import sys; print(sys.executable)')" --cc="ccache clang" --cxx="ccache clang++" --target-list=aarch64-softmmu --disable-docs --disable-tools --disable-guest-agent --disable-slirp --disable-hvf --disable-cocoa --disable-vnc --disable-sdl --disable-gtk --disable-curses
           ninja qemu-system-aarch64
+      - name: Verify genuine physical and virtual timer FIQ delivery
+        run: python3 Tools/check_timer_fiq.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify T8010 AIC v1 MMIO model
         run: python3 Tools/check_aic.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify Apple watchdog MMIO model
@@ -114,6 +116,7 @@ jobs:
             .firmware/device-tree-preparation.json
             .firmware/register-check-trace.txt
             .firmware/mcc-checks.json
+            .firmware/timer-fiq-checks.json
             .firmware/aic-checks.json
             .firmware/wdt-checks.json
             .firmware/gpio-checks.json

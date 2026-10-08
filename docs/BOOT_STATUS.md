@@ -1,3 +1,25 @@
+## Timer interrupt diagnosis after the extended probe
+
+Run 37815576973 completed the genuine 120-second restore experiment. It did
+not mount a confirmed root volume or start userland. CPU snapshots from both
+30-second and 120-second probes show PC=0xfffffff0071f1884 in the scheduler,
+not the former PMGR polling loop. Generic timers were still routed through
+virt's GIC, whereas Apple timer delivery uses FIQ. This is the next suspected
+cause, not a confirmed fix yet.
+
+The next research backend routes the physical and virtual EL1 timer outputs
+through a level-preserving OR to CPU FIQ and disconnects the unused GIC FIQ
+output for this CPU only. A genuine guest must receive each timer at the FIQ
+vector, observe ISTATUS, disable the timer, and resume with ERET. The kernel
+probe follows that test. External device IRQ wiring and Apple EL2 timer-enable
+controls remain unimplemented.
+
+Primary references:
+https://github.com/torvalds/linux/blob/master/drivers/irqchip/irq-apple-aic.c
+https://github.com/qemu/qemu/blob/v10.0.0/hw/arm/virt.c
+
+---
+
 ## Latest verified run: 37814842447
 
 The PMGR 64-bit aperture fault and the polling loop at 0x20e080230 are

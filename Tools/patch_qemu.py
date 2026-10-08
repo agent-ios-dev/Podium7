@@ -291,7 +291,7 @@ static void podium7_mcc_create(MachineState *machine, MemoryRegion *memory)
 /* Minimal Apple AIC v1 research model for the T8010 bootstrap.
  * The n112 firmware's ipid-mask is 40 bytes, so model 320 implemented IRQs;
  * the Linux driver documents the broader AIC family's 896-IRQ capability.
- * External device wiring and timer FIQ delivery are not modeled yet.
+ * External device wiring is not modeled; EL1 timers use a separate FIQ route.
  */
 #define PODIUM7_AIC_IRQ_COUNT 320
 typedef struct Podium7AIC {
@@ -1018,6 +1018,51 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
                  uart + aic + wdt + gpio + aes + thermal + usbphy + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
+    timer_fiq = r'''
+/* Research A10 EL1 timers arrive as FIQ, not GIC PPIs. External AIC device
+ * interrupts and Apple EL2 timer-enable controls are not modeled here. */
+typedef struct Podium7TimerFIQ {
+    qemu_irq output;
+    bool level[2];
+    unsigned logged;
+} Podium7TimerFIQ;
+
+static void podium7_timer_fiq_set(void *opaque, int input, int level)
+{
+    Podium7TimerFIQ *s = opaque;
+    s->level[input] = level;
+    qemu_set_irq(s->output, s->level[0] || s->level[1]);
+    if (s->logged++ < 128) {
+        qemu_log("PODIUM7 TIMER-FIQ source=%d level=%d combined=%d\n",
+                 input, level, s->level[0] || s->level[1]);
+    }
+}
+'''
+    replace_once(directory / "hw/arm/virt.c", "static void create_gic(",
+                 timer_fiq + "static void create_gic(")
+    replace_once(directory / "hw/arm/virt.c",
+                 "        for (unsigned irq = 0; irq < ARRAY_SIZE(timer_irq); irq++) {",
+                 '''        bool apple_timers = !strcmp(ms->cpu_type,
+                                    ARM_CPU_TYPE_NAME("podium7-research"));
+        Podium7TimerFIQ *fiq = NULL;
+        if (apple_timers) {
+            fiq = g_new0(Podium7TimerFIQ, 1);
+            fiq->output = qdev_get_gpio_in(cpudev, ARM_CPU_FIQ);
+        }
+        for (unsigned irq = 0; irq < ARRAY_SIZE(timer_irq); irq++) {
+            if (apple_timers && (irq == GTIMER_PHYS || irq == GTIMER_VIRT)) {
+                qdev_connect_gpio_out(cpudev, irq,
+                    qemu_allocate_irq(podium7_timer_fiq_set, fiq,
+                                      irq == GTIMER_PHYS ? 0 : 1));
+                continue;
+            }''')
+    replace_once(directory / "hw/arm/virt.c",
+                 '''        sysbus_connect_irq(gicbusdev, i + smp_cpus,
+                           qdev_get_gpio_in(cpudev, ARM_CPU_FIQ));''',
+                 '''        if (!apple_timers) {
+            sysbus_connect_irq(gicbusdev, i + smp_cpus,
+                               qdev_get_gpio_in(cpudev, ARM_CPU_FIQ));
+        }''')
     replace_once(directory / "hw/arm/virt.c",
                  "    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);",
                  '''    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);

@@ -815,6 +815,10 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
     }
 }
 '''
+    # Original MCA reset routine writes bits 0/1 at +0xc, then polls each
+    # until it clears. These are completion commands, not persistent flags.
+    mca = mca.replace("    uint32_t value = (uint32_t)data;",
+                      "    uint32_t value = (uint32_t)data;\n    if (address == 0xc) { value &= ~3U; }")
     mca = mca.replace("0x4000-byte control range at 0x20e200000",
                       "three 0x4000-byte MCA control ranges and three reset registers")
     mipi = dwi.replace("DWI", "MIPI-DSIM").replace("dwi", "mipi_dsim")

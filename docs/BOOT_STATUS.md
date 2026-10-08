@@ -1,3 +1,19 @@
+## Two minutes without panic; MCA reset stall: run 37831773255
+
+The genuine PMGR boundary setter now receives count 4, P-core-lowest 2.
+The former P-core assertion is resolved. CPU debug-map accesses also proceed.
+The restore probe runs for its full 120-second budget without a captured
+panic, but it does not confirm root mounting or userland.
+
+Actual CPU PC=0xfffffff0071c0a20 is a delay routine, with LR=0xfffffff00657c730.
+The original MCA reset routine writes bits 0/1 at offset 0xc, then polls each
+until it clears. The register backing retained bit 0 indefinitely, as proven
+by repeated reads at 0x20a0ac00c. The next model completes those reset commands
+immediately while preserving other fields. A guest test covers both commands
+on all three banks. It still provides no PCM, DMA or MCA interrupt delivery.
+
+---
+
 ## CPU group ordering and debug-map diagnosis: run 37830662740
 
 The P-core boundary setter still received zero with ascending E/P frequencies.

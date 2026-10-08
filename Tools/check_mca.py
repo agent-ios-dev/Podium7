@@ -92,6 +92,63 @@ b.ne failure
 str wzr, [x3]
 ldr w4, [x3]
 cbnz w4, failure
+movz x3, #12
+movk x3, #2570, lsl #16
+movk x3, #2, lsl #32
+mov w5, #1
+str w5, [x3]
+ldr w4, [x3]
+cbnz w4, failure
+mov w5, #2
+str w5, [x3]
+ldr w4, [x3]
+cbnz w4, failure
+mov w5, #3
+movk w5, #1, lsl #16
+str w5, [x3]
+ldr w4, [x3]
+movz w6, #0
+movk w6, #1, lsl #16
+cmp w4, w6
+b.ne failure
+movz x3, #32780
+movk x3, #2570, lsl #16
+movk x3, #2, lsl #32
+mov w5, #1
+str w5, [x3]
+ldr w4, [x3]
+cbnz w4, failure
+mov w5, #2
+str w5, [x3]
+ldr w4, [x3]
+cbnz w4, failure
+mov w5, #3
+movk w5, #1, lsl #16
+str w5, [x3]
+ldr w4, [x3]
+movz w6, #0
+movk w6, #1, lsl #16
+cmp w4, w6
+b.ne failure
+movz x3, #49164
+movk x3, #2570, lsl #16
+movk x3, #2, lsl #32
+mov w5, #1
+str w5, [x3]
+ldr w4, [x3]
+cbnz w4, failure
+mov w5, #2
+str w5, [x3]
+ldr w4, [x3]
+cbnz w4, failure
+mov w5, #3
+movk w5, #1, lsl #16
+str w5, [x3]
+ldr w4, [x3]
+movz w6, #0
+movk w6, #1, lsl #16
+cmp w4, w6
+b.ne failure
 mov x0, #0x20
 adr x1, success_exit
 hlt #0xf000
@@ -124,7 +181,8 @@ failure_exit:
             "model": "T8010 MCA register-window backing stores",
             "checks": ["three 16-KiB MCA banks initialize independently",
                        "all three original reset registers accept reset and clear",
-                       "last register in each original MCA bank"],
+                       "last register in each original MCA bank",
+                       "both reset command bits self-clear and preserve other fields"],
             "returncode": result.returncode, "stdout": result.stdout,
             "stderr": result.stderr}, indent=2))
         if not passed:

@@ -1,3 +1,19 @@
+## ACC assertion diagnosis from run 37824318487
+
+Runtime argument tracing captured readACCReg64(0x00f82000), originating from
+CPU state 254. The original driver at 0xfffffff006944a18 reads the low nibble
+of ACC 0x00f20020, subtracts 2, and masks to 8 bits. The raw backing store
+returned 0x61002000 with low nibble zero, producing the invalid state 254.
+The physical register is 0x202f20020. This is not a missing MMIO aperture.
+
+The next virtual CPU performance model starts at encoded state 2, preserves
+completed state during control initialization, processes UPDATE bit 25, and
+clears BUSY bit 31 immediately. It does not simulate physical DVFS/PLL timing.
+The guest regression test covers reset state, initialization, requested state,
+BUSY clearing and invalid-zero protection. Kernel validation is pending.
+
+---
+
 ## Verified FIQ progress: run 37816744771
 
 Physical and virtual timer FIQ delivery passed the real guest test. Original

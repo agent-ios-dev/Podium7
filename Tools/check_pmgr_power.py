@@ -87,6 +87,42 @@ str w5, [x3]
 ldr w4, [x3]
 cmp w4, w5
 b.ne failure
+// CPU performance state must survive initialization writes with zero state bits.
+movz x3, #0x20
+movk x3, #0x02f2, lsl #16
+movk x3, #2, lsl #32
+ldr x4, [x3]
+cmp x4, #2
+b.ne failure
+movz w5, #0
+movk w5, #0x0100, lsl #16
+str w5, [x3]
+ldr w4, [x3]
+mov w6, #2
+movk w6, #0x0100, lsl #16
+cmp w4, w6
+b.ne failure
+// A requested transition completes and clears hardware BUSY.
+mov w5, #3
+movk w5, #0x8200, lsl #16
+str w5, [x3]
+ldr w4, [x3]
+mov w6, #3
+movk w6, #0x0200, lsl #16
+cmp w4, w6
+b.ne failure
+str wzr, [x3]
+ldr w4, [x3]
+cmp w4, #3
+b.ne failure
+// Invalid zero cannot underflow the guest state decoder to 254.
+movz w5, #0
+movk w5, #0x0200, lsl #16
+str w5, [x3]
+ldr w4, [x3]
+and w4, w4, #15
+cmp w4, #3
+b.ne failure
 // XNU performs 64-bit accesses in PMGR aperture 6.
 movz x3, #0x40
 movk x3, #0x02f8, lsl #16
@@ -147,7 +183,9 @@ failure_exit:
                        "adjacent control word remains a latch",
                        "raw aperture round-trip", "power-state overlay has priority",
                        "AP and AOP aperture storage are independent",
-                       "64-bit aperture 6 round-trip and little-endian halves"],
+                       "64-bit aperture 6 round-trip and little-endian halves",
+                       "CPU state starts at encoded 2 and survives initialization",
+                       "CPU request completes, clears BUSY and rejects invalid zero"],
             "returncode": result.returncode, "stdout": result.stdout,
             "stderr": result.stderr}, indent=2))
         if not passed:

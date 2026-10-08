@@ -989,6 +989,18 @@ static void podium7_pmgr_raw_write(void *opaque, hwaddr address,
                                     uint64_t value, unsigned size)
 {
     Podium7PMGRRaw *s = opaque;
+    if (s->base == 0x202f20000ULL && address == 0x20) {
+        /* Original XNU decodes low nibble as CPU state index + 2. Its
+         * control initialization writes zero there before a request. Keep
+         * the completed state unless UPDATE (bit 25) requests a new one.
+         * Busy (bit 31) clears immediately in this fixed-clock TCG model. */
+        uint32_t actual = s->registers[address >> 2] & 0xf;
+        uint32_t desired = value & 0xf;
+        if ((value & (1U << 25)) && desired >= 2) {
+            actual = desired;
+        }
+        value = (value & ~0x8000000fULL) | actual;
+    }
     s->registers[address >> 2] = value;
     if (s->logged_accesses++ < 128) {
         qemu_log("PODIUM7 PMGR-RAW base=%016" PRIx64 " write offset=%06" PRIx64
@@ -1016,6 +1028,9 @@ static void podium7_pmgr_raw_create(MachineState *machine, MemoryRegion *memory)
         Podium7PMGRRaw *s = g_new0(Podium7PMGRRaw, 1);
         s->base = banks[i].base;
         s->registers = g_new0(uint32_t, banks[i].size / 4);
+        if (s->base == 0x202f20000ULL) {
+            s->registers[0x20 / 4] = 2; /* first valid virtual CPU state */
+        }
         memory_region_init_io(&s->io, OBJECT(machine), &podium7_pmgr_raw_ops,
                               s, "podium7-t8010-pmgr-raw", banks[i].size);
         memory_region_add_subregion_overlap(memory, s->base, &s->io, -1);

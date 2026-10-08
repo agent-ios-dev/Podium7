@@ -666,22 +666,29 @@ static const MemoryRegionOps podium7_thermal_ops = {
 };
 
 static void podium7_thermal_bank_create(MachineState *machine, MemoryRegion *memory,
-                                        hwaddr base, const char *name)
+                                        hwaddr base, hwaddr size, const char *name)
 {
     Podium7Thermal *thermal = g_new0(Podium7Thermal, 1);
     thermal->base = base;
     memory_region_init_io(&thermal->io, OBJECT(machine), &podium7_thermal_ops,
-                          thermal, name, 0x8000);
+                          thermal, name, size);
     memory_region_add_subregion(memory, base, &thermal->io);
 }
 
 static void podium7_thermal_create(MachineState *machine, MemoryRegion *memory)
 {
-    podium7_thermal_bank_create(machine, memory, 0x202f30000ULL,
+    podium7_thermal_bank_create(machine, memory, 0x202f30000ULL, 0x8000,
                                 "podium7-t8010-sochot-thermal");
     /* tempsensor0-2 share this 0x8000-byte window in the iPod9,1 DeviceTree. */
-    podium7_thermal_bank_create(machine, memory, 0x20e0bc000ULL,
+    podium7_thermal_bank_create(machine, memory, 0x20e0bc000ULL, 0x8000,
                                 "podium7-t8010-temperature-sensors");
+    /* sochot0's third range aliases 0x202f34000 within the first bank. */
+    podium7_thermal_bank_create(machine, memory, 0x20e0c4000ULL, 0x1000,
+                                "podium7-t8010-sochot0-control");
+    podium7_thermal_bank_create(machine, memory, 0x20e0c0000ULL, 0x1000,
+                                "podium7-t8010-sochot0-sensor");
+    podium7_thermal_bank_create(machine, memory, 0x2102bc000ULL, 0x4000,
+                                "podium7-t8010-sochot0-aop");
 }
 
 '''

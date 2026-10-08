@@ -10,42 +10,37 @@ from qemu_probe import elf_image
 
 
 def check(executable, report):
-    assembly = '''.text
-movz x3, #0
-movk x3, #0x02f3, lsl #16
-movk x3, #2, lsl #32
-ldr x4, [x3, #0x470]
-cmp x4, #0
-b.ne failure
-movz x5, #0x5678
-movk x5, #0x1234, lsl #16
-str x5, [x3, #0x470]
-ldr x4, [x3, #0x470]
-cmp x4, x5
-b.ne failure
-mov w5, #0x7f
-str x5, [x3, #0x7ff8]
-ldr x4, [x3, #0x7ff8]
-cmp x4, x5
-b.ne failure
-movz x3, #0xc000
-movk x3, #0x0e0b, lsl #16
-movk x3, #2, lsl #32
-ldr w4, [x3, #0x12c]
-cmp w4, #0
-b.ne failure
-mov w5, #0x5678
-str w5, [x3, #0x12c]
-ldr w4, [x3, #0x12c]
-cmp w4, w5
-b.ne failure
-movz x6, #0x7ffc
-add x6, x3, x6
-mov w5, #0x7f
-str w5, [x6]
-ldr w4, [x6]
-cmp w4, w5
-b.ne failure
+    # Generate addresses and boundary accesses explicitly: ARM64's immediate
+    # range differs for 32- and 64-bit accesses, so use computed addresses.
+    banks = [
+        (0x202f30000, 0x8000, 0x470, "x"),
+        (0x20e0bc000, 0x8000, 0x12c, "w"),
+        (0x20e0c4000, 0x1000, 0x20, "w"),
+        (0x20e0c0000, 0x1000, 0x20, "w"),
+        (0x2102bc000, 0x4000, 0x20, "w"),
+    ]
+    instructions = [".text"]
+    checks = []
+    for base, size, fault_offset, width in banks:
+        instructions += [f"movz x3, #{base & 0xffff}",
+                         f"movk x3, #{(base >> 16) & 0xffff}, lsl #16",
+                         f"movk x3, #{base >> 32}, lsl #32"]
+        for offset in (fault_offset, size - (8 if width == "x" else 4)):
+            instructions += [f"movz x6, #{offset}", "add x6, x3, x6",
+                             f"ldr {width}4, [x6]", f"cmp {width}4, #0",
+                             "b.ne failure", f"mov {width}5, #0x5678",
+                             f"str {width}5, [x6]", f"ldr {width}4, [x6]",
+                             f"cmp {width}4, {width}5", "b.ne failure"]
+            checks.append(f"{width}-register read/write at {hex(base + offset)}")
+    # sochot0 range 2 must share the tempsensor3-5 backing bank, not shadow it.
+    instructions += ["movz x3, #0", "movk x3, #0x02f3, lsl #16",
+                     "movk x3, #2, lsl #32", "movz x6, #0x4020",
+                     "add x6, x3, x6", "mov w5, #0x1234", "str w5, [x6]",
+                     "movz x3, #0x4000", "movk x3, #0x02f3, lsl #16",
+                     "movk x3, #2, lsl #32", "ldr w4, [x3, #0x20]",
+                     "cmp w4, w5", "b.ne failure"]
+    checks.append("sochot0 range 2 aliases the tempsensor3-5 bank")
+    assembly = "\n".join(instructions) + '''
 mov x0, #0x20
 adr x1, success_exit
 hlt #0xf000
@@ -76,10 +71,7 @@ failure_exit:
         passed = result.returncode == 0
         report.write_text(json.dumps({"passed": passed,
             "model": "T8010 SoCHot and shared temperature-sensor register banks",
-            "checks": ["SoCHot 64-bit read/write at offset 0x470",
-                       "SoCHot 64-bit read/write within its 0x8000-byte window",
-                       "tempsensor0-2 32-bit read/write at XNU fault offset 0x12c",
-                       "tempsensor0-2 32-bit read/write at end of its 0x8000-byte window"],
+            "checks": checks,
             "returncode": result.returncode, "stdout": result.stdout,
             "stderr": result.stderr}, indent=2))
         if not passed:

@@ -1,3 +1,15 @@
+## Verified DWI progress: run 37827170433
+
+The DWI initialization/boundary guest test passes. XNU reaches a new 32-bit
+store fault at physical 0x20a002008, PC 0xfffffff00657ab2c. The original tree
+identifies this as mca2 reg[1], a four-byte reset register. The next model
+covers the three original MCA banks (mca0/mca2/mca3, 16 KiB each) and their
+individual four-byte reset registers, with a guest test of all bank boundaries
+and reset/clear accesses. Register storage only: PCM, DMA, codecs and MCA IRQs
+remain unimplemented. No root mount or userspace is confirmed.
+
+---
+
 ## Verified USB-complex progress: run 37826471006
 
 The USB-complex parent control test passes and XNU proceeds past its control

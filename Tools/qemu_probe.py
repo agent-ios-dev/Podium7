@@ -210,6 +210,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
     thermal_transactions = [line for line in trace_text.splitlines() if "PODIUM7 THERMAL " in line]
     temperature_sensor_transactions = [line for line in trace_text.splitlines()
                                        if "PODIUM7 THERMAL base=000000020e0bc000 " in line]
+    mca_transactions = [line for line in trace_text.splitlines() if "PODIUM7 MCA " in line]
     dwi_transactions = [line for line in trace_text.splitlines() if "PODIUM7 DWI " in line]
     usbphy_transactions = [line for line in trace_text.splitlines() if "PODIUM7 USBPHY " in line]
     i2s_switch_transactions = [line for line in trace_text.splitlines() if "PODIUM7 I2S-SWITCH " in line]
@@ -237,6 +238,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                "aes_transactions": aes_transactions[:128],
                "thermal_transactions": thermal_transactions[:128],
                "temperature_sensor_transactions": temperature_sensor_transactions[:128],
+               "mca_transactions": mca_transactions[:128],
                "dwi_transactions": dwi_transactions[:128],
                "usbphy_transactions": usbphy_transactions[:128],
                "i2s_switch_transactions": i2s_switch_transactions[:128],

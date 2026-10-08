@@ -801,6 +801,22 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
                       "DeviceTree maps a 0x4000-byte control range at 0x20e200000; the")
     dwi = dwi.replace("PHY range at 0x20e0d8000. Registers are zeroed and stateful only; clocks,",
                       "registers are zeroed and stateful only; clocks,")
+    mca = dwi.replace("DWI", "MCA").replace("dwi", "mca")
+    start = mca.index("static void podium7_mca_create(")
+    mca = mca[:start] + '''static void podium7_mca_create(MachineState *machine, MemoryRegion *memory)
+{
+    static const hwaddr banks[] = { 0x20a0a0000ULL, 0x20a0a8000ULL, 0x20a0ac000ULL };
+    static const hwaddr reset[] = { 0x20a002000ULL, 0x20a002008ULL, 0x20a00200cULL };
+    for (unsigned i = 0; i < ARRAY_SIZE(banks); i++) {
+        podium7_mca_bank_create(machine, memory, banks[i], 0x4000,
+                                "podium7-t8010-mca-control");
+        podium7_mca_bank_create(machine, memory, reset[i], 4,
+                                "podium7-t8010-mca-reset");
+    }
+}
+'''
+    mca = mca.replace("0x4000-byte control range at 0x20e200000",
+                      "three 0x4000-byte MCA control ranges and three reset registers")
     i2s_switch = '''
 /* n112ap exposes 4-KiB main/AOP I2S banks and a 32-bit routing register.
  * Retain guest routing writes for bootstrap. No PCM/DMA/audio output yet.
@@ -1080,7 +1096,7 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
     timer_fiq = r'''
 /* Research A10 EL1 timers arrive as FIQ, not GIC PPIs. External AIC device
  * interrupts and Apple EL2 timer-enable controls are not modeled here. */
@@ -1145,6 +1161,7 @@ static void podium7_timer_fiq_set(void *opaque, int input, int level)
         podium7_thermal_create(machine, sysmem);
         podium7_usbphy_create(machine, sysmem);
         podium7_dwi_create(machine, sysmem);
+        podium7_mca_create(machine, sysmem);
         podium7_i2s_switch_create(machine, sysmem);
         podium7_pmgr_bridges_create(machine, sysmem);
         podium7_pmgr_raw_create(machine, sysmem);

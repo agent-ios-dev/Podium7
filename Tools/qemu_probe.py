@@ -166,6 +166,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
                                        if "PODIUM7 THERMAL base=000000020e0bc000 " in line]
     usbphy_transactions = [line for line in trace_text.splitlines() if "PODIUM7 USBPHY " in line]
     i2s_switch_transactions = [line for line in trace_text.splitlines() if "PODIUM7 I2S-SWITCH " in line]
+    pmgr_transactions = [line for line in trace_text.splitlines() if "PODIUM7 PMGR-BRIDGE " in line]
     exception_tail = faults[-24:]
     from inspect_pmgr_handoff import inspect_tree
     handoff = inspect_tree((directory / "DeviceTree.bin").read_bytes())
@@ -186,6 +187,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
                "temperature_sensor_transactions": temperature_sensor_transactions[:128],
                "usbphy_transactions": usbphy_transactions[:128],
                "i2s_switch_transactions": i2s_switch_transactions[:128],
+               "pmgr_bridge_transactions": pmgr_transactions[:128],
                "backend": version, "board": "QEMU virt bootstrap experiment, not T8010",
                "physical_ram_base": hex(PHYSICAL_BASE), "command": command, "stop": stop,
                "returncode": process.returncode, "seconds": time.monotonic() - start,

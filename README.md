@@ -68,3 +68,10 @@ recover n112ap bridge configuration and model its hardware semantics.
 Changing the optional mask or adding empty properties would not establish
 correct emulation. The extracted iBoot component is encrypted and was not
 used to fabricate settings.
+
+The research backend now maps all fourteen PMGR bridge register windows from
+n112ap. `Tools/check_pmgr_bridges.py` derives their addresses independently
+from the original DeviceTree and executes boundary/isolation checks in an
+ARM64 guest. The second arm-io translation places bridge 11 at `0x600010000`,
+not `0x800010000`. These banks preserve 32-bit register writes only; bridge
+counters, power transitions and iBoot bridge tuning remain unimplemented.

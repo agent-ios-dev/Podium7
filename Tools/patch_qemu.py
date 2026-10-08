@@ -819,10 +819,79 @@ static void podium7_i2s_switch_create(MachineState *machine, MemoryRegion *memor
 }
 
 '''
+
+    pmgr_bridges = r'''
+/* n112ap PMGR reg[10..23], selected by bridge-reg-index=10, #bridges=14.
+ * Register backing only. No fabricated iBoot settings or power transitions.
+ */
+typedef struct Podium7PMGRBridge {
+    MemoryRegion io;
+    uint32_t *registers;
+    uint64_t base;
+    unsigned index;
+    unsigned logged_accesses;
+} Podium7PMGRBridge;
+
+static uint64_t podium7_pmgr_bridge_read(void *opaque, hwaddr address,
+                                         unsigned size)
+{
+    Podium7PMGRBridge *s = opaque;
+    uint32_t value = s->registers[address >> 2];
+    if (s->logged_accesses++ < 32) {
+        qemu_log("PODIUM7 PMGR-BRIDGE index=%u base=%016" PRIx64
+                 " read offset=%04" PRIx64 " value=%08" PRIx32 "\n",
+                 s->index, s->base, (uint64_t)address, value);
+    }
+    return value;
+}
+
+static void podium7_pmgr_bridge_write(void *opaque, hwaddr address,
+                                       uint64_t value, unsigned size)
+{
+    Podium7PMGRBridge *s = opaque;
+    s->registers[address >> 2] = (uint32_t)value;
+    if (s->logged_accesses++ < 32) {
+        qemu_log("PODIUM7 PMGR-BRIDGE index=%u base=%016" PRIx64
+                 " write offset=%04" PRIx64 " value=%08" PRIx32 "\n",
+                 s->index, s->base, (uint64_t)address, (uint32_t)value);
+    }
+}
+
+static const MemoryRegionOps podium7_pmgr_bridge_ops = {
+    .read = podium7_pmgr_bridge_read, .write = podium7_pmgr_bridge_write,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+    .valid = { .min_access_size = 4, .max_access_size = 4, .unaligned = false },
+    .impl = { .min_access_size = 4, .max_access_size = 4, .unaligned = false },
+};
+
+static void podium7_pmgr_bridges_create(MachineState *machine, MemoryRegion *memory)
+{
+    static const struct { hwaddr base; hwaddr size; } banks[] = {
+        { 0x207000000ULL, 0x1000 }, { 0x207800000ULL, 0x9000 },
+        { 0x207a00000ULL, 0x9000 }, { 0x207c00000ULL, 0x9000 },
+        { 0x208000000ULL, 0x5000 }, { 0x205b00000ULL, 0x11000 },
+        { 0x206000000ULL, 0x1000 }, { 0x206100000ULL, 0x9000 },
+        { 0x201f00000ULL, 0x9000 }, { 0x201f80000ULL, 0x1000 },
+        { 0x20cb00000ULL, 0x1000 }, { 0x600010000ULL, 0x5000 },
+        { 0x208080000ULL, 0x1000 }, { 0x20f000000ULL, 0x9000 },
+    };
+    for (unsigned i = 0; i < ARRAY_SIZE(banks); i++) {
+        Podium7PMGRBridge *s = g_new0(Podium7PMGRBridge, 1);
+        s->base = banks[i].base;
+        s->index = i;
+        s->registers = g_new0(uint32_t, banks[i].size / 4);
+        memory_region_init_io(&s->io, OBJECT(machine), &podium7_pmgr_bridge_ops,
+                              s, "podium7-t8010-pmgr-bridge", banks[i].size);
+        memory_region_add_subregion(memory, s->base, &s->io);
+    }
+}
+
+'''
+
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + i2s_switch + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + i2s_switch + pmgr_bridges + "static void machvirt_init(MachineState *machine)")
     replace_once(directory / "hw/arm/virt.c",
                  "    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);",
                  '''    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);
@@ -842,6 +911,7 @@ static void podium7_i2s_switch_create(MachineState *machine, MemoryRegion *memor
         podium7_thermal_create(machine, sysmem);
         podium7_usbphy_create(machine, sysmem);
         podium7_i2s_switch_create(machine, sysmem);
+        podium7_pmgr_bridges_create(machine, sysmem);
     }''')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")

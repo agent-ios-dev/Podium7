@@ -38,12 +38,26 @@ str w5, [x3]
 ldr w4, [x3]
 cmp w4, #0xff
 b.ne failure
-// Slot 11 is explicitly absent in the n112ap valid-slot mask.
+// The third ps-regs field is not a validity mask.
 sub x3, x3, #8
 mov w5, #9
 str w5, [x3]
 ldr w4, [x3]
-cmp w4, #9
+cmp w4, #0x99
+b.ne failure
+// Reproduce the actual XNU polling loop at bank 0x200 offset 0x30.
+movz x3, #0x230
+movk x3, #0x0e08, lsl #16
+movk x3, #2, lsl #32
+mov w5, #15
+str w5, [x3]
+ldr w4, [x3]
+cmp w4, #0xff
+b.ne failure
+// The adjacent control word must remain an ordinary latch.
+str w5, [x3, #4]
+ldr w4, [x3, #4]
+cmp w4, #15
 b.ne failure
 // Raw aperture latches must not shadow the specific power-state bank.
 movz x3, #0x3c
@@ -129,7 +143,8 @@ failure_exit:
             "model": "T8010 deterministic virtual power-state handshake",
             "checks": ["zero initialization", "desired 9 acknowledges actual 9",
                        "control bits survive", "actual field cannot be forged",
-                       "power-off and power-on", "masked slot has no state handshake",
+                       "power-off and power-on", "bank 0x200 offset 0x30 completes XNU state polling",
+                       "adjacent control word remains a latch",
                        "raw aperture round-trip", "power-state overlay has priority",
                        "AP and AOP aperture storage are independent",
                        "64-bit aperture 6 round-trip and little-endian halves"],

@@ -890,14 +890,15 @@ static void podium7_pmgr_bridges_create(MachineState *machine, MemoryRegion *mem
 
 
     pmgr_power = r'''
-/* n112ap ps-regs triples select a register range and its valid state slots.
+/* n112ap ps-regs triples select power-register ranges. The third field is
+ * not a validity bitmap: original XNU requests offset 0x30 in bank 0x200
+ * even though the corresponding bit in that field is clear.
  * A deterministic virtual transition acknowledges DESIRED[3:0] in ACTUAL[7:4].
  * No analog voltages, parent dependency timing, or DVFS is simulated here.
  */
 typedef struct Podium7PMGRPower {
     MemoryRegion io;
     uint32_t registers[64];
-    uint32_t valid_slots;
     uint64_t base;
     unsigned logged_accesses;
 } Podium7PMGRPower;
@@ -918,7 +919,7 @@ static void podium7_pmgr_power_write(void *opaque, hwaddr address,
 {
     Podium7PMGRPower *s = opaque;
     uint32_t state = value;
-    if (!(address & 7) && (s->valid_slots & (1U << (address >> 3)))) {
+    if (!(address & 7)) {
         state = (state & ~0xf0U) | ((state & 0xfU) << 4);
     }
     s->registers[address >> 2] = state;
@@ -998,16 +999,13 @@ static void podium7_pmgr_raw_create(MachineState *machine, MemoryRegion *memory)
 
 static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memory)
 {
-    static const struct { hwaddr base; uint32_t mask; } banks[] = {
-        { 0x210280000ULL, 0xe07 }, { 0x20e080000ULL, 0 },
-        { 0x20e080100ULL, 0xfffff7ffU }, { 0x20e080200ULL, 0xffffffbfU },
-        { 0x20e080300ULL, 0x3d }, { 0x20e080400ULL, 1 },
-        { 0x20e084000ULL, 0x3f }, { 0x20e088000ULL, 0xf },
+    static const hwaddr banks[] = {
+        0x210280000ULL, 0x20e080000ULL, 0x20e080100ULL, 0x20e080200ULL,
+        0x20e080300ULL, 0x20e080400ULL, 0x20e084000ULL, 0x20e088000ULL,
     };
     for (unsigned i = 0; i < ARRAY_SIZE(banks); i++) {
         Podium7PMGRPower *s = g_new0(Podium7PMGRPower, 1);
-        s->base = banks[i].base;
-        s->valid_slots = banks[i].mask;
+        s->base = banks[i];
         memory_region_init_io(&s->io, OBJECT(machine), &podium7_pmgr_power_ops,
                               s, "podium7-t8010-pmgr-power", 0x100);
         memory_region_add_subregion(memory, s->base, &s->io);

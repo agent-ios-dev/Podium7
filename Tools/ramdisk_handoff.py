@@ -3,7 +3,7 @@ Apple xnu-8019.80.24 iokit/bsddev/IOKitBSDInit.cpp consumes two uintptr_t
 values at /chosen/memory-map/RAMDisk and selects the device with rd=md0.
 """
 import struct
-from analyze_firmware import device_tree
+from analyze_firmware import device_tree, payload, decompress
 
 
 def validate_hfs(image):
@@ -65,3 +65,21 @@ def attach_ramdisk(tree, address, size):
         raise ValueError("device tree has no chosen node")
     device_tree(result)
     return result
+
+
+def unwrap_restore_ramdisk(container):
+    image = payload(container, b"rdsk")
+    if image[:4] in (b"bvx2", b"bvx-", b"bvxn"):
+        image = decompress(image)
+    validate_hfs(image)
+    return image
+
+
+if __name__ == "__main__":
+    import argparse
+    from pathlib import Path
+    parser = argparse.ArgumentParser()
+    parser.add_argument("input", type=Path)
+    parser.add_argument("output", type=Path)
+    args = parser.parse_args()
+    args.output.write_bytes(unwrap_restore_ramdisk(args.input.read_bytes()))

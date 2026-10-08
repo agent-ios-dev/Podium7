@@ -91,13 +91,13 @@ probe. This is a fixed-frequency virtual domain, not recovered A10 DVFS.
 The synthetic PMGR probe passed bridge and CPU-domain metadata checks and
 then reached the unmapped n112ap state register `0x20e080160` (original XNU
 PC `0xfffffff0066ef4c4`). Eight windows selected by the original `ps-regs`
-triples now expose valid-slot-aware state registers. Writes to DESIRED[3:0]
+triples now expose aligned power-state registers. Writes to DESIRED[3:0]
 are acknowledged immediately in ACTUAL[7:4]; status bits cannot be supplied
 by the guest. This models a deterministic virtual transition, not analog
 power rails, dependency timing or physical A10 DVFS. The field layout agrees
 with the [m1n1 PMGR register definition](https://github.com/AsahiLinux/m1n1/blob/main/proxyclient/m1n1/hw/pmgr.py).
-`check_pmgr_power.py` executes power-on/off, control preservation and masked
-slot checks in an ARM64 guest. Original-metadata boot still stops on missing
+`check_pmgr_power.py` executes power-on/off, control preservation and adjacent
+control-word checks in an ARM64 guest. Original-metadata boot still stops on missing
 iBoot bridge settings; the separate experiment is not an authentic handoff.
 
 After PMGR state windows were modeled, the experiment reached
@@ -139,3 +139,11 @@ plus `rd=md0`, following Apple's XNU IOKitBSDInit.cpp. Host validation and ELF
 construction do not prove a guest mount or launchd startup. The workflow keeps
 this experiment separate from the no-disk baseline and does not redistribute
 Apple firmware in its diagnostic artifacts.
+
+The original XNU trace from run 37812389987 proves that the third `ps-regs`
+field is not a valid-slot bitmap: the driver writes DESIRED=15 at 0x20e080230
+and polls until ACTUAL matches. The earlier bitmap interpretation left that
+state at 0x0f indefinitely. All aligned state registers in the modeled banks
+now acknowledge desired transitions; the adjacent control words remain latches.
+The trace reached display, I2C and PCIe driver startup without a captured panic,
+but timed out before any confirmed root mount or userland startup.

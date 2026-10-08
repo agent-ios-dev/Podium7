@@ -70,7 +70,7 @@ jobs:
         run: |
           mkdir .firmware/ramdisk-experiment
           cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/ramdisk-experiment/
-          python3 -c "from pathlib import Path; import sys; sys.path.insert(0, 'Tools'); from analyze_firmware import payload, decompress; Path('.firmware/RestoreRamDisk.payload').write_bytes(decompress(payload(Path('.firmware/RestoreRamDisk.im4p').read_bytes(), b'rdsk')))"
+          python3 Tools/ramdisk_handoff.py .firmware/RestoreRamDisk.im4p .firmware/RestoreRamDisk.payload
           python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/ramdisk-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload
           python3 Tools/inspect_boot_fault.py --directory .firmware/ramdisk-experiment
       - name: Verify MCC register lock and protected RAM

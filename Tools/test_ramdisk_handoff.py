@@ -1,6 +1,6 @@
 import struct
 import unittest
-from ramdisk_handoff import attach_ramdisk, validate_hfs
+from ramdisk_handoff import attach_ramdisk, validate_hfs, unwrap_restore_ramdisk
 from test_device_tree_preparation import node
 from qemu_probe import boot_args
 
@@ -25,6 +25,18 @@ class RamdiskTests(unittest.TestCase):
         with self.assertRaises(ValueError): attach_ramdisk(tree, 0x48000001, 8192)
         with self.assertRaises(ValueError): attach_ramdisk(tree, 0x48000000, 8193)
         with self.assertRaises(ValueError): attach_ramdisk(node([("name", b"device-tree\0")]), 0x48000000, 8192)
+
+    def test_raw_rdsk_payload_is_not_sent_to_lzfse(self):
+        image = bytearray(8192)
+        struct.pack_into(">HH", image, 1024, 0x4858, 5)
+        struct.pack_into(">II", image, 1064, 4096, 2)
+        def der(tag, body):
+            length = len(body)
+            encoded = bytes([length]) if length < 128 else bytes([0x82]) + length.to_bytes(2, "big")
+            return bytes([tag]) + encoded + body
+        fields = der(0x16, b"IM4P") + der(0x16, b"rdsk") + der(0x16, b"restore") + der(4, image)
+        self.assertEqual(unwrap_restore_ramdisk(der(0x30, fields)), image)
+        with self.assertRaises(ValueError): unwrap_restore_ramdisk(der(0x30, fields.replace(b"rdsk", b"krnl")))
 
     def test_root_argument_and_reserved_top(self):
         args = boot_args(0xfffffff004000000, 0xfffffff008000000, 100, 0x51000000, ramdisk=True)

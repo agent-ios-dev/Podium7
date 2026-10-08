@@ -1,3 +1,16 @@
+## Verified CPU performance fix: run 37825327929
+
+The real guest CPU performance tests pass. The original kernel no longer
+panics on readACCReg64 with state 254. The next captured fault is a 64-bit
+store at PC 0xfffffff006ce380c to physical 0x202f38008, value 0x8033.
+Its saved registers show the driver mapping [0x202f38000,0x202f39000).
+This page is not in the PMGR DeviceTree reg list. The next model provides
+backing control latches for that observed page and a 64-bit guest test.
+No extra PLL/timing semantics are claimed. Root mounting and userland remain
+unconfirmed, and the research backend remains external to the IPA.
+
+---
+
 ## ACC assertion diagnosis from run 37824318487
 
 Runtime argument tracing captured readACCReg64(0x00f82000), originating from

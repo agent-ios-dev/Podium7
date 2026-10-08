@@ -147,6 +147,19 @@ movz w6, #0x5678
 movk w6, #0x9876, lsl #16
 cmp w4, w6
 b.ne failure
+// Real kernel maps an additional ACC control page and stores x2 at +8.
+movz x3, #0x8008
+movk x3, #0x02f3, lsl #16
+movk x3, #2, lsl #32
+ldr x4, [x3]
+cbnz x4, failure
+mov x5, #0x8033
+str x5, [x3]
+ldr x4, [x3]
+cmp x4, x5
+b.ne failure
+ldr w4, [x3, #4]
+cbnz w4, failure
 mov x0, #0x20
 adr x1, success_exit
 hlt #0xf000
@@ -185,7 +198,8 @@ failure_exit:
                        "AP and AOP aperture storage are independent",
                        "64-bit aperture 6 round-trip and little-endian halves",
                        "CPU state starts at encoded 2 and survives initialization",
-                       "CPU request completes, clears BUSY and rejects invalid zero"],
+                       "CPU request completes, clears BUSY and rejects invalid zero",
+                       "observed ACC control page 0x202f38008 accepts 64-bit kernel store"],
             "returncode": result.returncode, "stdout": result.stdout,
             "stderr": result.stderr}, indent=2))
         if not passed:

@@ -1023,6 +1023,10 @@ static void podium7_pmgr_raw_create(MachineState *machine, MemoryRegion *memory)
         { 0x202f40000ULL, 0x10000 }, { 0x202f50000ULL, 0x1000 },
         { 0x202f80000ULL, 0x1000 }, { 0x202050000ULL, 0xa000 },
         { 0x202150000ULL, 0xa000 }, { 0x20e308000ULL, 0x1000 },
+        /* Original 19H422 kernel maps [0x202f38000,0x202f39000) and writes
+         * 64-bit control 0x8033 at +8. This window is not in PMGR's reg list.
+         * Backing latches only; no unobserved PLL/timing semantics claimed. */
+        { 0x202f38000ULL, 0x1000 },
     };
     for (unsigned i = 0; i < ARRAY_SIZE(banks); i++) {
         Podium7PMGRRaw *s = g_new0(Podium7PMGRRaw, 1);

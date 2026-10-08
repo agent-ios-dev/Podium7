@@ -854,6 +854,10 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
                             "podium7-t8010-gfx-kf-control");
 }
 '''
+    # The original startup writes 0x11 at shared +0x1000 and waits for bit 4
+    # to clear. Complete this command, retaining bit 0 and other controls.
+    gfx = gfx.replace("    uint32_t value = (uint32_t)data;",
+                      "    uint32_t value = (uint32_t)data;\n    if (bank->base == 0x201d00000ULL && address == 0x1000) { value &= ~(1U << 4); }")
     gfx = gfx.replace("0x100000-byte GFX range at 0x206600000",
                       "original SGX/GFX control ranges; the shared bank is created once")
     clpc = mipi.replace("MIPI-DSIM", "CPU-CLPC").replace("mipi_dsim", "cpu_clpc")

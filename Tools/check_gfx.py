@@ -19,7 +19,7 @@ cbnz w4, failure
 mov w5, #17
 str w5, [x3]
 ldr w4, [x3]
-cmp w4, w5
+cmp w4, #1
 b.ne failure
 movz x3, #65532
 movk x3, #465, lsl #16
@@ -75,7 +75,16 @@ movz x3, #4096
 movk x3, #464, lsl #16
 movk x3, #2, lsl #32
 ldr w4, [x3]
-cmp w4, #0x11
+cmp w4, #1
+b.ne failure
+// Command completion must preserve the remaining control bits.
+mov w5, #0x11
+movk w5, #1, lsl #16
+str w5, [x3]
+ldr w4, [x3]
+mov w6, #1
+movk w6, #1, lsl #16
+cmp w4, w6
 b.ne failure
 mov x0, #0x20
 adr x1, success_exit
@@ -107,7 +116,8 @@ failure_exit:
         passed = result.returncode == 0
         report.write_text(json.dumps({"passed": passed,
             "model": "T8010 SGX/GFX control register-window backing stores",
-            "checks": ["original kernel 0x11 control write at 0x201d01000",
+            "checks": ["original kernel 0x11 command at 0x201d01000 clears bit 4",
+                       "command completion preserves other control bits",
                        "shared SGX/GFX physical bank is independent of other banks",
                        "first and last control registers in all three original ranges"],
             "returncode": result.returncode, "stdout": result.stdout,

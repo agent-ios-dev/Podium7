@@ -1,3 +1,16 @@
+## SGX/GFX command-completion stall: run 37839672173
+
+The restore probes now receive the official trust-cache region. No userland
+entry is yet confirmed: the modified-root probe ran for 120 seconds in
+original GPU startup code at PC 0xfffffff005fd2460. That code writes 0x11 at
+0x201d01000 and polls bit 4 until it clears. The backing model kept 0x11
+forever. The next change completes that command by clearing only bit 4,
+retaining bit 0 and other fields, with a genuine guest regression. This is
+startup command semantics, not GPU rendering or command-stream emulation.
+AMFI acceptance of launchd remains unconfirmed until the next actual load.
+
+---
+
 ## Actual launchd load attempt: run 37836967932
 
 The explicit modified-kernel restore experiment progresses beyond the root

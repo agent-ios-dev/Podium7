@@ -1,3 +1,16 @@
+## Verified MIPI-DSIM progress: run 37828651313
+
+The MIPI-DSIM range guest test passes and XNU progresses past its initial
+read. The next failure is a 32-bit store of 0x11 to 0x201d01000, PC
+0xfffffff005fd2458. Original sgx and gfx-kf nodes share the 128-KiB physical
+range at 0x201d00000. The next model creates that bank once, plus their
+separate 1-MiB SGX and 64-KiB GFX-KF banks. Guest checks cover the observed
+store, bank independence and boundaries. This is register backing only, not
+GPU command execution, rendering, DMA or GPU interrupt emulation.
+Boot to root/userland/desktop remains unconfirmed.
+
+---
+
 ## Verified MCA progress: run 37827850041
 
 All three MCA banks and reset-register guest checks pass. XNU moves on to a

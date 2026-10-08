@@ -831,6 +831,22 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
 '''
     mipi = mipi.replace("0x4000-byte control range at 0x20e200000",
                         "0x100000-byte MIPI-DSIM range at 0x206600000")
+    gfx = mipi.replace("MIPI-DSIM", "GFX").replace("mipi_dsim", "gfx")
+    gfx = gfx.replace("Podium7MIPIDSIMBank", "Podium7GFXBank")
+    start = gfx.index("static void podium7_gfx_create(")
+    gfx = gfx[:start] + '''static void podium7_gfx_create(MachineState *machine, MemoryRegion *memory)
+{
+    /* sgx and gfx-kf share the second physical bank. Create it only once. */
+    podium7_gfx_bank_create(machine, memory, 0x201000000ULL, 0x100000,
+                            "podium7-t8010-sgx-control");
+    podium7_gfx_bank_create(machine, memory, 0x201d00000ULL, 0x20000,
+                            "podium7-t8010-sgx-gfx-shared-control");
+    podium7_gfx_bank_create(machine, memory, 0x201d20000ULL, 0x10000,
+                            "podium7-t8010-gfx-kf-control");
+}
+'''
+    gfx = gfx.replace("0x100000-byte GFX range at 0x206600000",
+                      "original SGX/GFX control ranges; the shared bank is created once")
     i2s_switch = '''
 /* n112ap exposes 4-KiB main/AOP I2S banks and a 32-bit routing register.
  * Retain guest routing writes for bootstrap. No PCM/DMA/audio output yet.
@@ -1110,7 +1126,7 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
     timer_fiq = r'''
 /* Research A10 EL1 timers arrive as FIQ, not GIC PPIs. External AIC device
  * interrupts and Apple EL2 timer-enable controls are not modeled here. */
@@ -1177,6 +1193,7 @@ static void podium7_timer_fiq_set(void *opaque, int input, int level)
         podium7_dwi_create(machine, sysmem);
         podium7_mca_create(machine, sysmem);
         podium7_mipi_dsim_create(machine, sysmem);
+        podium7_gfx_create(machine, sysmem);
         podium7_i2s_switch_create(machine, sysmem);
         podium7_pmgr_bridges_create(machine, sysmem);
         podium7_pmgr_raw_create(machine, sysmem);

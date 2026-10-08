@@ -45,6 +45,34 @@ str w5, [x3]
 ldr w4, [x3]
 cmp w4, #9
 b.ne failure
+// Raw aperture latches must not shadow the specific power-state bank.
+movz x3, #0x3c
+movk x3, #0x0e04, lsl #16
+movk x3, #2, lsl #32
+ldr w4, [x3]
+cbnz w4, failure
+mov w5, #0x4567
+str w5, [x3]
+ldr w4, [x3]
+cmp w4, w5
+b.ne failure
+movz x3, #0x160
+movk x3, #0x0e08, lsl #16
+movk x3, #2, lsl #32
+ldr w4, [x3]
+cmp w4, #0xff
+b.ne failure
+// AOP aperture must have independent storage.
+movz x3, #0x3c
+movk x3, #0x1024, lsl #16
+movk x3, #2, lsl #32
+ldr w4, [x3]
+cbnz w4, failure
+mov w5, #0x1234
+str w5, [x3]
+ldr w4, [x3]
+cmp w4, w5
+b.ne failure
 mov x0, #0x20
 adr x1, success_exit
 hlt #0xf000
@@ -77,7 +105,9 @@ failure_exit:
             "model": "T8010 deterministic virtual power-state handshake",
             "checks": ["zero initialization", "desired 9 acknowledges actual 9",
                        "control bits survive", "actual field cannot be forged",
-                       "power-off and power-on", "masked slot has no state handshake"],
+                       "power-off and power-on", "masked slot has no state handshake",
+                       "raw aperture round-trip", "power-state overlay has priority",
+                       "AP and AOP aperture storage are independent"],
             "returncode": result.returncode, "stdout": result.stdout,
             "stderr": result.stderr}, indent=2))
         if not passed:

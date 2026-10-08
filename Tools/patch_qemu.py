@@ -936,6 +936,60 @@ static const MemoryRegionOps podium7_pmgr_power_ops = {
     .impl = { .min_access_size = 4, .max_access_size = 4, .unaligned = false },
 };
 
+
+/* Backing store for the two DeviceTree PMGR apertures. Specific power,
+ * thermal and AES models retain higher priority and their own semantics.
+ * Other control registers are latches only, with accesses explicitly logged.
+ */
+typedef struct Podium7PMGRRaw {
+    MemoryRegion io;
+    uint32_t *registers;
+    uint64_t base;
+    unsigned logged_accesses;
+} Podium7PMGRRaw;
+
+static uint64_t podium7_pmgr_raw_read(void *opaque, hwaddr address, unsigned size)
+{
+    Podium7PMGRRaw *s = opaque;
+    uint32_t value = s->registers[address >> 2];
+    if (s->logged_accesses++ < 128) {
+        qemu_log("PODIUM7 PMGR-RAW base=%016" PRIx64 " read offset=%06" PRIx64
+                 " value=%08" PRIx32 "\n", s->base, (uint64_t)address, value);
+    }
+    return value;
+}
+
+static void podium7_pmgr_raw_write(void *opaque, hwaddr address,
+                                    uint64_t value, unsigned size)
+{
+    Podium7PMGRRaw *s = opaque;
+    s->registers[address >> 2] = value;
+    if (s->logged_accesses++ < 128) {
+        qemu_log("PODIUM7 PMGR-RAW base=%016" PRIx64 " write offset=%06" PRIx64
+                 " value=%08" PRIx32 "\n", s->base, (uint64_t)address, (uint32_t)value);
+    }
+}
+
+static const MemoryRegionOps podium7_pmgr_raw_ops = {
+    .read = podium7_pmgr_raw_read, .write = podium7_pmgr_raw_write,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+    .valid = { .min_access_size = 4, .max_access_size = 4, .unaligned = false },
+    .impl = { .min_access_size = 4, .max_access_size = 4, .unaligned = false },
+};
+
+static void podium7_pmgr_raw_create(MachineState *machine, MemoryRegion *memory)
+{
+    static const hwaddr bases[] = { 0x20e000000ULL, 0x210200000ULL };
+    for (unsigned i = 0; i < ARRAY_SIZE(bases); i++) {
+        Podium7PMGRRaw *s = g_new0(Podium7PMGRRaw, 1);
+        s->base = bases[i];
+        s->registers = g_new0(uint32_t, 0x100000 / 4);
+        memory_region_init_io(&s->io, OBJECT(machine), &podium7_pmgr_raw_ops,
+                              s, "podium7-t8010-pmgr-raw", 0x100000);
+        memory_region_add_subregion_overlap(memory, s->base, &s->io, -1);
+    }
+}
+
 static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memory)
 {
     static const struct { hwaddr base; uint32_t mask; } banks[] = {
@@ -980,6 +1034,7 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
         podium7_usbphy_create(machine, sysmem);
         podium7_i2s_switch_create(machine, sysmem);
         podium7_pmgr_bridges_create(machine, sysmem);
+        podium7_pmgr_raw_create(machine, sysmem);
         podium7_pmgr_power_create(machine, sysmem);
     }''')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)

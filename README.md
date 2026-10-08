@@ -108,3 +108,10 @@ After PMGR state windows were modeled, the experiment reached
 fills only this all-zero placeholder with nominal 24 MHz sources and class 2
 (nclk); these are virtual sources, not physical A10 PLL values. The baseline
 probe preserves the IPSW values. No successful iOS boot has been observed.
+
+The next observed fault was PMGR control offset `0x4003c` in aperture 0.
+Both original 1 MiB PMGR apertures now have low-priority register latches;
+specific power-state, thermal and AES models retain priority. These latches
+do not simulate PLL lock, interrupt generation or other control side effects.
+Their accesses are separately logged as `PMGR-RAW` and guest tests verify
+that they do not shadow the implemented power-state transitions.

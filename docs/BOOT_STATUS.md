@@ -1,3 +1,19 @@
+## Latest verified run: 37814842447
+
+The PMGR 64-bit aperture fault and the polling loop at 0x20e080230 are
+resolved in the external research backend. Genuine guest tests pass. The
+unpatched kernel reaches display, I2C, PCIe and AVE driver startup, with and
+without the official restore ramdisk. Both experiments reach the 30-second
+execution budget without a captured panic. This is not proof of a mounted
+root volume, launchd or SpringBoard: none is confirmed.
+
+The next probe extends the restore experiment to 120 seconds and captures
+actual stopped CPU registers using local QMP, rather than inferring the
+stopped PC from the last translated block. iOS is not yet booted to its home
+screen and the backend is not yet part of the IPA.
+
+---
+
 ## October 8, 2026: no iOS desktop confirmed
 
 The external QEMU v10 research backend executes the original iPod9,1

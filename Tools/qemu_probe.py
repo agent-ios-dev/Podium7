@@ -11,6 +11,8 @@ import re
 import struct
 import subprocess
 import time
+import tempfile
+from qmp_diagnostics import capture as capture_cpu
 from analyze_firmware import macho, device_tree
 from prepare_device_tree import prepare
 from ramdisk_handoff import attach_ramdisk, validate_hfs
@@ -140,7 +142,9 @@ def panic_capture_complete(serial_bytes):
         serial_bytes[header:]) is not None
 
 
-def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, research_bridge_handoff=False, ramdisk=None):
+def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, research_bridge_handoff=False, ramdisk=None, seconds=30):
+    if not 1 <= seconds <= 600:
+        raise ValueError("execution budget must be between 1 and 600 seconds")
     if research_bridge_handoff and cpu != "podium7-research":
         raise ValueError("synthetic bridge handoff requires the research bridge model")
     image, kernel_entry, rorgn = make_probe(directory, research_bridge_handoff=research_bridge_handoff, ramdisk=ramdisk)
@@ -151,6 +155,10 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
     if cpu == "podium7-research":
         command += ["-device", f"loader,addr=0x2000007e4,data={rorgn[0]},data-len=4",
                     "-device", f"loader,addr=0x2000007e8,data={rorgn[1]},data-len=4"]
+    monitor_dir = tempfile.TemporaryDirectory(prefix="p7-qmp-")
+    monitor_path = pathlib.Path(monitor_dir.name) / "monitor.sock"
+    command += ["-qmp", f"unix:{monitor_path},server=on,wait=off"]
+    snapshot = None
     version = subprocess.check_output([executable, "--version"], text=True).splitlines()[0]
     with serial.open("wb") as output:
         process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT)
@@ -158,7 +166,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
         stop = "QEMU exited"
         panic_started = None
         while process.poll() is None:
-            deadline = time.monotonic() - start > 30
+            deadline = time.monotonic() - start > seconds
             full_trace = trace.exists() and trace.stat().st_size > 16 * 1024 * 1024
             serial_bytes = serial.read_bytes()
             panic_seen = b"panic(cpu " in serial_bytes
@@ -169,7 +177,14 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
             if deadline or full_trace or complete or panic_timeout:
                 stop = ("XNU panic captured" if complete else
                         "XNU panic capture incomplete" if panic_seen else
-                        "30-second execution deadline reached" if deadline else "16-MiB trace limit reached")
+                        f"{seconds}-second execution deadline reached" if deadline else "16-MiB trace limit reached")
+                try:
+                    snapshot = capture_cpu(monitor_path)
+                    (directory / "cpu-snapshot.txt").write_text(snapshot["registers"])
+                    (directory / "cpu-snapshot.json").write_text(json.dumps(snapshot, indent=2))
+                except (OSError, ValueError) as error:
+                    snapshot = {"capture_error": str(error)}
+                    (directory / "cpu-snapshot.json").write_text(json.dumps(snapshot, indent=2))
                 process.terminate()
                 try:
                     process.wait(timeout=3)
@@ -178,6 +193,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                     process.wait()
                 break
             time.sleep(0.1)
+    monitor_dir.cleanup()
     trace_text = trace.read_text(errors="replace") if trace.exists() else ""
     entry_seen = any(int(address, 16) == kernel_entry for address in re.findall(r"^0x([0-9a-fA-F]+):", trace_text, re.MULTILINE))
     faults = [line for line in trace_text.splitlines() if "exception" in line.lower() or "unimplemented" in line.lower() or "unallocated" in line.lower() or "unsupported" in line.lower()]
@@ -220,6 +236,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                "pmgr_bridge_transactions": pmgr_transactions[:128],
                "pmgr_power_transactions": pmgr_power_transactions[:128],
                "pmgr_raw_transactions": pmgr_raw_transactions[:128],
+               "execution_budget_seconds": seconds, "cpu_snapshot": snapshot,
                "restore_ramdisk_requested": ramdisk is not None,
                "backend": version, "board": "QEMU virt bootstrap experiment, not T8010",
                "physical_ram_base": hex(PHYSICAL_BASE), "command": command, "stop": stop,
@@ -242,6 +259,7 @@ if __name__ == "__main__":
     parser.add_argument("--research-bridge-handoff", action="store_true",
                         help="Synthetic empty tuning lists for modeled bridges; not authentic iBoot settings")
     parser.add_argument("--ramdisk", type=pathlib.Path, help="Raw HFS restore disk, reserved in harness RAM; root md0")
+    parser.add_argument("--seconds", type=int, default=30, help="Bounded execution budget (1..600 seconds)")
     args = parser.parse_args()
     run_probe(args.directory, executable=args.qemu, cpu=args.cpu,
-              research_bridge_handoff=args.research_bridge_handoff, ramdisk=args.ramdisk)
+              research_bridge_handoff=args.research_bridge_handoff, ramdisk=args.ramdisk, seconds=args.seconds)

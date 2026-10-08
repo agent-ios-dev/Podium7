@@ -1,0 +1,32 @@
+"""Read a stopped QEMU CPU snapshot; no guest-success heuristics."""
+import json
+import socket
+
+
+def capture(path):
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+        connection.settimeout(3)
+        connection.connect(str(path))
+        with connection.makefile("rwb") as stream:
+            def receive():
+                line = stream.readline(1024 * 1024)
+                if not line or not line.endswith(b"\n"):
+                    raise ValueError("incomplete QMP message")
+                return json.loads(line)
+            if "QMP" not in receive():
+                raise ValueError("missing QMP greeting")
+            def request(command, arguments=None):
+                message = {"execute": command, "id": command}
+                if arguments is not None: message["arguments"] = arguments
+                stream.write(json.dumps(message).encode() + b"\n")
+                stream.flush()
+                for _ in range(100):
+                    reply = receive()
+                    if reply.get("id") == command:
+                        if "error" in reply: raise ValueError(str(reply["error"]))
+                        return reply["return"]
+                raise ValueError("QMP reply missing after 100 events")
+            request("qmp_capabilities")
+            request("stop")
+            return {"cpus": request("query-cpus-fast"),
+                    "registers": request("human-monitor-command", {"command-line": "info registers"})}

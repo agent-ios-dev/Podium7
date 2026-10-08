@@ -71,7 +71,7 @@ jobs:
           mkdir .firmware/ramdisk-experiment
           cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/ramdisk-experiment/
           python3 Tools/ramdisk_handoff.py .firmware/RestoreRamDisk.im4p .firmware/RestoreRamDisk.payload
-          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/ramdisk-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload
+          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/ramdisk-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --seconds 120
           python3 Tools/inspect_boot_fault.py --directory .firmware/ramdisk-experiment
       - name: Verify MCC register lock and protected RAM
         timeout-minutes: 1
@@ -100,6 +100,8 @@ jobs:
             .firmware/pmgr-handoff.json
             .firmware/pmgr-bridge-checks.json
             .firmware/pmgr-power-checks.json
+            .firmware/cpu-snapshot.json
+            .firmware/cpu-snapshot.txt
             .firmware/qemu-probe.json
             .firmware/qemu-trace.txt
             .firmware/qemu-serial.txt

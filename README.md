@@ -82,3 +82,8 @@ separate from the original-metadata probe. It does not recover real iBoot
 settings, implement bridge tuning, or prove working power management.
 Existing settings, the optional mask and settings version remain unchanged.
 Both traces and explicit provenance are retained in the CI artifact.
+
+The synthetic PMGR probe additionally replaces only an all-zero 128-byte
+CPU `voltage-states1` placeholder with one nominal TCG state (24 MHz, no
+physical voltage). Original voltage tables are preserved in the baseline
+probe. This is a fixed-frequency virtual domain, not recovered A10 DVFS.

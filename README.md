@@ -115,3 +115,10 @@ specific power-state, thermal and AES models retain priority. These latches
 do not simulate PLL lock, interrupt generation or other control side effects.
 Their accesses are separately logged as `PMGR-RAW` and guest tests verify
 that they do not shadow the implemented power-state transitions.
+
+Original XNU's type-1 CPU domain stores a fixed-point period, not Hertz:
+it computes MHz as `(1000 << 16) / period` at `0xfffffff0066e0008`.
+The research single-state table now encodes a period matching the original
+`mcx-fast-cpu-frequency` (1644 MHz) exactly. This fixes the earlier synthetic
+field encoding; it does not change the 24 MHz architectural timer or claim
+that TCG executes 1644 million instructions per second.

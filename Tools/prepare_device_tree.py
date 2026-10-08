@@ -93,13 +93,24 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
             # Model one fixed nominal state for TCG, not physical CPU voltages.
             levels = names.get(b"voltage-states1")
             if levels is not None and len(levels) == 128 and not any(levels):
-                value = struct.pack("<II", counter_frequency, 0) + bytes(120)
+                requested = names.get(b"mcx-fast-cpu-frequency")
+                if requested is None or len(requested) != 4:
+                    raise ValueError("synthetic CPU domain requires mcx-fast-cpu-frequency")
+                frequency_mhz = int.from_bytes(requested, "little")
+                if not 1 <= frequency_mhz <= 10000:
+                    raise ValueError("invalid nominal CPU frequency")
+                # Type-1 PMGR domains encode a period, not Hz. Original XNU
+                # computes MHz as (1000 << 16) / period at 0x0066e0008.
+                period = (1000 << 16) // frequency_mhz
+                if (1000 << 16) // period != frequency_mhz:
+                    raise ValueError("nominal CPU frequency is not exactly representable")
+                value = struct.pack("<II", period, 0) + bytes(120)
                 position = next(i for i, (key, _) in enumerate(properties)
                                 if key.split(b"\0")[0] == b"voltage-states1")
                 properties[position] = (properties[position][0], value)
                 changes.append({"path": path, "property": "voltage-states1",
                                 "source": "synthetic fixed-frequency TCG performance domain",
-                                "nominal_frequency": counter_frequency, "states": 1,
+                                "nominal_frequency_mhz": frequency_mhz, "encoded_period": period, "states": 1,
                                 "authentic_iboot_handoff": False})
             changes.append({"path": path, "source": "synthetic research bridge model",
                             "properties": added, "bytes_per_property": 0,

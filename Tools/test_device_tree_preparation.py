@@ -60,7 +60,7 @@ class ResearchBridgeHandoffTests(unittest.TestCase):
         pmgr = node([("name", b"pmgr\0"), ("compatible", compatible),
                      ("#bridges", struct.pack("<I", 14)),
                      ("optional-bridge-mask", struct.pack("<I", 0x2000)),
-                     ("bridge-settings-3", bytes(range(8))), ("voltage-states1", bytes(128))])
+                     ("bridge-settings-3", bytes(range(8))), ("voltage-states1", bytes(128)), ("mcx-fast-cpu-frequency", struct.pack("<I", 1644))])
         return node([("name", b"device-tree\0")], [node([("name", b"cpus\0")], [cpu]),
                          node([("name", b"arm-io\0"), ("clock-frequencies", bytes(384))], [pmgr])])
 
@@ -75,7 +75,7 @@ class ResearchBridgeHandoffTests(unittest.TestCase):
         self.assertEqual(properties["bridge-settings-3"], bytes(range(8)).hex())
         self.assertEqual(properties["optional-bridge-mask"], "00200000")
         self.assertNotIn("bridge-settings-version", properties)
-        self.assertEqual(bytes.fromhex(properties["voltage-states1"]), struct.pack("<II", 24000000, 0) + bytes(120))
+        self.assertEqual(bytes.fromhex(properties["voltage-states1"]), struct.pack("<II", (1000 << 16) // 1644, 0) + bytes(120))
         self.assertEqual(original["voltage-states1"], bytes(128).hex())
         clocks = next(n["properties"] for n in device_tree(prepared) if n["path"] == "/device-tree/arm-io")
         self.assertEqual(bytes.fromhex(clocks["clock-frequencies"]), struct.pack("<I", 24000000) * 96)

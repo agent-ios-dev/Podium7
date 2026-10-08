@@ -83,13 +83,13 @@ jobs:
           mkdir .firmware/ramdisk-experiment
           cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/ramdisk-experiment/
           python3 Tools/ramdisk_handoff.py .firmware/RestoreRamDisk.im4p .firmware/RestoreRamDisk.payload
-          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/ramdisk-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --seconds 30
+          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/ramdisk-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --trust-cache .firmware/RestoreTrustCache.im4p --seconds 30
           python3 Tools/inspect_boot_fault.py --directory .firmware/ramdisk-experiment
       - name: Isolate restore userland from blocked root security callback
         run: |
           mkdir .firmware/restore-userland-experiment
           cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/restore-userland-experiment/
-          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/restore-userland-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --research-ramdisk-root --seconds 120
+          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/restore-userland-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --trust-cache .firmware/RestoreTrustCache.im4p --research-ramdisk-root --seconds 120
           python3 Tools/inspect_boot_fault.py --directory .firmware/restore-userland-experiment
       - name: Verify MCC register lock and protected RAM
         timeout-minutes: 1

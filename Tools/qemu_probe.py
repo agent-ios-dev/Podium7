@@ -15,8 +15,9 @@ import tempfile
 from qmp_diagnostics import capture as capture_cpu
 from analyze_firmware import macho, device_tree
 from prepare_device_tree import prepare
-from ramdisk_handoff import attach_ramdisk, validate_hfs
+from ramdisk_handoff import attach_ramdisk, attach_memory_file, validate_hfs
 from guest_patches import skip_restore_secure_root
+from trust_cache_handoff import serialize as serialize_trust_cache
 COUNTER_FREQUENCY = 24_000_000
 QEMU_RAM_BASE = 0x40000000
 QEMU_RAM_SIZE = 2 * 1024 * 1024 * 1024
@@ -66,7 +67,7 @@ def elf_image(entry, segments):
     return header + b"".join(headers) + b"".join(bodies)
 
 
-def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, research_ramdisk_root=False):
+def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, research_ramdisk_root=False, trust_cache=None):
     if research_ramdisk_root and ramdisk is None:
         raise ValueError("research root gate skip is restricted to explicit restore ramdisk probes")
     kernel = (directory / "KernelCache.macho").read_bytes()
@@ -89,6 +90,20 @@ def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, resear
     stub_address = align(maximum - virtual_base + PHYSICAL_BASE)
     args_address = stub_address + 0x4000
     tree_address = args_address + 0x4000
+    cache_region = None
+    cache_address = None
+    if trust_cache is not None:
+        cache_region, cache_report = serialize_trust_cache(trust_cache.read_bytes())
+        cache_address = align(minimum - virtual_base + PHYSICAL_BASE) - len(cache_region)
+        if cache_address < PHYSICAL_BASE:
+            raise ValueError("trust cache does not fit below kernel in harness RAM")
+        tree = attach_memory_file(tree, cache_address, len(cache_region), "TrustCache")
+        cache_report.update(physical_address=hex(cache_address),
+                            placement="immediately below lowest kernel segment")
+        (directory / "trust-cache-handoff.json").write_text(json.dumps(cache_report, indent=2))
+        clocks.append({"path": "/device-tree/chosen/memory-map", "property": "TrustCache",
+                       "physical_address": hex(cache_address), "bytes": len(cache_region),
+                       "source": "official IPSW restore trust cache", "entries": cache_report["entries"]})
     disk = ramdisk.read_bytes() if ramdisk is not None else None
     if disk is not None:
         disk_info = validate_hfs(disk)
@@ -126,9 +141,13 @@ def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, resear
                  (tree_address, align(len(tree)), tree)]
     if disk is not None:
         segments.append((disk_address, align(len(disk)), disk))
+    if cache_region is not None:
+        segments.append((cache_address, len(cache_region), cache_region))
     destination = directory / "qemu-kernel-probe.elf"
     destination.write_bytes(elf_image(stub_address, segments))
     readonly_low = min(int(x["address"], 16) for x in regions if x["name"] == "__PRELINK_TEXT") - virtual_base + PHYSICAL_BASE
+    if cache_address is not None:
+        readonly_low = min(readonly_low, cache_address)
     last = next(x for x in regions if x["name"] == "__LAST")
     readonly_high = int(last["address"], 16) + last["length"] - virtual_base + PHYSICAL_BASE - 1
     return destination, entry, ((readonly_low - QEMU_RAM_BASE) >> 14, (readonly_high - QEMU_RAM_BASE) >> 14)
@@ -150,12 +169,12 @@ def panic_capture_complete(serial_bytes):
         serial_bytes[header:]) is not None
 
 
-def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, research_bridge_handoff=False, ramdisk=None, seconds=30, research_ramdisk_root=False):
+def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, research_bridge_handoff=False, ramdisk=None, seconds=30, research_ramdisk_root=False, trust_cache=None):
     if not 1 <= seconds <= 600:
         raise ValueError("execution budget must be between 1 and 600 seconds")
     if research_bridge_handoff and cpu != "podium7-research":
         raise ValueError("synthetic bridge handoff requires the research bridge model")
-    image, kernel_entry, rorgn = make_probe(directory, research_bridge_handoff=research_bridge_handoff, ramdisk=ramdisk, research_ramdisk_root=research_ramdisk_root)
+    image, kernel_entry, rorgn = make_probe(directory, research_bridge_handoff=research_bridge_handoff, ramdisk=ramdisk, research_ramdisk_root=research_ramdisk_root, trust_cache=trust_cache)
     trace, serial = directory / "qemu-trace.txt", directory / "qemu-serial.txt"
     command = [executable, "-machine", "virt,secure=off,virtualization=off", "-cpu", f"{cpu},cntfrq={COUNTER_FREQUENCY}", "-accel", "tcg",
                "-m", "2048", "-smp", "1", "-display", "none", "-monitor", "none", "-serial", "stdio",
@@ -260,6 +279,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                "pmgr_power_transactions": pmgr_power_transactions[:128],
                "pmgr_raw_transactions": pmgr_raw_transactions[:128],
                "execution_budget_seconds": seconds, "cpu_snapshot": snapshot,
+               "restore_trust_cache_supplied": trust_cache is not None,
                "research_ramdisk_root_gate_skip": research_ramdisk_root,
                "original_kernel_unpatched": not research_ramdisk_root,
                "restore_ramdisk_requested": ramdisk is not None,
@@ -287,6 +307,7 @@ if __name__ == "__main__":
     parser.add_argument("--seconds", type=int, default=30, help="Bounded execution budget (1..600 seconds)")
     parser.add_argument("--research-ramdisk-root", action="store_true",
                         help="Opt-in exact-kernel SecureRootName gate skip; unauthenticated restore userland experiment")
+    parser.add_argument("--trust-cache", type=pathlib.Path, help="Official RestoreTrustCache rtsc IM4P, loaded below kernel")
     args = parser.parse_args()
     run_probe(args.directory, executable=args.qemu, cpu=args.cpu,
-              research_bridge_handoff=args.research_bridge_handoff, ramdisk=args.ramdisk, seconds=args.seconds, research_ramdisk_root=args.research_ramdisk_root)
+              research_bridge_handoff=args.research_bridge_handoff, ramdisk=args.ramdisk, seconds=args.seconds, research_ramdisk_root=args.research_ramdisk_root, trust_cache=args.trust_cache)

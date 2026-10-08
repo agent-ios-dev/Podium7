@@ -78,7 +78,7 @@ def stage(output, url=URL, size=SIZE, *, restore_ramdisk=False):
         report = {"url": url, "version": manifest["ProductVersion"], "build": manifest["ProductBuildVersion"],
                   "device": "iPod9,1", "identity": identity["Info"], "components": {}}
         (output / "BuildManifest.plist").write_bytes(manifest_data)
-        for component in ["KernelCache", "DeviceTree"] + (["RestoreRamDisk"] if restore_ramdisk else []):
+        for component in ["KernelCache", "DeviceTree"] + (["RestoreRamDisk", "RestoreTrustCache"] if restore_ramdisk else []):
             source = identity["Manifest"][component]["Info"]["Path"]
             info = archive.getinfo(source)
             if info.file_size > 128 * 1024 * 1024:

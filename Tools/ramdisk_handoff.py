@@ -21,14 +21,16 @@ def validate_hfs(image):
             "bytes": len(image), "block_size": block_size, "blocks": blocks}
 
 
-def attach_ramdisk(tree, address, size):
+def attach_memory_file(tree, address, size, name="RAMDisk"):
+    if name not in ("RAMDisk", "TrustCache"):
+        raise ValueError("unsupported boot memory-file name")
     device_tree(tree)
     if address < 0 or address % 16384 or size <= 0 or size % 4096 or address + size > 2**64:
         raise ValueError("invalid ramdisk physical range")
     def prop(name, value):
         return name.encode().ljust(32, b"\0") + struct.pack("<I", len(value)) + value + bytes((-len(value)) & 3)
     def memory_node():
-        return struct.pack("<II", 2, 0) + prop("name", b"memory-map\0") + prop("RAMDisk", struct.pack("<QQ", address, size))
+        return struct.pack("<II", 2, 0) + prop("name", b"memory-map\0") + prop(name, struct.pack("<QQ", address, size))
     found = False
     def walk(cursor, parent):
         nonlocal found
@@ -50,9 +52,9 @@ def attach_ramdisk(tree, address, size):
             parts.append(encoded)
             child_names.append(child_path)
         if path == "/device-tree/chosen/memory-map":
-            if any(key == "RAMDisk" for key, _ in properties):
-                raise ValueError("existing RAMDisk reservation must not be overwritten")
-            properties.append(("RAMDisk", struct.pack("<QQ", address, size)))
+            if any(key == name for key, _ in properties):
+                raise ValueError(f"existing {name} reservation must not be overwritten")
+            properties.append((name, struct.pack("<QQ", address, size)))
             found = True
         if path == "/device-tree/chosen" and path + "/memory-map" not in child_names:
             parts.append(memory_node())
@@ -65,6 +67,10 @@ def attach_ramdisk(tree, address, size):
         raise ValueError("device tree has no chosen node")
     device_tree(result)
     return result
+
+
+def attach_ramdisk(tree, address, size):
+    return attach_memory_file(tree, address, size, "RAMDisk")
 
 
 def unwrap_restore_ramdisk(container):

@@ -1,3 +1,28 @@
+## Actual launchd load attempt: run 37836967932
+
+The explicit modified-kernel restore experiment progresses beyond the root
+security gate and attempts to load /sbin/launchd. Original AMFI rejects its
+adhoc signature with unsuitable CT policy 0; init receives SIGKILL. This is
+an execution/load attempt, not confirmed launchd userland entry.
+
+The official n112ap erase BuildManifest supplies RestoreTrustCache at
+Firmware/098-68700-067.dmg.trustcache. Its rtsc IM4P contains a v1 module with
+233 entries (including one valid identical duplicate), UUID
+d0516b3d23844c8f9edd1d3bcfe65fca. No hashes, hash types or flags are changed.
+XNU osfmk/arm/trustcache.c expects a serialized module-count/offset region.
+The next probe passes it through /chosen/memory-map/TrustCache, at physical
+0x454e0000 immediately below the first kernel segment, in a 16-KiB region.
+The modeled MCC read-only range now includes that page. ELF regions were
+verified non-overlapping. Both original and explicitly modified root probes
+receive the official cache; AMFI validation remains enabled. Guest acceptance
+is pending. 41 local Python tests pass.
+
+Sources:
+https://github.com/apple-oss-distributions/xnu/blob/xnu-8019.80.24/osfmk/arm/trustcache.c
+https://github.com/apple-oss-distributions/xnu/blob/xnu-8019.80.24/osfmk/arm64/arm_vm_init.c
+
+---
+
 ## Confirmed post-mount block: run 37834592824
 
 Original HFS root mounting repeats successfully. Runtime tracing reaches

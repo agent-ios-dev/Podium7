@@ -99,6 +99,15 @@ def make_probe(directory):
     return destination, entry, ((readonly_low - QEMU_RAM_BASE) >> 14, (readonly_high - QEMU_RAM_BASE) >> 14)
 
 
+def panic_capture_complete(serial_bytes):
+    """Wait for the first panic's saved PC/ESR/FAR, not just its header."""
+    header = serial_bytes.find(b"panic(cpu ")
+    return header >= 0 and re.search(
+        rb"pc:\s*0x[0-9a-fA-F]+\s+cpsr:\s*0x[0-9a-fA-F]+"
+        rb"\s+esr:\s*0x[0-9a-fA-F]+\s+far:\s*0x[0-9a-fA-F]+[\r\n]",
+        serial_bytes[header:]) is not None
+
+
 def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
     image, kernel_entry, rorgn = make_probe(directory)
     trace, serial = directory / "qemu-trace.txt", directory / "qemu-serial.txt"
@@ -113,12 +122,19 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max"):
         process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT)
         start = time.monotonic()
         stop = "QEMU exited"
+        panic_started = None
         while process.poll() is None:
             deadline = time.monotonic() - start > 30
             full_trace = trace.exists() and trace.stat().st_size > 16 * 1024 * 1024
-            panic_seen = b"panic(cpu " in serial.read_bytes()
-            if deadline or full_trace or panic_seen:
-                stop = ("XNU panic captured" if panic_seen else
+            serial_bytes = serial.read_bytes()
+            panic_seen = b"panic(cpu " in serial_bytes
+            if panic_seen and panic_started is None:
+                panic_started = time.monotonic()
+            complete = panic_capture_complete(serial_bytes)
+            panic_timeout = panic_started is not None and time.monotonic() - panic_started > 2
+            if deadline or full_trace or complete or panic_timeout:
+                stop = ("XNU panic captured" if complete else
+                        "XNU panic capture incomplete" if panic_seen else
                         "30-second execution deadline reached" if deadline else "16-MiB trace limit reached")
                 process.terminate()
                 try:

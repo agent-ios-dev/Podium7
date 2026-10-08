@@ -1,9 +1,18 @@
 import struct
 import unittest
-from qemu_probe import boot_args, elf_image, PHYSICAL_BASE, RAM_SIZE, virtual_base_for_kernel
+from qemu_probe import boot_args, elf_image, PHYSICAL_BASE, RAM_SIZE, virtual_base_for_kernel, panic_capture_complete
 
 
 class QEMUProbeTests(unittest.TestCase):
+    def test_panic_capture_waits_for_complete_first_saved_state(self):
+        state = (b"pc: 0xfffffff005e45984 cpsr: 0x80400204 "
+                 b"esr: 0x96000010 far: 0xffffffe0004ac020\n")
+        header = b"panic(cpu 0 caller 0xfffffff00780f61c): Kernel data abort.\n"
+        self.assertFalse(panic_capture_complete(header + b"x16: 0xfffffff007823ffc"))
+        self.assertFalse(panic_capture_complete(state + header))
+        self.assertFalse(panic_capture_complete(header + state[:-1]))
+        self.assertTrue(panic_capture_complete(header + state))
+
     def test_kernel_base_covers_lower_prelinked_and_upper_text_segments(self):
         base = virtual_base_for_kernel(0xfffffff0054e4000, 0xfffffff007dd0000)
         self.assertEqual(base, 0xfffffff004000000)

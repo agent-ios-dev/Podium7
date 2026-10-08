@@ -87,3 +87,15 @@ The synthetic PMGR probe additionally replaces only an all-zero 128-byte
 CPU `voltage-states1` placeholder with one nominal TCG state (24 MHz, no
 physical voltage). Original voltage tables are preserved in the baseline
 probe. This is a fixed-frequency virtual domain, not recovered A10 DVFS.
+
+The synthetic PMGR probe passed bridge and CPU-domain metadata checks and
+then reached the unmapped n112ap state register `0x20e080160` (original XNU
+PC `0xfffffff0066ef4c4`). Eight windows selected by the original `ps-regs`
+triples now expose valid-slot-aware state registers. Writes to DESIRED[3:0]
+are acknowledged immediately in ACTUAL[7:4]; status bits cannot be supplied
+by the guest. This models a deterministic virtual transition, not analog
+power rails, dependency timing or physical A10 DVFS. The field layout agrees
+with the [m1n1 PMGR register definition](https://github.com/AsahiLinux/m1n1/blob/main/proxyclient/m1n1/hw/pmgr.py).
+`check_pmgr_power.py` executes power-on/off, control preservation and masked
+slot checks in an ARM64 guest. Original-metadata boot still stops on missing
+iBoot bridge settings; the separate experiment is not an authentic handoff.

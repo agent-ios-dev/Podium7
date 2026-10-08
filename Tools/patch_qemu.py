@@ -888,10 +888,78 @@ static void podium7_pmgr_bridges_create(MachineState *machine, MemoryRegion *mem
 
 '''
 
+
+    pmgr_power = r'''
+/* n112ap ps-regs triples select a register range and its valid state slots.
+ * A deterministic virtual transition acknowledges DESIRED[3:0] in ACTUAL[7:4].
+ * No analog voltages, parent dependency timing, or DVFS is simulated here.
+ */
+typedef struct Podium7PMGRPower {
+    MemoryRegion io;
+    uint32_t registers[64];
+    uint32_t valid_slots;
+    uint64_t base;
+    unsigned logged_accesses;
+} Podium7PMGRPower;
+
+static uint64_t podium7_pmgr_power_read(void *opaque, hwaddr address, unsigned size)
+{
+    Podium7PMGRPower *s = opaque;
+    uint32_t value = s->registers[address >> 2];
+    if (s->logged_accesses++ < 64) {
+        qemu_log("PODIUM7 PMGR-POWER base=%016" PRIx64 " read offset=%04" PRIx64
+                 " value=%08" PRIx32 "\n", s->base, (uint64_t)address, value);
+    }
+    return value;
+}
+
+static void podium7_pmgr_power_write(void *opaque, hwaddr address,
+                                      uint64_t value, unsigned size)
+{
+    Podium7PMGRPower *s = opaque;
+    uint32_t state = value;
+    if (!(address & 7) && (s->valid_slots & (1U << (address >> 3)))) {
+        state = (state & ~0xf0U) | ((state & 0xfU) << 4);
+    }
+    s->registers[address >> 2] = state;
+    if (s->logged_accesses++ < 64) {
+        qemu_log("PODIUM7 PMGR-POWER base=%016" PRIx64 " write offset=%04" PRIx64
+                 " value=%08" PRIx32 " state=%08" PRIx32 "\n",
+                 s->base, (uint64_t)address, (uint32_t)value, state);
+    }
+}
+
+static const MemoryRegionOps podium7_pmgr_power_ops = {
+    .read = podium7_pmgr_power_read, .write = podium7_pmgr_power_write,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+    .valid = { .min_access_size = 4, .max_access_size = 4, .unaligned = false },
+    .impl = { .min_access_size = 4, .max_access_size = 4, .unaligned = false },
+};
+
+static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memory)
+{
+    static const struct { hwaddr base; uint32_t mask; } banks[] = {
+        { 0x210280000ULL, 0xe07 }, { 0x20e080000ULL, 0 },
+        { 0x20e080100ULL, 0xfffff7ffU }, { 0x20e080200ULL, 0xffffffbfU },
+        { 0x20e080300ULL, 0x3d }, { 0x20e080400ULL, 1 },
+        { 0x20e084000ULL, 0x3f }, { 0x20e088000ULL, 0xf },
+    };
+    for (unsigned i = 0; i < ARRAY_SIZE(banks); i++) {
+        Podium7PMGRPower *s = g_new0(Podium7PMGRPower, 1);
+        s->base = banks[i].base;
+        s->valid_slots = banks[i].mask;
+        memory_region_init_io(&s->io, OBJECT(machine), &podium7_pmgr_power_ops,
+                              s, "podium7-t8010-pmgr-power", 0x100);
+        memory_region_add_subregion(memory, s->base, &s->io);
+    }
+}
+
+'''
+
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + i2s_switch + pmgr_bridges + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
     replace_once(directory / "hw/arm/virt.c",
                  "    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);",
                  '''    create_uart(vms, VIRT_UART0, sysmem, serial_hd(0), false);
@@ -912,6 +980,7 @@ static void podium7_pmgr_bridges_create(MachineState *machine, MemoryRegion *mem
         podium7_usbphy_create(machine, sysmem);
         podium7_i2s_switch_create(machine, sysmem);
         podium7_pmgr_bridges_create(machine, sysmem);
+        podium7_pmgr_power_create(machine, sysmem);
     }''')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")

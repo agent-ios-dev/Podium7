@@ -99,3 +99,12 @@ with the [m1n1 PMGR register definition](https://github.com/AsahiLinux/m1n1/blob
 `check_pmgr_power.py` executes power-on/off, control preservation and masked
 slot checks in an ARM64 guest. Original-metadata boot still stops on missing
 iBoot bridge settings; the separate experiment is not an authentic handoff.
+
+After PMGR state windows were modeled, the experiment reached
+`AppleT8010PMGR::_pllFrequencies[0]` validation. The original arm-io
+`clock-frequencies` contains 384 zero placeholder bytes and lacks the matched
+`clock-frequencies-nclk` clock-class array. Original AppleARMIO code at
+`0xfffffff005b8f83c` consumes matching UInt32 arrays. The research handoff
+fills only this all-zero placeholder with nominal 24 MHz sources and class 0
+(nclk); these are virtual sources, not physical A10 PLL values. The baseline
+probe preserves the IPSW values. No successful iOS boot has been observed.

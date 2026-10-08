@@ -62,7 +62,7 @@ class ResearchBridgeHandoffTests(unittest.TestCase):
                      ("optional-bridge-mask", struct.pack("<I", 0x2000)),
                      ("bridge-settings-3", bytes(range(8))), ("voltage-states1", bytes(128))])
         return node([("name", b"device-tree\0")], [node([("name", b"cpus\0")], [cpu]),
-                         node([("name", b"arm-io\0")], [pmgr])])
+                         node([("name", b"arm-io\0"), ("clock-frequencies", bytes(384))], [pmgr])])
 
     def test_opt_in_preserves_real_settings_and_mask(self):
         tree = self.make_tree()
@@ -77,6 +77,9 @@ class ResearchBridgeHandoffTests(unittest.TestCase):
         self.assertNotIn("bridge-settings-version", properties)
         self.assertEqual(bytes.fromhex(properties["voltage-states1"]), struct.pack("<II", 24000000, 0) + bytes(120))
         self.assertEqual(original["voltage-states1"], bytes(128).hex())
+        clocks = next(n["properties"] for n in device_tree(prepared) if n["path"] == "/device-tree/arm-io")
+        self.assertEqual(bytes.fromhex(clocks["clock-frequencies"]), struct.pack("<I", 24000000) * 96)
+        self.assertEqual(clocks["clock-frequencies-nclk"], bytes(384).hex())
         self.assertFalse(next(c for c in changes if c.get("source") == "synthetic research bridge model")["authentic_iboot_handoff"])
 
     def test_other_platforms_rejected(self):

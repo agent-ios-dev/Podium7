@@ -66,6 +66,14 @@ if panic:
                             f"{extension.get(option, 'option-' + str(option))}{modifier}]"
                         )
                 break
+    from resolve_mmio_fault import physical_address, owners
+    if "far" in values:
+        physical = physical_address(trace, int(values["far"], 16))
+        if physical is not None:
+            report["observed_physical_fault_address"] = hex(physical)
+            tree_path = root / "DeviceTree.bin"
+            if tree_path.exists():
+                report["device_tree_register_windows"] = owners(tree_path.read_bytes(), physical)
     (root / "panic-context.json").write_text(json.dumps(report, indent=2))
     print(json.dumps(report, indent=2))
     if fault_pc >= 0xfffffff000000000 and kernel_path.exists() and "segment" in report:

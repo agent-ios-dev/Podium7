@@ -56,6 +56,24 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
                 else:
                     properties[existing] = (properties[existing][0], encoded_value)
                 changes.append({"path": path, "property": name.decode(), "value": hex(value), "source": "QEMU virt RAM"})
+        if research_bridge_handoff and path == "/device-tree/arm-io":
+            frequencies = names.get(b"clock-frequencies")
+            if frequencies is not None and len(frequencies) == 384 and not any(frequencies):
+                # AppleARMIO consumes matched arrays of UInt32 frequencies and
+                # clock classes. Class 0 is nclk. TCG clocks are fixed nominal
+                # sources, not recovered physical A10 PLL programming.
+                count = len(frequencies) // 4
+                replacement = struct.pack("<I", counter_frequency) * count
+                position = next(i for i, (key, _) in enumerate(properties)
+                                if key.split(b"\0")[0] == b"clock-frequencies")
+                properties[position] = (properties[position][0], replacement)
+                key = b"clock-frequencies-nclk"
+                if key not in names:
+                    properties.append((key.ljust(32, b"\0"), bytes(len(frequencies))))
+                changes.append({"path": path, "property": "clock-frequencies",
+                                "source": "synthetic fixed-frequency virtual clock sources",
+                                "frequency": counter_frequency, "count": count,
+                                "authentic_iboot_handoff": False})
         if research_bridge_handoff and path == "/device-tree/arm-io/pmgr":
             # Synthetic board metadata, not recovered iBoot register tuning.
             # The modeled bridges have no tuning parameters. Keep real settings

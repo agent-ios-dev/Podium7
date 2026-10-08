@@ -26,7 +26,7 @@ class QMPTests(unittest.TestCase):
         connection = MagicMock()
         connection.__enter__.return_value = connection
         connection.makefile.return_value = stream
-        with patch("qmp_diagnostics.socket.socket", return_value=connection):
+        with patch("qmp_diagnostics.socket.AF_UNIX", 1, create=True), patch("qmp_diagnostics.socket.socket", return_value=connection):
             result = capture("local.sock")
         self.assertEqual(result["registers"], "PC=fffffff0071904e8")
         self.assertEqual(result["cpus"][0]["cpu-index"], 0)
@@ -38,5 +38,5 @@ class QMPTests(unittest.TestCase):
         connection = MagicMock()
         connection.__enter__.return_value = connection
         connection.makefile.return_value = stream
-        with patch("qmp_diagnostics.socket.socket", return_value=connection):
+        with patch("qmp_diagnostics.socket.AF_UNIX", 1, create=True), patch("qmp_diagnostics.socket.socket", return_value=connection):
             with self.assertRaisesRegex(ValueError, "denied"): capture("local.sock")

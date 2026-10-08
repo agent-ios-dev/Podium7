@@ -4,7 +4,10 @@ import socket
 
 
 def capture(path):
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+    family = getattr(socket, "AF_UNIX", None)
+    if family is None:
+        raise OSError("local QMP snapshots require Unix-domain sockets")
+    with socket.socket(family, socket.SOCK_STREAM) as connection:
         connection.settimeout(3)
         connection.connect(str(path))
         with connection.makefile("rwb") as stream:

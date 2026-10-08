@@ -55,12 +55,12 @@ class DeviceTreePreparationTests(unittest.TestCase):
 
 
 class ResearchBridgeHandoffTests(unittest.TestCase):
-    def make_tree(self, compatible=b"pmgr1,t8010\0"):
+    def make_tree(self, compatible=b"pmgr1,t8010\0", levels=bytes(128)):
         cpu = node([("name", b"cpu0\0"), ("device_type", b"cpu\0")])
         pmgr = node([("name", b"pmgr\0"), ("compatible", compatible),
                      ("#bridges", struct.pack("<I", 14)),
                      ("optional-bridge-mask", struct.pack("<I", 0x2000)),
-                     ("bridge-settings-3", bytes(range(8))), ("voltage-states1", bytes(128)), ("mcx-fast-cpu-frequency", struct.pack("<I", 1644))])
+                     ("bridge-settings-3", bytes(range(8))), ("voltage-states1", levels), ("mcx-fast-cpu-frequency", struct.pack("<I", 1644))])
         return node([("name", b"device-tree\0")], [node([("name", b"cpus\0")], [cpu]),
                          node([("name", b"arm-io\0"), ("clock-frequencies", bytes(384))], [pmgr])])
 
@@ -77,6 +77,8 @@ class ResearchBridgeHandoffTests(unittest.TestCase):
         self.assertNotIn("bridge-settings-version", properties)
         self.assertEqual(bytes.fromhex(properties["voltage-states1"]), struct.pack("<II", (1000 << 16) // 1644, 0) + bytes(120))
         self.assertEqual(original["voltage-states1"], bytes(128).hex())
+        period = struct.unpack_from("<I", bytes.fromhex(properties["voltage-states1"]))[0]
+        self.assertEqual((1000 << 16) // period, 1644)
         clocks = next(n["properties"] for n in device_tree(prepared) if n["path"] == "/device-tree/arm-io")
         self.assertEqual(bytes.fromhex(clocks["clock-frequencies"]), struct.pack("<I", 24000000) * 96)
         self.assertEqual(bytes.fromhex(clocks["clock-frequencies-nclk"]), struct.pack("<I", 2) * 96)
@@ -85,3 +87,11 @@ class ResearchBridgeHandoffTests(unittest.TestCase):
     def test_other_platforms_rejected(self):
         with self.assertRaises(ValueError):
             prepare(self.make_tree(b"pmgr,t8103\0"), 24000000, random_seed=bytes(64), research_bridge_handoff=True)
+
+    def test_real_performance_table_is_not_replaced(self):
+        levels = struct.pack("<II", 42000, 1100) + bytes(120)
+        tree = self.make_tree(levels=levels)
+        prepared, changes = prepare(tree, 24000000, random_seed=bytes(64), research_bridge_handoff=True)
+        properties = device_tree(prepared)[-1]["properties"]
+        self.assertEqual(properties["voltage-states1"], levels.hex())
+        self.assertFalse(any(c.get("property") == "voltage-states1" for c in changes))

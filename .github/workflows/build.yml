@@ -1,5 +1,17 @@
 name: Verify ARM64 core and build iOS app
-on: [push, workflow_dispatch]
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'App/**'
+      - 'Sources/**'
+      - 'Tests/**'
+      - 'Package.swift'
+      - 'Package.resolved'
+      - 'project.yml'
+      - 'Tools/verify_encodings.py'
+      - '.github/workflows/build.yml'
+
 jobs:
   verify:
     runs-on: macos-15

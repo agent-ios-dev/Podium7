@@ -6,6 +6,8 @@ import pathlib
 import re
 import subprocess
 import time
+import tempfile
+from qmp_diagnostics import capture as capture_cpu
 from analyze_firmware import macho
 
 KERNEL_SHA256 = "115489dd3e2adbe3e0d646413adb9397cfaf1c47f7b5d03620f78dd7d9371814"
@@ -35,11 +37,13 @@ def probe(executable, directory, output):
     blob = output / "PMPFirmware.bin"
     blob.write_bytes(firmware)
     trace = output / "qemu-trace.txt"
+    socket_root = tempfile.TemporaryDirectory(prefix="pmp-qmp-")
+    qmp = pathlib.Path(socket_root.name) / "qmp.sock"
     command = [executable, "-machine", "virt,secure=off,virtualization=off,gic-version=2",
         "-cpu", "cortex-a7", "-m", "128", "-display", "none", "-monitor", "none",
         "-serial", "none", "-no-reboot", "-d", "in_asm,exec,int,guest_errors",
-        "-D", str(trace), "-device",
-        f"loader,file={blob},addr=0x40000000,cpu-num=0,force-raw=on"]
+        "-D", str(trace), "-qmp", f"unix:{qmp},server=on,wait=off", "-device",
+        f"loader,file={blob},addr=0x41000000,cpu-num=0,force-raw=on"]
     process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     deadline = time.monotonic() + 3
     limit_hit = False
@@ -48,19 +52,28 @@ def probe(executable, directory, output):
             limit_hit = True
             break
         time.sleep(0.05)
+    snapshot = {}
     if process.poll() is None:
+        try:
+            snapshot = capture_cpu(qmp)
+        except (OSError, ValueError) as error:
+            snapshot = {"error": str(error)}
         process.terminate()
     try:
         _, stderr = process.communicate(timeout=5)
     except subprocess.TimeoutExpired:
         process.kill()
         _, stderr = process.communicate()
+    socket_root.cleanup()
+    (output / "cpu-snapshot.json").write_text(json.dumps(snapshot, indent=2))
     text = trace.read_text(errors="replace") if trace.exists() else ""
     blocks = re.findall(r"Trace.*?\[[^/]*/([0-9a-fA-F]+)/", text)
     addresses = sorted({int(pc, 16) for pc in blocks})
-    reset_executed = 0x40000068 in addresses
+    reset_executed = 0x41000068 in addresses
     report = {"firmware_sha256": FIRMWARE_SHA256, "firmware_bytes": len(firmware),
         "cpu_model": "generic Cortex-A7 ARMv7-A research baseline",
+        "synthetic_load_address": "0x41000000",
+        "cpu_snapshot": snapshot,
         "exact_pmp_cpu_model": False, "firmware_reset_body_executed": reset_executed,
         "pmp_boot_confirmed": False, "ios_boot_confirmed": False,
         "pmp_hardware_or_mailbox_peer_implemented": False,

@@ -1,3 +1,16 @@
+## Standalone PMP probe reserves virt bootloader DTB memory
+
+Run 37981854516 stops before ARM32 execution: generic virt loads its DTB at
+0x40000000..0x40100000, overlapping the standalone firmware load address.
+Move the synthetic probe to 0x41000000 (main XNU platform is unchanged).
+The firmware is position-aware but its real PMP memory map is still absent.
+Capture a stopped ARM32 QMP register snapshot before terminating, alongside
+actual executed-TB trace. This distinguishes code execution from a loader
+attempt and identifies the next unsupported instruction or memory access.
+No standalone PMP boot is yet confirmed; validation pending.
+
+---
+
 ## Initial device apertures pass; real kernel now waits for PMP firmware
 
 Run 37980997607 passes all device checks including the monotonic AOP counter.

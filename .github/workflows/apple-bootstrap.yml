@@ -195,6 +195,7 @@ jobs:
             .firmware/pcie-checks.json
             .firmware/aop-checks.json
             .firmware/pmp-core-experiment/qemu-probe.json
+            .firmware/pmp-core-experiment/cpu-snapshot.json
             .firmware/pmp-core-experiment/qemu-trace.txt
             .firmware/cpu-clpc-checks.json
             .firmware/i2s-switch-checks.json

@@ -42,7 +42,8 @@ def probe(executable, directory, output):
     command = [executable, "-machine", "virt,secure=off,virtualization=off,gic-version=2",
         "-cpu", "cortex-a7", "-m", "128", "-display", "none", "-monitor", "none",
         "-serial", "none", "-no-reboot", "-d", "in_asm,exec,int,guest_errors",
-        "-D", str(trace), "-qmp", f"unix:{qmp},server=on,wait=off", "-device",
+        "-D", str(trace), "-qmp", f"unix:{qmp},server=on,wait=off",
+        "-drive", f"if=none,id=podium7-pmp-core,format=raw,read-only=on,file={blob}", "-device",
         f"loader,file={blob},addr=0x41000000,cpu-num=0,force-raw=on"]
     process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     deadline = time.monotonic() + 3
@@ -77,12 +78,13 @@ def probe(executable, directory, output):
         "exact_pmp_cpu_model": False, "firmware_reset_body_executed": reset_executed,
         "pmp_boot_confirmed": False, "ios_boot_confirmed": False,
         "pmp_hardware_or_mailbox_peer_implemented": False,
+        "mapped_discovery_apertures": ["0x20e300000/0x20000", "0x20e400000/0x10000"],
         "distinct_executed_blocks": len(addresses),
         "first_executed_pcs": [hex(pc) for pc in addresses[:32]],
         "last_executed_pcs": [hex(int(pc, 16)) for pc in blocks[-16:]],
         "fault_evidence": re.findall(r".*(?:DFSR|DFAR|IFSR|IFAR).*", text)[-12:],
         "trace_limit_hit": limit_hit, "returncode": process.returncode, "stderr": stderr,
-        "limitations": "synthetic virt RAM map; no PMP peripherals, mailbox or ARM32/ARM64 integration"}
+        "limitations": "synthetic virt RAM map; passive PMP discovery controls only; no mailbox peer or ARM32/ARM64 integration"}
     (output / "qemu-probe.json").write_text(json.dumps(report, indent=2))
     print(json.dumps(report, indent=2))
     if not reset_executed:

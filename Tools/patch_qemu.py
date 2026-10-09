@@ -1647,6 +1647,13 @@ static void podium7_irq_or_set(void *opaque, int input, int level)
                                  0x8000, nvram, 0x2000, 1, 1,
                                  0x01, 0x7e, 0, 0, 0x5555, 0x2aaa, 0);
         }
+    }
+    /* Standalone Cortex-A7 PMP firmware experiment only, explicitly opted in
+     * by its guarded firmware backend. No ARM64 XNU integration or peer ACKs. */
+    if (blk_by_name("podium7-pmp-core")) {
+        podium7_sep_mailbox_bank_create(machine, sysmem, 0x20e300000ULL, 0x20000,
+                                        "podium7-pmp-core-mailbox");
+        podium7_pmp_system_create(machine, sysmem);
     }''')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")

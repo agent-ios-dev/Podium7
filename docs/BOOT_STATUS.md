@@ -1,3 +1,17 @@
+## PMP firmware uses LPAE to address the same high physical mailbox
+
+Run 37983124660 executes the same 483 authentic firmware TBs. Stopped QMP
+gva2gpa resolves 0xc0500040 -> 0x20e300040 and 0xc0500008 -> 0x20e300008.
+The ARMv7-A firmware uses LPAE physical addresses above 32 bits; dropping the
+high bits would be wrong. An explicit guarded firmware backend now opts the
+standalone Cortex-A7 probe into the existing high-address PMP mailbox and
+system control apertures. This is still separate from ARM64 XNU: passive
+controls do not supply an AP peer, fake replies or a completed PMP boot.
+The next actual firmware execution trace must reveal subsequent hardware
+access or mailbox operations. Original kernel still waits for PMP firmware.
+
+---
+
 ## Actual ARM32 PMP code executes and relocates; next access needs private I/O map
 
 Run 37982337383 confirms reset-body execution and 483 distinct actual TBs

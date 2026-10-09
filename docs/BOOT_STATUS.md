@@ -1,3 +1,16 @@
+## Runtime firmware object resolves exact legacy receive status/data offsets
+
+Run 37987733454 captures the actual PMP mailbox object at 0x010144b0.
+Field +8 is 0xc0500b80; fields +0x94/+0x9c are offsets 4/0x10. The receive
+helper adds those fields, so it reads status at 0xc0500b84 and message at
+0xc0500b90. The prior +0xb80 alias applied to the base control address and
+could not fix the drain loop. Move derived empty bit17 to exact +0xb84 and
+remove its treatment at +0xb80. Regression checks target the observed status
+address. No message or firmware-ready state is invented; next trace must
+confirm leaving the drain loop. Main XNU still awaits a real PMP peer.
+
+---
+
 ## Legacy queue empty check passes; firmware loop still requires exact object mapping
 
 Run 37987144912 passes the +0xb80 empty-view regression, but firmware still

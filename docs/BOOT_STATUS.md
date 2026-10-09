@@ -1,3 +1,18 @@
+## SPI regression passes; next original access reaches I2C initialization
+
+Run 37975568120 passes SPI controls and advances the kernel to I2C1.
+Original PC 0xfffffff00613c824 writes divider 4 to physical 0x20a11101c,
+then timing 0x0aa00040 at +0x14, zero at +0x18, and 0x80000000 at +0x10.
+Original DeviceTree defines three 4-KiB banks at 0x20a110000, 0x20a111000,
+0x20a112000 (IRQs 232/233/234), compatible i2c,t8010/i2c,s5l8940x.
+Provide independent discovery/control storage and a genuine ARM64 probe of
+that sequence and each bank's boundary. Slave acknowledgments, bus packets,
+FIFO side effects and IRQ completion are not yet implemented or claimed.
+The original initialization routine does not poll a reset-complete bit at
+this point. This is not a synthetic hardware-ready signal. Probe pending.
+
+---
+
 ## Original SPI driver discovery/control apertures
 
 Run 37974713532 data-aborts in Samsung SPI register write at physical

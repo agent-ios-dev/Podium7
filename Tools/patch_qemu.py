@@ -993,6 +993,20 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
                             "podium7-t8010-spi2-control");
 }
 '''
+    # Original I2C startup configures divider/timing/control at these banks.
+    # Bus packets, slave acknowledgments, FIFO completions and IRQs absent.
+    i2c = mipi.replace("MIPI-DSIM", "I2C").replace("mipi_dsim", "i2c")
+    i2c = i2c.replace("Podium7MIPIDSIMBank", "Podium7I2CBank")
+    i2c = "\n/* Original T8010 I2C discovery/control banks; no slave responses. */\n" + i2c[i2c.index("typedef struct "):]
+    start = i2c.index("static void podium7_i2c_create(")
+    i2c = i2c[:start] + '''static void podium7_i2c_create(MachineState *machine, MemoryRegion *memory)
+{
+    for (unsigned i = 0; i < 3; i++) {
+        podium7_i2c_bank_create(machine, memory, 0x20a110000ULL + i * 0x1000,
+                                0x1000, "podium7-t8010-i2c-control");
+    }
+}
+'''
     i2s_switch = '''
 /* n112ap exposes 4-KiB main/AOP I2S banks and a 32-bit routing register.
  * Retain guest routing writes for bootstrap. No PCM/DMA/audio output yet.
@@ -1318,7 +1332,7 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + spi + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + spi + i2c + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
     timer_fiq = r'''
 /* Research A10 EL1 timers arrive as FIQ, not GIC PPIs. External AIC device
  * interrupts and Apple EL2 timer-enable controls are not modeled here. */
@@ -1390,6 +1404,7 @@ static void podium7_timer_fiq_set(void *opaque, int input, int level)
         podium7_error_handler_create(machine, sysmem);
         podium7_sep_mailbox_create(machine, sysmem);
         podium7_spi_create(machine, sysmem);
+        podium7_i2c_create(machine, sysmem);
         podium7_i2s_switch_create(machine, sysmem);
         podium7_pmgr_bridges_create(machine, sysmem);
         podium7_pmgr_raw_create(machine, sysmem);

@@ -108,6 +108,17 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
                                 "source": "synthetic fixed-frequency virtual clock sources",
                                 "frequency": counter_frequency, "count": count,
                                 "authentic_iboot_handoff": False})
+        if research_bridge_handoff and path == "/device-tree/arm-io/apcie":
+            if names.get(b"compatible", b"").rstrip(b"\0") != b"apcie,t8010":
+                raise ValueError("research PCIe handoff requires T8010 APCIE")
+            # A virtual PHY has no analog tuning words. Declare an empty table
+            # rather than silently dropping Apple's required OSData property.
+            # Preserve genuine iBoot tuning when it was supplied.
+            if b"apcie-phy-tunables" not in names:
+                properties.append((b"apcie-phy-tunables".ljust(32, b"\0"), b""))
+                changes.append({"path": path, "property": "apcie-phy-tunables",
+                                "source": "empty tuning list for research virtual PHY",
+                                "bytes": 0, "authentic_iboot_handoff": False})
         if research_bridge_handoff and path == "/device-tree/arm-io/pmgr":
             # Synthetic board metadata, not recovered iBoot register tuning.
             # The modeled bridges have no tuning parameters. Keep real settings

@@ -1,3 +1,18 @@
+## I2C passes; original PCIe configure requires an iBoot tuning property
+
+Run 37976146675 passes I2C ARM64 initialization and advances to
+AppleT8010PCIe::configure. Its original assertion requires an OSData property
+named apcie-phy-tunables, absent from the IPSW /arm-io/apcie node. Original
+code at 0xfffffff00694ed04 looks it up and casts it before storing +0x1d8.
+The opt-in research virtual PHY declares an empty tuning list: no analog
+hardware needs programming. Existing supplied tables are preserved and the
+original metadata baseline is unchanged. No kernel assertion is patched,
+no PHY-ready or PCI link-up state is manufactured. A real controller model
+and subsequent kernel validation remain necessary. Tests cover opt-in,
+platform validation and preservation of authentic supplied data.
+
+---
+
 ## SPI regression passes; next original access reaches I2C initialization
 
 Run 37975568120 passes SPI controls and advances the kernel to I2C1.

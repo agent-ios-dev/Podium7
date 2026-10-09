@@ -161,3 +161,31 @@ class ChipTypeHandoffTests(unittest.TestCase):
         self.assertIn(chip, prepared)
         with self.assertRaises(ValueError):
             prepare(self.fixture(platform=b"arm-io,t8011\0"), 24000000, random_seed=bytes(64), research_bridge_handoff=True)
+
+
+class PCIeHandoffTests(unittest.TestCase):
+    def fixture(self, tuning=None, compatible=b"apcie,t8010\0"):
+        props = [("name", b"apcie\0"), ("compatible", compatible)]
+        if tuning is not None:
+            props.append(("apcie-phy-tunables", tuning))
+        return node([("name", b"device-tree\0")], [
+            node([("name", b"cpu0\0"), ("device_type", b"cpu\0")]),
+            node([("name", b"arm-io\0")], [node(props),
+                node([("name", b"pmgr\0"), ("compatible", b"pmgr1,t8010\0"),
+                      ("#bridges", struct.pack("<I", 14))])])])
+
+    def test_missing_virtual_phy_table_is_opt_in(self):
+        normal, _ = prepare(self.fixture(), 24000000, random_seed=bytes(64))
+        props = next(n["properties"] for n in device_tree(normal) if n["path"].endswith("/apcie"))
+        self.assertNotIn("apcie-phy-tunables", props)
+        prepared, changes = prepare(self.fixture(), 24000000, random_seed=bytes(64), research_bridge_handoff=True)
+        self.assertIn(b"apcie-phy-tunables".ljust(32, b"\0") + struct.pack("<I", 0), prepared)
+        self.assertEqual(next(c for c in changes if c.get("property") == "apcie-phy-tunables")["bytes"], 0)
+
+    def test_supplied_settings_preserved_and_other_soc_rejected(self):
+        tuning = bytes(range(32))
+        prepared, changes = prepare(self.fixture(tuning), 24000000, random_seed=bytes(64), research_bridge_handoff=True)
+        self.assertIn(b"apcie-phy-tunables".ljust(32, b"\0") + struct.pack("<I", 32) + tuning, prepared)
+        self.assertFalse(any(c.get("property") == "apcie-phy-tunables" for c in changes))
+        with self.assertRaises(ValueError):
+            prepare(self.fixture(compatible=b"apcie,t8103\0"), 24000000, random_seed=bytes(64), research_bridge_handoff=True)

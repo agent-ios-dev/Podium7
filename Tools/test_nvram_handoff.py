@@ -40,3 +40,44 @@ class NVRAMTests(unittest.TestCase):
         self.assertEqual(flash_image()[:8192],empty_bank())
         with self.assertRaises(ValueError): attach(result)
         with self.assertRaises(ValueError): attach(node([('name',b'device-tree\0')]))
+
+    def test_persisted_proxy_uses_newest_valid_bank_and_never_resets_corruption(self):
+        from cfi_nvram_handoff import flash_image, select_bank
+        raw = bytearray(flash_image())
+        marker = b'restore-outcome=test\0'
+        raw[8192+48:8192+48+len(marker)] = marker
+        struct.pack_into('<I',raw,8192+20,3)
+        struct.pack_into('<I',raw,8192+16,zlib.adler32(raw[8192+20:16384]))
+        index,generation,proxy = select_bank(bytes(raw))
+        self.assertEqual((index,generation),(1,3))
+        self.assertIn(marker,proxy)
+        raw[8192+100] ^= 1
+        self.assertEqual(select_bank(bytes(raw))[0],0)
+        raw[100] ^= 1
+        with self.assertRaises(ValueError): select_bank(bytes(raw))
+        with self.assertRaises(ValueError): select_bank(bytes(8192))
+
+    def test_generation_wrap_is_ordered_as_uint32_serial(self):
+        from cfi_nvram_handoff import flash_image, select_bank
+        raw = bytearray(flash_image())
+        for offset,generation in [(0,0xffffffff),(8192,0)]:
+            struct.pack_into('<I',raw,offset+20,generation)
+            struct.pack_into('<I',raw,offset+16,zlib.adler32(raw[offset+20:offset+8192]))
+        self.assertEqual(select_bank(bytes(raw))[:2],(1,0))
+
+    def test_restore_proxy_contains_persisted_variables_not_empty_factory(self):
+        from cfi_nvram_handoff import flash_image, attach
+        from test_device_tree_preparation import node
+        raw = bytearray(flash_image())
+        marker = b'restore-outcome=kept\0'
+        raw[8192+48:8192+48+len(marker)] = marker
+        struct.pack_into('<I',raw,8192+20,3)
+        struct.pack_into('<I',raw,8192+16,zlib.adler32(raw[8192+20:16384]))
+        tree = node([('name',b'device-tree\0')], [
+            node([('name',b'chosen\0'),('nvram-bank-count',bytes(4)),('nvram-current-bank',bytes(4)),
+                  ('nvram-proxy-data',empty_bank())]),
+            node([('name',b'arm-io\0'),('ranges',struct.pack('<QQQ',0,0x200000000,0x100000000))])])
+        restored = attach(tree,bytes(raw))
+        self.assertIn(bytes(raw[8192:16384]),restored)
+        self.assertIn(b'nvram-current-bank'.ljust(32,b'\0')+struct.pack('<II',4,1),restored)
+        self.assertEqual(restored.count(b'nvram-proxy-data'),1)

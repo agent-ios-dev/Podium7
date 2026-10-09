@@ -1,3 +1,32 @@
+## Guest NVRAM writes now persist: run 37936769787
+
+Original AppleARMCHRPNVRAM now writes both banks successfully. Host backing
+bank 0 has generation 2 and bank 1 generation 3; both Adler-32 checks pass
+and both contain the guest restore-outcome variable. No raw variables or
+backing key material are exported. Restore userland remains confirmed with
+17,107 EL0 returns. These are research NOR banks, not real n112ap NVMe.
+
+The two diagnosed CFI faults are fixed: AMD unlock/unlock/query now enters
+query mode (the former zero erase geometry caused kIOReturnNotAligned), and
+64-bit reads after query are split into supported 32-bit callbacks (the
+former access-size rejection caused a genuine XNU memcpy data abort).
+The immediate-program virtual NOR advertises a matching 1-us byte program
+time; original Apple driver code and alignment checks are retained.
+
+On the next launch the research handoff selects the newest checksum-valid
+saved bank, including UInt32 generation wrap handling, and restores its
+proxy bytes. It never resets an image whose two banks are corrupt. A second
+actual kernel start is now part of CI; its result is pending.
+
+AES startup remains blocked because original AIC startup calls provider
+registerInterrupt for CPU source 0 at PC 0xfffffff0068fcb94 and never records
+its return at 0xfffffff0068fcb98. Only IOPlatformInterruptController registers;
+IOInterruptController00000018 (AIC) is requested but never registered.
+Therefore the next genuine panic remains missing IOAESAccelerator after
+90 seconds. No successful AES operations or SpringBoard boot are claimed.
+
+---
+
 ## Original NVRAM driver registers: run 37926905157
 
 The separate CFI experiment now executes original AppleARMCHRPNVRAM startup:

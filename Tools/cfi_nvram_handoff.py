@@ -3,6 +3,7 @@
 This is alternative research hardware, not the physical n112ap NVMe storage.
 """
 import struct
+import zlib
 from analyze_firmware import device_tree
 from nvram_handoff import empty_bank
 
@@ -14,7 +15,33 @@ def flash_image():
     return empty_bank() * 2 + bytes([255]) * (SIZE - 16384)
 
 
-def attach(data):
+def select_bank(backing):
+    if len(backing) != SIZE:
+        raise ValueError('invalid CFI backing image size')
+    candidates = []
+    for index in (0, 1):
+        bank = backing[index * 8192:(index + 1) * 8192]
+        checksum = bank[0] + sum(bank[2:16])
+        while checksum > 255:
+            checksum = (checksum & 255) + (checksum >> 8)
+        if (bank[4:16].rstrip(b'\0') not in (b'nvram', b'2nvram') or
+            bank[1] != checksum or struct.unpack_from('<H', bank, 2)[0] != 2 or
+            struct.unpack_from('<I', bank, 16)[0] != zlib.adler32(bank[20:])):
+            continue
+        candidates.append((index, struct.unpack_from('<I', bank, 20)[0], bank))
+    if not candidates:
+        raise ValueError('no valid persisted CHRP NVRAM bank; refusing to reset data')
+    selected = candidates[0]
+    for candidate in candidates[1:]:
+        delta = (candidate[1] - selected[1]) & 0xffffffff
+        if 0 < delta < 0x80000000:
+            selected = candidate
+    return selected
+
+
+def attach(data, backing=None):
+    selected_index, generation, proxy = select_bank(flash_image() if backing is None else backing)
+
     device_tree(data)
     seen = set()
     def encode(properties, children):
@@ -36,11 +63,13 @@ def attach(data):
         for _ in range(children):
             child,cursor = walk(cursor,path);encoded_children.append(child)
         if path == '/device-tree/chosen':
-            for key,value in [(b'nvram-bank-count',2),(b'nvram-current-bank',0)]:
+            for key,value in [(b'nvram-bank-count',2),(b'nvram-current-bank',selected_index)]:
                 if key in names and names[key] != bytes(4):
                     raise ValueError('CFI experiment requires untouched zero bank metadata')
                 properties = [(k,v) for k,v in properties if k != key]
                 properties.append((key,struct.pack('<I',value)))
+            properties = [(k,v) for k,v in properties if k != b'nvram-proxy-data']
+            properties.append((b'nvram-proxy-data',proxy))
             seen.add('chosen')
         if path == '/device-tree/arm-io':
             if b'podium7-nvram-cfi' in data:

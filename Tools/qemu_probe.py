@@ -78,16 +78,19 @@ def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, resear
     if research_cfi_nvram:
         if not research_bridge_handoff:
             raise ValueError("CFI NVRAM requires synthetic research handoff")
-        from cfi_nvram_handoff import attach, flash_image, BASE, SIZE
-        tree = attach(tree)
+        from cfi_nvram_handoff import attach, flash_image, select_bank, BASE, SIZE
         flash = directory / "nvram-flash.raw"
         if not flash.exists():
             flash.write_bytes(flash_image())
         elif flash.stat().st_size != SIZE:
             raise ValueError("invalid CFI NVRAM backing image size")
+        backing = flash.read_bytes()
+        bank_index, generation, _ = select_bank(backing)
+        tree = attach(tree, backing)
         (directory / "nvram-handoff.json").write_text(json.dumps({
             "provider": "synthetic AMD CFI NOR", "physical_base": hex(BASE),
             "bytes": SIZE, "banks": 2, "bank_bytes": 8192,
+            "selected_bank": bank_index, "selected_generation": generation,
             "original_nvme_hardware": False, "kernel_driver": "AppleARMCHRPNVRAM",
             "persistent_backing_file": str(flash)}, indent=2))
     info = macho(kernel)

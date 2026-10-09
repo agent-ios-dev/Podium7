@@ -101,6 +101,12 @@ jobs:
           cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/cfi-nvram-experiment/
           python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/cfi-nvram-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --trust-cache .firmware/RestoreTrustCache.im4p --research-ramdisk-root --research-cfi-nvram --seconds 120
           python3 Tools/inspect_boot_fault.py --directory .firmware/cfi-nvram-experiment
+      - name: Verify NVRAM survives a second actual kernel start
+        run: |
+          mkdir .firmware/cfi-first-boot
+          cp .firmware/cfi-nvram-experiment/*.json .firmware/cfi-nvram-experiment/*.txt .firmware/cfi-first-boot/
+          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/cfi-nvram-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --trust-cache .firmware/RestoreTrustCache.im4p --research-ramdisk-root --research-cfi-nvram --seconds 120
+          python3 -c 'import json; from pathlib import Path; p=Path(".firmware/cfi-nvram-experiment"); h=json.loads((p/"nvram-handoff.json").read_text()); j=json.loads((p/"qemu-probe.json").read_text()); assert h["selected_generation"] > 1; assert j["boot_milestones"]["userland_execution_confirmed"]; assert any(b["adler_valid"] and b["restore_outcome_variable_present"] for b in j["nvram_backing_evidence"]["banks"])'
       - name: Verify MCC register lock and protected RAM
         timeout-minutes: 1
         run: python3 Tools/check_mcc.py --qemu .qemu/build/qemu-system-aarch64
@@ -118,6 +124,8 @@ jobs:
           name: apple-bootstrap-evidence
           include-hidden-files: true
           path: |
+            .firmware/cfi-first-boot/*.json
+            .firmware/cfi-first-boot/*.txt
             .firmware/cfi-nvram-checks.json
             .firmware/cfi-nvram-experiment/*.json
             .firmware/cfi-nvram-experiment/*.txt

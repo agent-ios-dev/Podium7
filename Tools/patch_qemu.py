@@ -1109,6 +1109,26 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
                                    "podium7-t8010-pmp-system-control");
 }
 '''
+    dart = mipi.replace("MIPI-DSIM", "DART").replace("mipi_dsim", "dart")
+    dart = dart.replace("Podium7MIPIDSIMBank", "Podium7DARTBank")
+    dart = "\n/* T8010 DART discovery/configuration banks. DMA translation is absent. */\n" + dart[dart.index("typedef struct "):]
+    start = dart.index("static void podium7_dart_create(")
+    dart = dart[:start] + '''static void podium7_dart_create(MachineState *machine, MemoryRegion *memory)
+{
+    static const struct { hwaddr base; hwaddr size; } banks[] = {
+        { 0x206304000ULL, 0x4000 }, { 0x206300000ULL, 0x4000 },
+        { 0x207908000ULL, 0x2000 }, { 0x207904000ULL, 0x4000 },
+        { 0x207b04000ULL, 0x4000 }, { 0x207b0c000ULL, 0x4000 },
+        { 0x205b28000ULL, 0x4000 }, { 0x205b2c000ULL, 0x4000 },
+        { 0x207c30000ULL, 0x4000 }, { 0x207c20000ULL, 0x4000 },
+        { 0x601008000ULL, 0x4000 }, { 0x604008000ULL, 0x4000 },
+    };
+    for (unsigned i = 0; i < ARRAY_SIZE(banks); i++) {
+        podium7_dart_bank_create(machine, memory, banks[i].base, banks[i].size,
+                                 "podium7-t8010-dart-control");
+    }
+}
+'''
     i2s_switch = '''
 /* n112ap exposes 4-KiB main/AOP I2S banks and a 32-bit routing register.
  * Retain guest routing writes for bootstrap. No PCM/DMA/audio output yet.
@@ -1434,7 +1454,7 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + spi + i2c + pmp_system + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + spi + i2c + pmp_system + dart + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
     timer_fiq = r'''
 /* Research A10 EL1 timers arrive as FIQ, not GIC PPIs. External AIC device
  * interrupts use a separate CPU IRQ route; EL2 timer-enable controls are absent. */
@@ -1533,6 +1553,7 @@ static void podium7_irq_or_set(void *opaque, int input, int level)
         podium7_spi_create(machine, sysmem);
         podium7_i2c_create(machine, sysmem);
         podium7_pmp_system_create(machine, sysmem);
+        podium7_dart_create(machine, sysmem);
         podium7_i2s_switch_create(machine, sysmem);
         podium7_pmgr_bridges_create(machine, sysmem);
         podium7_pmgr_raw_create(machine, sysmem);

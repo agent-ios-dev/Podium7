@@ -72,6 +72,8 @@ jobs:
         run: python3 Tools/check_i2c.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify real AIC and I2C interrupt delivery to EL1
         run: python3 Tools/check_aic_irq.py --qemu .qemu/build/qemu-system-aarch64
+      - name: Verify original DART discovery and stream controls
+        run: python3 Tools/check_dart.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify original CPU debug and CLPC control banks
         run: python3 Tools/check_cpu_clpc.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify T8010 AOP I2S routing register
@@ -183,6 +185,7 @@ jobs:
             .firmware/sep-mailbox-checks.json
             .firmware/spi-checks.json
             .firmware/i2c-checks.json
+            .firmware/dart-checks.json
             .firmware/cpu-clpc-checks.json
             .firmware/i2s-switch-checks.json
             .firmware/ktrr-checks.json

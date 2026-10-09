@@ -1,3 +1,21 @@
+## I2C pull-up regression passes; original ISP DART is the next device
+
+Run 37978974681 passes six-pin GPIO electrical tests. The original driver
+sets each SCL/SDA pin to peripheral/input config 0x221 and now samples high,
+advancing beyond the prior bad-bus assertion. The next data abort writes
+0x0020fffc to physical 0x205b28024, original PC 0xfffffff0060d7ba4.
+DeviceTree identifies dart-isp reg[0] within the encompassing ISP aperture.
+Original routine writes a shifted table address at +0x24, stream control
+at +0xc (with readback check), and configuration at +0x30/+0x20.
+
+Add the 12 exact independent DART register windows in original DeviceTree,
+including the 8-KiB scaler bank and the two PCIe DARTs. ARM64 checks cover
+table/stream programming and each window's boundary. DMA address translation,
+permission enforcement, faults and cache invalidation semantics remain absent;
+no peripheral DMA is implemented or claimed. Next kernel validation pending.
+
+---
+
 ## Real IRQ regression passes; investigate I2C electrical idle lines
 
 Run 37978335556 confirms real EL1 IRQ vector entry and ERET for both AIC

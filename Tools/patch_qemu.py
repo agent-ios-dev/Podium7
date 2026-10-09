@@ -972,7 +972,7 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
     /* Original PMP reg[1] is firmware SRAM, not mailbox control registers.
      * RTBuddy copies real t8010pmp words here. No PMP CPU is realized yet. */
     MemoryRegion *pmp_sram = g_new0(MemoryRegion, 1);
-    memory_region_init_ram(pmp_sram, OBJECT(machine), "podium7-t8010-pmp-sram",
+    memory_region_init_ram(pmp_sram, NULL, "podium7-t8010-pmp-sram",
                            0x20000, &error_fatal);
     memory_region_add_subregion(memory, 0x20e500000ULL, pmp_sram);
 }

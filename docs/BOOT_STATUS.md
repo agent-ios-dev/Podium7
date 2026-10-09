@@ -1,3 +1,14 @@
+## PMP SRAM allocation ownership regression caught before kernel execution
+
+Run 37973912011 fails the first timer test before any guest executes. QEMU
+memory_region_init_ram requires a NULL or DeviceState owner for RAM migration
+naming, while the new region supplied MachineState. The assertion accurately
+identifies this initialization bug. Use NULL with the unique board RAM name;
+QEMU registers the region globally. The existing timer and SRAM tests must
+both pass before the next genuine kernel probe. No iOS boot claimed.
+
+---
+
 ## PMP firmware loading reaches previously missing SRAM: run 37973299612
 
 Both SEP/SIO ARM64 tests pass, including queue independence in the same

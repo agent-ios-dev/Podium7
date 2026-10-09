@@ -16,7 +16,10 @@ final class VirtualDiskTests: XCTestCase {
             let size = try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber
             XCTAssertEqual(size?.uint64Value, 17_179_869_184)
             var status = stat()
-            XCTAssertEqual(url.withUnsafeFileSystemRepresentation { Darwin.stat($0!, &status) }, 0)
+            let descriptor = url.withUnsafeFileSystemRepresentation { Darwin.open($0!, O_RDONLY) }
+            XCTAssertGreaterThanOrEqual(descriptor, 0)
+            defer { if descriptor >= 0 { Darwin.close(descriptor) } }
+            XCTAssertEqual(fstat(descriptor, &status), 0)
             XCTAssertLessThan(UInt64(status.st_blocks) * 512, 1024 * 1024)
             XCTAssertEqual(try disk.read(offset: 12 * 1024 * 1024 * 1024, count: 512), Data(repeating: 0, count: 512))
             let marker = Data([1, 2, 3, 4])

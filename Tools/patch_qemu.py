@@ -35,6 +35,7 @@ void HELPER(podium7_acc_trace)(CPUARMState *env, uint64_t pc)
 {
     static unsigned logged;
     if (logged++ < 256 || pc == 0xfffffff0069445c4ULL ||
+        pc == 0xfffffff005b898e4ULL ||
         (pc >= 0xfffffff0077b9084ULL && pc <= 0xfffffff0077b910cULL)) {
         qemu_log("PODIUM7 BOOT-ARG pc=%016" PRIx64 " x0=%016" PRIx64
                  " x1=%016" PRIx64 " x2=%016" PRIx64 " x3=%016" PRIx64

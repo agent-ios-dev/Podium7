@@ -1,3 +1,24 @@
+## Replace I2C status latch with real empty-bus packet semantics
+
+Run 37976778224 advances beyond the missing PCIe tuning assertion, then
+I2C0 fails its bus-status check for display-pmu with status 0x0aa00040.
+That is the driver's acknowledgment mask, incorrectly retained as status by
+the discovery-only model. Original code and Linux i2c-pasemi-core agree:
++0 is MTXFIFO, +4 MRXFIFO, +0x14 SMSTA (W1C), +0x18 IMASK, +0x1c CTL.
+START/STOP/READ commands use bits 8/9/10; status includes XIP bit28,
+XEN bit27, MTN (NACK) bit21, MTE (TX-empty) bit16.
+
+Model an empty bus: START has no responding slave and produces NACK;
+STOP ends active transfer and records completion. RX remains empty, TX
+commands are consumed, and derived active/empty state cannot be set by
+acknowledgment writes. CTL FIFO-reset commands self-clear. Genuine ARM64
+tests cover NACK, START/STOP, W1C, RX emptiness and reset. No successful
+slave transaction or interrupt delivery is claimed; next kernel probe pending.
+
+Reference: https://github.com/torvalds/linux/blob/master/drivers/i2c/busses/i2c-pasemi-core.c
+
+---
+
 ## I2C passes; original PCIe configure requires an iBoot tuning property
 
 Run 37976146675 passes I2C ARM64 initialization and advances to

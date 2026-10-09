@@ -997,7 +997,36 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
     # Bus packets, slave acknowledgments, FIFO completions and IRQs absent.
     i2c = mipi.replace("MIPI-DSIM", "I2C").replace("mipi_dsim", "i2c")
     i2c = i2c.replace("Podium7MIPIDSIMBank", "Podium7I2CBank")
-    i2c = "\n/* Original T8010 I2C discovery/control banks; no slave responses. */\n" + i2c[i2c.index("typedef struct "):]
+    i2c = "\n/* T8010 I2C empty-bus packet engine with W1C status; no slave ACKs. */\n" + i2c[i2c.index("typedef struct "):]
+    i2c = i2c.replace("    unsigned logged_accesses;", "    unsigned logged_accesses;\n    bool transfer_active;")
+    i2c = i2c.replace("    uint32_t value = bank->registers[address >> 2];",
+        "    uint32_t value = bank->registers[address >> 2];\n"
+        "    if (address == 0x14) {\n"
+        "        value |= 1U << 16; /* TX FIFO drained. */\n"
+        "        if (bank->transfer_active) { value |= 1U << 28; }\n"
+        "    } else if (address == 4) { value = 1U << 8; /* RX empty. */ }")
+    i2c_store = "bank->registers[address >> 2] = value;"
+    if i2c.count(i2c_store) != 1:
+        raise ValueError("I2C control-write source anchor changed")
+    i2c = i2c.replace(i2c_store,
+        "if (address == 0x14) {\n"
+        "        /* W1C events; TX-empty and transfer-active are derived. */\n"
+        "        bank->registers[address >> 2] &= ~(value & 0x0ae00040U);\n"
+        "    } else if (address == 0) {\n"
+        "        if (value & (1U << 8)) {\n"
+        "            bank->transfer_active = true;\n"
+        "            bank->registers[0x14 >> 2] |= 1U << 21; /* No slave: NACK. */\n"
+        "        }\n"
+        "        if (value & (1U << 9)) {\n"
+        "            bank->transfer_active = false;\n"
+        "            bank->registers[0x14 >> 2] |= 1U << 27; /* STOP completed. */\n"
+        "        }\n"
+        "    } else if (address == 4 || address == 8 || address == 0xc) {\n"
+        "        /* RX/counts are hardware state, not writable contents. */\n"
+        "    } else if (address == 0x1c) {\n"
+        "        if (value & 0x700U) { bank->transfer_active = false; }\n"
+        "        bank->registers[address >> 2] = value & ~0x700U;\n"
+        "    } else {\n        bank->registers[address >> 2] = value;\n    }")
     start = i2c.index("static void podium7_i2c_create(")
     i2c = i2c[:start] + '''static void podium7_i2c_create(MachineState *machine, MemoryRegion *memory)
 {

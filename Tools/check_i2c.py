@@ -27,7 +27,8 @@ mov w5, #0x40
 movk w5, #0xaa0, lsl #16
 str w5, [x3, #0x14]
 ldr w4, [x3, #0x14]
-cmp w4, w5
+mov w6, #0x10000
+cmp w4, w6
 b.ne failure
 str wzr, [x3, #0x18]
 mov w5, #0x80000000
@@ -35,6 +36,39 @@ str w5, [x3, #0x10]
 ldr w4, [x3, #0x10]
 cmp w4, w5
 b.ne failure
+mov w5, #0x150
+str w5, [x3]
+ldr w4, [x3, #0x14]
+mov w5, #0x10210000
+cmp w4, w5
+b.ne failure
+mov w5, #0x255
+str w5, [x3]
+ldr w4, [x3, #0x14]
+mov w5, #0x08210000
+cmp w4, w5
+b.ne failure
+mov w5, #-1
+str w5, [x3, #0x14]
+ldr w4, [x3, #0x14]
+mov w5, #0x10000
+cmp w4, w5
+b.ne failure
+mov w5, #-1
+str w5, [x3, #4]
+ldr w4, [x3, #4]
+mov w5, #0x100
+cmp w4, w5
+b.ne failure
+mov w5, #0x150
+str w5, [x3]
+mov w5, #0x704
+str w5, [x3, #0x1c]
+ldr w4, [x3, #0x1c]
+cmp w4, #4
+b.ne failure
+ldr w4, [x3, #0x14]
+tbnz w4, #28, failure
 mov x6, #0xffc
 ldr w4, [x3, x6]
 cbnz w4, failure
@@ -76,8 +110,8 @@ failure_exit:
         passed = result.returncode == 0
         report.write_text(json.dumps({"passed": passed,
             "model": "original T8010 I2C0/I2C1/I2C2 control apertures",
-            "checks": ["original timing and control initialization sequence",
-                       "three independent banks and final control-word bounds"],
+            "checks": ["original divider/control initialization and W1C flags",
+                       "START/STOP returns NACK on an empty bus; FIFO reset and bank independence"],
             "returncode": result.returncode, "stdout": result.stdout,
             "stderr": result.stderr}, indent=2))
         if not passed:

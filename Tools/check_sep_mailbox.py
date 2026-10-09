@@ -14,14 +14,14 @@ adr x10, banks
 mov x9, #4
 next_bank:
 ldr x3, [x10], #8
-ldr w6, [x3, #0xb84]
+ldr w6, [x3, #0xb88]
 tbz w6, #17, failure
-str wzr, [x3, #0xb84]
-ldr w6, [x3, #0xb84]
+str wzr, [x3, #0xb88]
+ldr w6, [x3, #0xb88]
 tbz w6, #17, failure
 mov w5, #0x1100
-str w5, [x3, #0xb84]
-ldr w6, [x3, #0xb84]
+str w5, [x3, #0xb88]
+ldr w6, [x3, #0xb88]
 tbz w6, #17, failure
 and w6, w6, #0xffff
 cmp w6, w5

@@ -1002,8 +1002,8 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
         "        value = bank->inbox_pending ? (1U << 16) : (1U << 17);\n"
         "    } else if (address == 0x4020) {\n"
         "        value = (value & 1U) | (1U << 17);\n"
-        "    } else if (address == 0xb84) {\n"
-        "        value |= 1U << 17; /* Observed ARM32 receive-control offset +4. */\n"
+        "    } else if (address == 0xb88) {\n"
+        "        value |= 1U << 17; /* Observed ARM32 receive-control offset +8. */\n"
         "    }")
     sep_store = "bank->registers[address >> 2] = value;"
     if sep.count(sep_store) != 1:

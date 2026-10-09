@@ -1,3 +1,15 @@
+## Correct arithmetic of the captured legacy mailbox object
+
+Run 37988260194 still drains zero messages. Re-read the captured structure:
+0x01014540 = object+0x90 contains [4,8,0x10,0x18]. Therefore field +0x94
+is 8, and +0x9c is 0x18, not 4/0x10. Combined with base 0xc0500b80, the
+status is +0xb88 and 64-bit receive data is +0xb98. The stopped R02 confirms
+0xc0500b98 at message load. Prior +0xb84 assignment was an analysis error;
+move the derived empty bit to +0xb88, preserving all other controls. Real
+firmware and regression verification pending. No ready response fabricated.
+
+---
+
 ## Runtime firmware object resolves exact legacy receive status/data offsets
 
 Run 37987733454 captures the actual PMP mailbox object at 0x010144b0.

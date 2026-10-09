@@ -347,7 +347,7 @@ static void podium7_mcc_create(MachineState *machine, MemoryRegion *memory)
 /* Minimal Apple AIC v1 research model for the T8010 bootstrap.
  * The n112 firmware's ipid-mask is 40 bytes, so model 320 implemented IRQs;
  * the Linux driver documents the broader AIC family's 896-IRQ capability.
- * External device wiring is not modeled; EL1 timers use a separate FIQ route.
+ * Level device inputs and software events drive CPU0 IRQ; timers use FIQ.
  */
 #define PODIUM7_AIC_IRQ_COUNT 320
 typedef struct Podium7AIC {
@@ -471,6 +471,41 @@ static void podium7_aic_create(MachineState *machine, MemoryRegion *memory)
 }
 
 '''
+    aic = aic.replace("    MemoryRegion io;", "    MemoryRegion io;\n    qemu_irq output;\n    uint32_t external_state[32];")
+    start = aic.index("static uint32_t podium7_aic_event(")
+    aic = aic[:start] + '''static Podium7AIC *podium7_aic_device;
+
+static void podium7_aic_update(Podium7AIC *aic)
+{
+    bool pending = (aic->ipi_pending & ~aic->ipi_mask) != 0;
+    for (unsigned irq = 0; irq < PODIUM7_AIC_IRQ_COUNT && !pending; irq++) {
+        uint32_t bit = 1U << (irq & 31);
+        pending = (aic->target_cpu[irq] & 1) &&
+            ((aic->irq_state[irq >> 5] | aic->external_state[irq >> 5]) & bit) &&
+            !(aic->irq_mask[irq >> 5] & bit);
+    }
+    qemu_set_irq(aic->output, pending);
+}
+
+static void podium7_aic_set_external(unsigned irq, bool level)
+{
+    Podium7AIC *aic = podium7_aic_device;
+    if (!aic || irq >= PODIUM7_AIC_IRQ_COUNT) { return; }
+    uint32_t bit = 1U << (irq & 31);
+    if (level) { aic->external_state[irq >> 5] |= bit; }
+    else { aic->external_state[irq >> 5] &= ~bit; }
+    podium7_aic_update(aic);
+}
+
+''' + aic[start:]
+    aic = aic.replace("(aic->irq_state[irq >> 5] & bit)",
+                      "((aic->irq_state[irq >> 5] | aic->external_state[irq >> 5]) & bit)")
+    aic = aic.replace("    if (aic->logged_accesses < 512) {",
+                      "    podium7_aic_update(aic);\n    if (aic->logged_accesses < 512) {")
+    aic = aic.replace("    memset(aic->irq_mask, 0xff, sizeof(aic->irq_mask));",
+                      "    aic->output = podium7_aic_cpu_irq;\n"
+                      "    podium7_aic_device = aic;\n"
+                      "    memset(aic->irq_mask, 0xff, sizeof(aic->irq_mask));")
     wdt = '''
 /* Minimal Apple SoC watchdog register bank for the T8010 bootstrap.
  * The Apple watchdog has WD0/WD1/WD2 counter, bite-time, and control registers.
@@ -1027,6 +1062,14 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
         "        if (value & 0x700U) { bank->transfer_active = false; }\n"
         "        bank->registers[address >> 2] = value & ~0x700U;\n"
         "    } else {\n        bank->registers[address >> 2] = value;\n    }")
+    write_end = "    if (bank->logged_accesses < 256) {"
+    write_start = i2c.index("static void podium7_i2c_write(")
+    notify = i2c.index(write_end, write_start)
+    i2c = i2c[:notify] + '''    bool irq_enabled = (bank->registers[0x10 >> 2] & 0x80000000U) != 0;
+    bool pending = (bank->registers[0x14 >> 2] & bank->registers[0x18 >> 2]) != 0;
+    podium7_aic_set_external(232 + (bank->base - 0x20a110000ULL) / 0x1000,
+                            irq_enabled && pending);
+''' + i2c[notify:]
     start = i2c.index("static void podium7_i2c_create(")
     i2c = i2c[:start] + '''static void podium7_i2c_create(MachineState *machine, MemoryRegion *memory)
 {
@@ -1034,6 +1077,16 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
         podium7_i2c_bank_create(machine, memory, 0x20a110000ULL + i * 0x1000,
                                 0x1000, "podium7-t8010-i2c-control");
     }
+}
+'''
+    pmp_system = mipi.replace("MIPI-DSIM", "PMP-SYSTEM").replace("mipi_dsim", "pmp_system")
+    pmp_system = pmp_system.replace("Podium7MIPIDSIMBank", "Podium7PMPSystemBank")
+    pmp_system = "\n/* PMP reg[2] system controls. No coprocessor execution or ready state. */\n" + pmp_system[pmp_system.index("typedef struct "):]
+    start = pmp_system.index("static void podium7_pmp_system_create(")
+    pmp_system = pmp_system[:start] + '''static void podium7_pmp_system_create(MachineState *machine, MemoryRegion *memory)
+{
+    podium7_pmp_system_bank_create(machine, memory, 0x20e400000ULL, 0x10000,
+                                   "podium7-t8010-pmp-system-control");
 }
 '''
     i2s_switch = '''
@@ -1361,10 +1414,10 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + spi + i2c + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + spi + i2c + pmp_system + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
     timer_fiq = r'''
 /* Research A10 EL1 timers arrive as FIQ, not GIC PPIs. External AIC device
- * interrupts and Apple EL2 timer-enable controls are not modeled here. */
+ * interrupts use a separate CPU IRQ route; EL2 timer-enable controls are absent. */
 typedef struct Podium7TimerFIQ {
     qemu_irq output;
     bool level[2];
@@ -1382,8 +1435,33 @@ static void podium7_timer_fiq_set(void *opaque, int input, int level)
     }
 }
 '''
+    irq_route = r'''
+/* CPU0 sees the OR of the normal virt GIC output and Apple's AIC output. */
+typedef struct Podium7IRQOr {
+    qemu_irq output;
+    bool level[2];
+} Podium7IRQOr;
+static qemu_irq podium7_aic_cpu_irq;
+static void podium7_irq_or_set(void *opaque, int input, int level)
+{
+    Podium7IRQOr *s = opaque;
+    s->level[input] = level;
+    qemu_set_irq(s->output, s->level[0] || s->level[1]);
+}
+'''
     replace_once(directory / "hw/arm/virt.c", "static void create_gic(",
-                 timer_fiq + "static void create_gic(")
+                 timer_fiq + irq_route + "static void create_gic(")
+    replace_once(directory / "hw/arm/virt.c",
+        "        sysbus_connect_irq(gicbusdev, i, qdev_get_gpio_in(cpudev, ARM_CPU_IRQ));",
+        '''        if (apple_timers && i == 0) {
+            Podium7IRQOr *route = g_new0(Podium7IRQOr, 1);
+            route->output = qdev_get_gpio_in(cpudev, ARM_CPU_IRQ);
+            sysbus_connect_irq(gicbusdev, i,
+                qemu_allocate_irq(podium7_irq_or_set, route, 0));
+            podium7_aic_cpu_irq = qemu_allocate_irq(podium7_irq_or_set, route, 1);
+        } else {
+            sysbus_connect_irq(gicbusdev, i, qdev_get_gpio_in(cpudev, ARM_CPU_IRQ));
+        }''')
     replace_once(directory / "hw/arm/virt.c",
                  "        for (unsigned irq = 0; irq < ARRAY_SIZE(timer_irq); irq++) {",
                  '''        bool apple_timers = !strcmp(ms->cpu_type,
@@ -1434,6 +1512,7 @@ static void podium7_timer_fiq_set(void *opaque, int input, int level)
         podium7_sep_mailbox_create(machine, sysmem);
         podium7_spi_create(machine, sysmem);
         podium7_i2c_create(machine, sysmem);
+        podium7_pmp_system_create(machine, sysmem);
         podium7_i2s_switch_create(machine, sysmem);
         podium7_pmgr_bridges_create(machine, sysmem);
         podium7_pmgr_raw_create(machine, sysmem);

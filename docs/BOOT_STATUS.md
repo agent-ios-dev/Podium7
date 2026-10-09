@@ -1,3 +1,24 @@
+## I2C empty-bus semantics pass; next PMP bank and real IRQ routing
+
+Run 37977641862 passes I2C START/STOP/NACK/W1C/reset tests and advances
+beyond the fabricated busy-status regression. The next data abort is
+original PC 0xfffffff005dc4bac, physical 0x20e400000, /arm-io/pmp reg[2]
+(64-KiB system control bank). Add this independently from PMP mailbox and
+firmware SRAM. The original 32-bit control writes are retained without
+manufacturing coprocessor ready state or firmware execution.
+
+Separately, AIC events previously existed only in MMIO and did not drive
+CPU IRQ. The research AIC now combines software and external level events,
+updates CPU0 IRQ on mask/target/event changes, and auto-masks on event read.
+The CPU receives the OR of the normal GIC and Apple AIC lines. I2C NACK/STOP
+events drive original IRQs 232/233/234 when their interrupt masks and global
+enable permit it; W1C deasserts the level. A genuine EL1 ARM64 regression
+checks software IRQ0 and external I2C IRQ232, vector entry, acknowledgment,
+ERET and absence of duplicate events. Timers retain their independent FIQ
+route. New kernel validation remains pending; no launchd/SpringBoard claim.
+
+---
+
 ## Replace I2C status latch with real empty-bus packet semantics
 
 Run 37976778224 advances beyond the missing PCIe tuning assertion, then

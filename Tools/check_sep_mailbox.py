@@ -115,6 +115,23 @@ b.ne failure
 ldrb w6, [x3, #3]
 cmp w6, #0xea
 b.ne failure
+movz x3, #0
+movk x3, #0xe40, lsl #16
+movk x3, #2, lsl #32
+ldr w6, [x3]
+cbnz w6, failure
+mov w5, #1
+str w5, [x3]
+ldr w6, [x3]
+cmp w5, w6
+b.ne failure
+mov x4, #0xfffc
+ldr w6, [x3, x4]
+cbnz w6, failure
+str w5, [x3, x4]
+ldr w6, [x3, x4]
+cmp w5, w6
+b.ne failure
 mov x0, #0x20
 adr x1, success_exit
 hlt #0xf000
@@ -153,7 +170,7 @@ banks:
         report.write_text(json.dumps({"passed": passed, "iop_firmware_execution": False,
             "checks": ["observed IOP boot-parameter and IRQ-mask writes", "empty receive queue",
                        "64-bit send occupies one slot without overwrite", "queue status cannot be forged", "each bank starts empty after filling the other",
-                       "PMP SRAM firmware word, byte order and final 64-bit boundary"],
+                       "PMP SRAM firmware word, byte order and final 64-bit boundary; separate system bank"],
             "results": results}, indent=2))
         if not passed:
             raise RuntimeError("T8010 SEP/SIO mailbox MMIO checks failed")

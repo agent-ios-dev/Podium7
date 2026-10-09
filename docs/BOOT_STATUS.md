@@ -1,3 +1,28 @@
+## Single-CPU topology releases AIC's CPU registration: run 37938836505
+
+With cpus=1 the original AIC registerInterrupt for source 0 returns success
+at 0xfffffff0068fcb98. Its unused source 1 returns a resource/index error and
+the startup continues. The new actual fault is a 32-bit store at physical
+0x200d10008, inside /arm-io/error-handler's third register window. It is not
+a CLPC window. Restore userland regressed because this newly reached device
+was absent; the CI launchd gate correctly fails instead of claiming boot.
+
+The next model provides the five missing error-handler apertures at
+0x200d00000/0x13000 and 0x200d20000, 0x200d90000, 0x200e20000,
+0x200e90000 (each 0x1000). Only the observed status acknowledgment at +0x10008
+is write-one-to-clear; other words are discovery/control backing stores.
+The first two original windows already fall inside MCC and are not remapped.
+No synthetic faults, full fabric-error handling or error IRQs are claimed.
+A genuine ARM64 regression checks the exact faulting acknowledgment and
+first/last control words of every added bank. Kernel validation is pending.
+
+Separately, run 37938174593 confirms NVRAM preservation across two actual
+kernel starts: second handoff selects bank 1 generation 3, guest userland
+runs again, and backing banks finish at generations 5 and 4 with valid
+checksums and the guest restore-outcome variable present. No SpringBoard.
+
+---
+
 ## Match XNU CPU topology to the single realized QEMU CPU
 
 Original IOCPUInterruptController::registerInterrupt waits while enabledCPUs

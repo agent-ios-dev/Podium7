@@ -62,6 +62,8 @@ jobs:
         run: python3 Tools/check_mipi_dsim.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify shared SGX and GFX control windows
         run: python3 Tools/check_gfx.py --qemu .qemu/build/qemu-system-aarch64
+      - name: Verify original ARM error-handler register ranges
+        run: python3 Tools/check_error_handler.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify original CPU debug and CLPC control banks
         run: python3 Tools/check_cpu_clpc.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify T8010 AOP I2S routing register
@@ -168,6 +170,7 @@ jobs:
             .firmware/mca-checks.json
             .firmware/mipi-dsim-checks.json
             .firmware/gfx-checks.json
+            .firmware/error-handler-checks.json
             .firmware/cpu-clpc-checks.json
             .firmware/i2s-switch-checks.json
             .firmware/ktrr-checks.json

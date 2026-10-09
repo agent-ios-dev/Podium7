@@ -902,6 +902,29 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
 '''
     clpc = clpc.replace("0x100000-byte CPU-CLPC range at 0x206600000",
                         "original four CPU-debug/CLPC register ranges")
+    # Missing error-status apertures discovered after the CPU topology fix.
+    error_handler = mipi.replace("MIPI-DSIM", "ERROR-HANDLER").replace("mipi_dsim", "error_handler")
+    error_handler = error_handler.replace("Podium7MIPIDSIMBank", "Podium7ErrorHandlerBank")
+    start = error_handler.index("static void podium7_error_handler_create(")
+    error_handler = error_handler[:start] + '''static void podium7_error_handler_create(MachineState *machine, MemoryRegion *memory)
+{
+    static const struct { hwaddr base; hwaddr size; } banks[] = {
+        { 0x200d00000ULL, 0x13000 }, { 0x200d20000ULL, 0x1000 },
+        { 0x200d90000ULL, 0x1000 }, { 0x200e20000ULL, 0x1000 },
+        { 0x200e90000ULL, 0x1000 },
+    };
+    for (unsigned i = 0; i < ARRAY_SIZE(banks); i++) {
+        podium7_error_handler_bank_create(machine, memory, banks[i].base,
+            banks[i].size, "podium7-t8010-error-handler");
+    }
+}
+'''
+    # Observed original startup clears status with an all-one write at 0x10008.
+    # No synthetic errors are raised; other control words remain latches.
+    error_handler = error_handler.replace("s->registers[address >> 2] = value;",
+        "if (address == 0x10008) {\n"
+        "        s->registers[address >> 2] &= ~value;\n"
+        "    } else {\n        s->registers[address >> 2] = value;\n    }")
     i2s_switch = '''
 /* n112ap exposes 4-KiB main/AOP I2S banks and a 32-bit routing register.
  * Retain guest routing writes for bootstrap. No PCM/DMA/audio output yet.
@@ -1227,7 +1250,7 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
     timer_fiq = r'''
 /* Research A10 EL1 timers arrive as FIQ, not GIC PPIs. External AIC device
  * interrupts and Apple EL2 timer-enable controls are not modeled here. */
@@ -1296,6 +1319,7 @@ static void podium7_timer_fiq_set(void *opaque, int input, int level)
         podium7_mipi_dsim_create(machine, sysmem);
         podium7_gfx_create(machine, sysmem);
         podium7_cpu_clpc_create(machine, sysmem);
+        podium7_error_handler_create(machine, sysmem);
         podium7_i2s_switch_create(machine, sysmem);
         podium7_pmgr_bridges_create(machine, sysmem);
         podium7_pmgr_raw_create(machine, sysmem);

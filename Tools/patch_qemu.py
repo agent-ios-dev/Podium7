@@ -1533,7 +1533,7 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     replace_once(directory / "hw/arm/virt.c", '#include "hw/block/flash.h"',
                  '#include "hw/block/flash.h"\n#include "system/block-backend.h"')
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
-                 '#include "qemu/error-report.h"\n#include "qemu/log.h"')
+                 '#include "qemu/error-report.h"\n#include "qemu/log.h"\n#include "qemu/timer.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
                  uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + spi + i2c + pmp_system + dart + pcie + aop_system + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
     timer_fiq = r'''

@@ -47,7 +47,7 @@ def boot_args(virtual_base, tree_address, tree_size, top, *, ramdisk=False):
     struct.pack_into("<HH", args, 0, 2, 2)
     struct.pack_into("<4Q", args, 8, virtual_base, PHYSICAL_BASE, RAM_SIZE, top)
     struct.pack_into("<QI", args, 96, tree_address, tree_size)
-    command = b"-v serial=3 debug=0x8" + (b" rd=md0" if ramdisk else b"")
+    command = b"-v serial=3 debug=0x8 cpus=1" + (b" rd=md0" if ramdisk else b"")
     args[108:108 + len(command)] = command
     struct.pack_into("<Q", args, 728, RAM_SIZE)
     return bytes(args)

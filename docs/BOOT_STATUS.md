@@ -1,3 +1,20 @@
+## Match XNU CPU topology to the single realized QEMU CPU
+
+Original IOCPUInterruptController::registerInterrupt waits while enabledCPUs
+is different from numCPUs. The trace confirms entry to registerInterrupt and
+enableCPUInterrupt, but AIC's first CPU-source registration does not return.
+The harness realizes one CPU (-smp 1), while original DeviceTree describes
+multiple CPUs. XNU ml_parse_cpu_topology accepts the supported cpus=N boot
+argument and excludes additional CPU nodes. All single-CPU probe boot args
+now include cpus=1. No original interrupt wait/check is patched out, and no
+CPU enable state is fabricated. Actual AIC registration remains pending.
+
+Sources:
+https://github.com/apple-oss-distributions/xnu/blob/xnu-8019.80.24/iokit/Kernel/IOCPU.cpp
+https://github.com/apple-oss-distributions/xnu/blob/xnu-8019.80.24/osfmk/arm64/machine_routines.c
+
+---
+
 ## Guest NVRAM writes now persist: run 37936769787
 
 Original AppleARMCHRPNVRAM now writes both banks successfully. Host backing

@@ -34,7 +34,7 @@ class QEMUProbeTests(unittest.TestCase):
         self.assertEqual(struct.unpack_from("<Q", args, 16)[0], PHYSICAL_BASE)
         self.assertEqual(struct.unpack_from("<Q", args, 24)[0], RAM_SIZE)
         self.assertEqual(struct.unpack_from("<QI", args, 96), (0xfffffff007d00000, 1234))
-        self.assertEqual(args[108:716].split(b"\0", 1)[0], b"-v serial=3 debug=0x8")
+        self.assertEqual(args[108:716].split(b"\0", 1)[0], b"-v serial=3 debug=0x8 cpus=1")
         self.assertEqual(struct.unpack_from("<Q", args, 720)[0], 0)
         self.assertEqual(struct.unpack_from("<Q", args, 728)[0], RAM_SIZE)
 

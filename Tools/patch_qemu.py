@@ -498,6 +498,13 @@ static void podium7_aic_set_external(unsigned irq, bool level)
 }
 
 ''' + aic[start:]
+    aic_view = "    if (address >= 0x5000 && address < 0x5080) {"
+    if aic.count(aic_view) != 2:
+        raise ValueError("AIC CPU-view source anchors changed")
+    aic = aic.replace(aic_view,
+        "    if (address >= 0x1000 && address < 0x1080) {\n"
+        "        address = address - 0x1000 + 0x2000; /* Observed PMP CPU view. */\n"
+        "    }\n" + aic_view)
     aic = aic.replace("(aic->irq_state[irq >> 5] & bit)",
                       "((aic->irq_state[irq >> 5] | aic->external_state[irq >> 5]) & bit)")
     aic = aic.replace("    if (aic->logged_accesses < 512) {",
@@ -1580,7 +1587,7 @@ static void podium7_irq_or_set(void *opaque, int input, int level)
                  timer_fiq + irq_route + "static void create_gic(")
     replace_once(directory / "hw/arm/virt.c",
         "        sysbus_connect_irq(gicbusdev, i, qdev_get_gpio_in(cpudev, ARM_CPU_IRQ));",
-        '''        if (apple_timers && i == 0) {
+        '''        if ((apple_timers || blk_by_name("podium7-pmp-core")) && i == 0) {
             Podium7IRQOr *route = g_new0(Podium7IRQOr, 1);
             route->output = qdev_get_gpio_in(cpudev, ARM_CPU_IRQ);
             sysbus_connect_irq(gicbusdev, i,
@@ -1657,6 +1664,7 @@ static void podium7_irq_or_set(void *opaque, int input, int level)
     /* Standalone Cortex-A7 PMP firmware experiment only, explicitly opted in
      * by its guarded firmware backend. No ARM64 XNU integration or peer ACKs. */
     if (blk_by_name("podium7-pmp-core")) {
+        podium7_aic_create(machine, sysmem);
         Podium7SEPMailboxBank *pmp = podium7_sep_mailbox_bank_create(
             machine, sysmem, 0x20e300000ULL, 0x20000, "podium7-pmp-core-mailbox");
         /* Mirror the original driver's boot descriptor, using this probe's

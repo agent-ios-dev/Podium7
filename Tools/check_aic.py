@@ -66,6 +66,16 @@ add x7, x7, #0x180
 ldr w4, [x7]
 cmp w4, #0
 b.ne failure
+ldr w4, [x3, #0x1000]
+cbnz w4, failure
+mov w5, #0x80000000
+str w5, [x3, #0x1008]
+ldr w4, [x3, #0x200c]
+cmp w4, w5
+b.ne failure
+str w5, [x3, #0x100c]
+ldr w4, [x3, #0x200c]
+cbnz w4, failure
 mov x0, #0x20
 adr x1, success_exit
 hlt #0xf000
@@ -95,7 +105,7 @@ failure_exit:
                    "enable=on,target=native", "-device", f"loader,file={image},cpu-num=0"]
         result = subprocess.run(command, capture_output=True, text=True, timeout=10)
         checks = ["AIC v1 reserved register", "320 IRQs matching the n112 firmware mask", "WHOAMI and empty event",
-                  "configuration read/write", "target CPU register", "initial IRQ mask",
+                  "PMP CPU view aliases WHOAMI and IPI set/ack", "configuration read/write", "target CPU register", "initial IRQ mask",
                   "mask clear", "software IRQ pending/event auto-mask/clear"]
         passed = result.returncode == 0
         report.write_text(json.dumps({"passed": passed, "model": "T8010 Apple AIC v1 research model",

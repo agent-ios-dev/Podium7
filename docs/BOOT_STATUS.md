@@ -1,3 +1,17 @@
+## PMP private CPU view maps to the real AIC region
+
+Run 37984678914 confirms firmware DFAR 0xc0101028 translates to physical
+0x20e101028. This is an AIC CPU register view, not a new timer or invented
+mailbox. Extend the existing AIC CPU0 view with the observed +0x1000 alias,
+preserving original +0x2000/+0x5000 views. ARM64 tests verify WHOAMI and
+cross-view IPI set/ack behavior. The explicit standalone PMP probe realizes
+AIC and routes its output alongside the normal GIC through the IRQ OR.
+No software event is synthesized: authentic ARM32 firmware drives its own
+AIC registers. Subsequent IRQ/controller initialization validation pending.
+Main ARM64 still lacks a connected PMP firmware peer and does not boot iOS.
+
+---
+
 ## PMP code advances with mapped control aperture; supply authentic boot descriptor shape
 
 Run 37983815067 executes 755 distinct original firmware TBs (previously

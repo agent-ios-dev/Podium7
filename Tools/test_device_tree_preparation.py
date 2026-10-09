@@ -121,3 +121,14 @@ class ResearchBridgeHandoffTests(unittest.TestCase):
         kept, _ = prepare(supplied, 24000000, random_seed=bytes(64), research_bridge_handoff=True)
         chosen = next(n['properties'] for n in device_tree(kept) if n['path'].endswith('/chosen'))
         self.assertIn(b'nvram-proxy-data'.ljust(32,b'\0') + struct.pack('<I',17) + b'existing handoff!', kept)
+
+    def test_original_zero_nvram_iboot_placeholder_is_initialized(self):
+        from nvram_handoff import empty_bank
+        base = self.make_tree()
+        count, children = struct.unpack_from("<II", base)
+        tree = struct.pack("<II", count, children + 1) + base[8:] + node([
+            ("name", b"chosen\0"), ("nvram-bank-size", bytes(4)),
+            ("nvram-proxy-data", bytes(8192))])
+        prepared, changes = prepare(tree, 24000000, random_seed=bytes(64), research_bridge_handoff=True)
+        self.assertIn(empty_bank(), prepared)
+        self.assertTrue(next(c for c in changes if 'NVRAM' in c.get('source',''))['replaced_zero_iboot_placeholder'])

@@ -12,11 +12,12 @@ volume, or a usable IPA. The IOSecureBSDRoot experiment remains explicitly
 modified; the original kernel comparison remains separate.
 
 The next observed dependency is repeated IOResources/IONVRAM waiting.
-Original /chosen lacks nvram-bank-size and nvram-proxy-data. XNU's
+Original /chosen contains all-zero iBoot placeholders for nvram-bank-size
+and the 8-KiB nvram-proxy-data. XNU's
 IODTNVRAM::init requires the former; start parses the latter. The research
 handoff now supplies an empty 8-KiB CHRP v1 bank with checked header sums,
-Adler-32, and empty common/system partitions. Existing handoff bytes are
-preserved. This is volatile proxy initialization only: no persistent NVRAM
+Adler-32, and empty common/system partitions. Nonzero existing handoff bytes are
+preserved; only absent properties or the exact zero-placeholder pair are initialized. This is volatile proxy initialization only: no persistent NVRAM
 controller, nonce seeds, security-variable fabrication, or forced resource
 publication is included. Actual service availability needs the next run.
 

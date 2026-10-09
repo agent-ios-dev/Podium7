@@ -59,14 +59,23 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
         if research_bridge_handoff and path == "/device-tree/chosen":
             # iBoot normally provides these. Keep real handoff bytes untouched.
             # A proxy initializes IODTNVRAM; a persistent controller is separate.
-            if b"nvram-bank-size" not in names and b"nvram-proxy-data" not in names:
+            missing = b"nvram-bank-size" not in names and b"nvram-proxy-data" not in names
+            placeholder = (names.get(b"nvram-bank-size") == bytes(4)
+                           and names.get(b"nvram-proxy-data") == bytes(8192))
+            if missing or placeholder:
                 from nvram_handoff import empty_bank
                 bank = empty_bank()
-                properties.extend([
-                    (b"nvram-bank-size".ljust(32, b"\0"), struct.pack("<I", len(bank))),
-                    (b"nvram-proxy-data".ljust(32, b"\0"), bank)])
+                for key, value in [(b"nvram-bank-size", struct.pack("<I", len(bank))),
+                                   (b"nvram-proxy-data", bank)]:
+                    existing = next((i for i, (raw, _) in enumerate(properties)
+                                     if raw.split(b"\0")[0] == key), None)
+                    if existing is None:
+                        properties.append((key.ljust(32, b"\0"), value))
+                    else:
+                        properties[existing] = (properties[existing][0], value)
                 changes.append({"path": path, "source": "synthetic volatile CHRP v1 NVRAM proxy",
                                 "bytes": len(bank), "persistent_controller": False,
+                                "replaced_zero_iboot_placeholder": placeholder,
                                 "authentic_iboot_handoff": False})
         if research_bridge_handoff and path == "/device-tree/arm-io":
             frequencies = names.get(b"clock-frequencies")

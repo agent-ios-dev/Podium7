@@ -1665,6 +1665,7 @@ static void podium7_irq_or_set(void *opaque, int input, int level)
      * by its guarded firmware backend. No ARM64 XNU integration or peer ACKs. */
     if (blk_by_name("podium7-pmp-core")) {
         podium7_aic_create(machine, sysmem);
+        podium7_pmgr_raw_create(machine, sysmem);
         Podium7SEPMailboxBank *pmp = podium7_sep_mailbox_bank_create(
             machine, sysmem, 0x20e300000ULL, 0x20000, "podium7-pmp-core-mailbox");
         /* Mirror the original driver's boot descriptor, using this probe's

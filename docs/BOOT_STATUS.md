@@ -1,3 +1,17 @@
+## PMP advances through AIC setup; next write is an existing PMGR aperture
+
+Run 37985453138 executes 1111 authentic ARM32 firmware blocks (previously
+755) after its AIC CPU view becomes accessible. Next fault is a store at
+DFAR 0xc00d4004, translated physical 0x20e0d4004. Original DeviceTree PMGR
+reg[1] covers 0x20e000000..0x20e100000; this is not an unverified UART.
+The main research board already maps it in PMGR raw controls. Enable that
+same discovery/control model in the explicit standalone PMP probe. No
+additional success flags or firmware replies are supplied. Next firmware
+trace will show whether further command semantics or register windows are
+required. Main XNU/firmware integration is still absent; no iOS boot claim.
+
+---
+
 ## PMP private CPU view maps to the real AIC region
 
 Run 37984678914 confirms firmware DFAR 0xc0101028 translates to physical

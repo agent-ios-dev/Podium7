@@ -1196,6 +1196,13 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
         "            pfl->wcycle = WCYCLE_CFI;\n"
         "            pfl->cmd = 0x98;\n"
         "            return;\n        case 0x20:")
+    # ARM64 memcpy issues 64-bit reads immediately after leaving query mode,
+    # before the lazy ROMD switch. Split them into supported 32-bit callbacks.
+    wide_anchor = "    .valid.max_access_size = 4,"
+    if cfi_source.count(wide_anchor) != 1:
+        raise ValueError("CFI memory-operation source anchor changed")
+    cfi_source = cfi_source.replace(wide_anchor,
+        "    .valid.max_access_size = 8,\n    .impl.min_access_size = 1,\n    .impl.max_access_size = 4,")
     cfi_path.write_text(cfi_source)
     kconfig = directory / "hw/arm/Kconfig"
     config = kconfig.read_text()

@@ -51,6 +51,11 @@ cmp w4, #0x20
 b.ne failure
 mov w5, #0xf0
 strb w5, [x3]
+// Darwin memcpy reads pairs of 64-bit words before lazy ROMD is restored.
+ldp x9, x10, [x3]
+and w4, w9, #0xff
+cmp w4, #0x70
+b.ne failure
 mov w5, #0xaa
 strb w5, [x3, x6]
 mov x7, #0x2aaa
@@ -138,6 +143,7 @@ failure_exit:
             "model": "synthetic AMD CFI NOR for original CHRP NVRAM driver",
             "checks": ["CHRP bank backing bytes", "CFI QRY query at Apple unlock address 0x5555",
                        "Apple unlock/unlock/query yields correct erase geometry",
+                       "64-bit pair read immediately after query reset",
                        "AMD sector erase and reprogram", "programmed byte persisted in backing file"],
             "returncode": result.returncode, "stdout": result.stdout,
             "stderr": result.stderr}, indent=2))

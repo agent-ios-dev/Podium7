@@ -147,3 +147,13 @@ state at 0x0f indefinitely. All aligned state registers in the modeled banks
 now acknowledge desired transitions; the adjacent control words remain latches.
 The trace reached display, I2C and PCIe driver startup without a captured panic,
 but timed out before any confirmed root mount or userland startup.
+
+### Fixed virtual disk
+
+The laboratory app creates a fixed 16-GiB (`17,179,869,184` bytes) sparse raw
+image at Application Support/VirtualMachine/disk.raw. There is no capacity
+selector. Existing smaller images are extended without losing bytes;
+oversized images are rejected rather than truncated. File-backed reads and
+writes use 64-bit offsets and do not map the disk into guest RAM. Allocation
+on APFS grows as data is written. This is persistent backing storage, not
+an implemented guest NVMe device or a formatted iOS system volume yet.

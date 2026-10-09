@@ -7,6 +7,8 @@ import Podium7Core
 
 struct LaboratoryView: View {
     @State private var output = ""
+    @State private var disk: VirtualDisk?
+    @State private var diskStatus = "Подготовка диска…"
     @StateObject private var jit = JITCoordinator()
     @Environment(\.scenePhase) private var scenePhase
     var body: some View {
@@ -14,6 +16,7 @@ struct LaboratoryView: View {
             VStack(alignment: .leading, spacing: 20) {
                 Text("iPod touch 7 · A10").font(.title2.bold())
                 Text("Начальный этап разработки. Загрузка iOS пока не реализована.")
+                Text(diskStatus).font(.footnote)
                 Text(jit.status).font(.footnote)
                 HStack {
                     Button("Включить JIT в StikDebug") { jit.requestStikDebug() }
@@ -29,6 +32,17 @@ struct LaboratoryView: View {
                 ScrollView { Text(output).font(.system(.body, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
                 Spacer()
             }.padding().navigationTitle("Podium7")
+        }
+        .task {
+            guard disk == nil else { return }
+            do {
+                let directory = try FileManager.default.url(for: .applicationSupportDirectory,
+                    in: .userDomainMask, appropriateFor: nil, create: true)
+                    .appendingPathComponent("VirtualMachine", isDirectory: true)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                disk = try VirtualDisk(url: directory.appendingPathComponent("disk.raw"))
+                diskStatus = "Диск: 16 ГБ. Подключение к гостевой iOS ещё разрабатывается."
+            } catch { diskStatus = "Ошибка подготовки диска: \(error)" }
         }
         .onChange(of: scenePhase) { _, phase in if phase == .active { jit.returnedToApp() } }
     }

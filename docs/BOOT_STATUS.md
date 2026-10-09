@@ -1,3 +1,22 @@
+## Real IRQ regression passes; investigate I2C electrical idle lines
+
+Run 37978335556 confirms real EL1 IRQ vector entry and ERET for both AIC
+software IRQ0 and external I2C IRQ232; W1C deasserts without duplicates.
+The original kernel still reports an I2C bad-bus assertion with otherwise
+idle TX-empty status 0x00010000. Original I2C recovery inspects GPIO helpers
+for SCL/SDA; the existing GPIO model sampled all undriven pins low.
+
+Original gpio-iic_scl/sda tuples map I2C0 to pins 197/196, I2C1 to 40/39,
+and I2C2 to 132/133 on the main bank. Model external pull-ups on these six
+lines when released/input; output mode 1 preserves actively driven low/high.
+Unrelated GPIOs and AOP pins are unchanged. ARM64 checks exercise all six
+pins' idle, driven-low/high and input-release transitions. Bound extra
+logging for these pins exposes the actual driver's recovery operations.
+Next kernel validation pending. Pin data/mode layout reference:
+https://github.com/torvalds/linux/blob/master/drivers/pinctrl/pinctrl-apple-gpio.c
+
+---
+
 ## I2C empty-bus semantics pass; next PMP bank and real IRQ routing
 
 Run 37977641862 passes I2C START/STOP/NACK/W1C/reset tests and advances

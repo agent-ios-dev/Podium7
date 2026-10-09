@@ -75,6 +75,36 @@ str w5, [x3, #0x984]
 ldr w4, [x3, #0x984]
 cmp w4, #0
 b.ne failure
+mov x3, #0xf10
+lsl x3, x3, #16
+movk x3, #2, lsl #32
+adr x7, bus_pins
+mov x9, #6
+next_bus_pin:
+ldr w6, [x7], #4
+ldr w4, [x3, x6]
+tbz w4, #0, failure
+mov w5, #2
+str w5, [x3, x6]
+ldr w4, [x3, x6]
+cmp w4, #2
+b.ne failure
+mov w5, #3
+str w5, [x3, x6]
+ldr w4, [x3, x6]
+cmp w4, #3
+b.ne failure
+mov w5, #14
+str w5, [x3, x6]
+ldr w4, [x3, x6]
+cmp w4, #15
+b.ne failure
+str wzr, [x3, x6]
+ldr w4, [x3, x6]
+cmp w4, #1
+b.ne failure
+subs x9, x9, #1
+b.ne next_bus_pin
 mov x0, #0x20
 adr x1, success_exit
 hlt #0xf000
@@ -89,6 +119,8 @@ success_exit:
 .quad 0x20026, 0
 failure_exit:
 .quad 0x20026, 1
+bus_pins:
+.word 156, 160, 528, 532, 784, 788
 '''
     with tempfile.TemporaryDirectory() as temporary:
         root = pathlib.Path(temporary)
@@ -103,7 +135,7 @@ failure_exit:
                    "-monitor", "none", "-serial", "none", "-semihosting-config",
                    "enable=on,target=native", "-device", f"loader,file={image},cpu-num=0"]
         result = subprocess.run(command, capture_output=True, text=True, timeout=10)
-        checks = ["main GPIO first/last pins and 208-pin boundary",
+        checks = ["I2C six-pin idle pull-ups, output-low/high and input release", "main GPIO first/last pins and 208-pin boundary",
                   "AOP GPIO first/last pins and 42-pin boundary",
                   "GPIO interrupt status write-one-to-clear for groups 0 and 6",
                   "AOP GPIO interrupt status groups and reserved pin boundary",

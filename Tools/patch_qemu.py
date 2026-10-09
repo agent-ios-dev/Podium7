@@ -652,6 +652,26 @@ static void podium7_gpio_create(MachineState *machine, MemoryRegion *memory,
 }
 
 '''
+    # Original gpio-iic_scl/sda tuples identify these six main-bank pins.
+    # Idle I2C lines have board pull-ups; GPIO output-low still overrides them.
+    before = gpio.index("static uint64_t podium7_gpio_read(")
+    gpio = gpio[:before] + '''static bool podium7_gpio_i2c_pin(Podium7GPIO *gpio, hwaddr address)
+{
+    unsigned pin = address >> 2;
+    return gpio->base == 0x20f100000ULL && !(address & 3) &&
+           (pin == 39 || pin == 40 || pin == 132 || pin == 133 ||
+            pin == 196 || pin == 197);
+}
+
+''' + gpio[before:]
+    gpio = gpio.replace("        value = gpio->pin_config[address >> 2];",
+        "        value = gpio->pin_config[address >> 2];\n"
+        "        if (podium7_gpio_i2c_pin(gpio, address) && ((value >> 1) & 7) != 1) {\n"
+        "            value |= 1; /* Released/input line samples its external pull-up. */\n"
+        "        }")
+    gpio = gpio.replace("    unsigned logged_accesses;", "    unsigned logged_accesses;\n    unsigned bus_logged;")
+    gpio = gpio.replace("if (gpio->logged_accesses < 256)",
+        "if (gpio->logged_accesses < 256 || (podium7_gpio_i2c_pin(gpio, address) && gpio->bus_logged++ < 512))")
     aes = '''
 /* Minimal T8010 AES register windows for kernel bootstrap.
  * AppleS8000AES maps both ranges as 0x4000-byte windows. This backing store

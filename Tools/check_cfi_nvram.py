@@ -43,6 +43,8 @@ strb w5, [x3, x6]
 ldrb w4, [x3, #0x10]
 cmp w4, #0x51
 b.ne failure
+ldrb w4, [x3, #0x1f]
+cbnz w4, failure
 ldrb w4, [x3, #0x2d]
 cmp w4, #3
 b.ne failure

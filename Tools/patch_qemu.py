@@ -57,7 +57,8 @@ void HELPER(podium7_acc_trace)(CPUARMState *env, uint64_t pc)
                  pc, name, env->xregs[2]);
     }
     if (logged++ < 256 || pc == 0xfffffff0069445c4ULL ||
-        pc == 0xfffffff005b898e4ULL ||
+        pc == 0xfffffff005b898e4ULL || pc == 0xfffffff0068fcb94ULL ||
+        pc == 0xfffffff0068fcb98ULL ||
         (pc >= 0xfffffff0077b9084ULL && pc <= 0xfffffff0077b910cULL)) {
         qemu_log("PODIUM7 BOOT-ARG pc=%016" PRIx64 " x0=%016" PRIx64
                  " x1=%016" PRIx64 " x2=%016" PRIx64 " x3=%016" PRIx64
@@ -76,7 +77,8 @@ void HELPER(podium7_acc_trace)(CPUARMState *env, uint64_t pc)
     if (pc == 0xfffffff0069459f4ULL || pc == 0xfffffff006945b6cULL || pc == 0xfffffff0069445c4ULL ||
         pc == 0xfffffff0077b9084ULL || pc == 0xfffffff0077b9108ULL ||
         pc == 0xfffffff0077b910cULL || pc == 0xfffffff005b898e4ULL ||
-        pc == 0xfffffff00777f958ULL || pc == 0xfffffff00777f8ecULL) {
+        pc == 0xfffffff00777f958ULL || pc == 0xfffffff00777f8ecULL ||
+        pc == 0xfffffff0068fcb94ULL || pc == 0xfffffff0068fcb98ULL) {
         gen_helper_podium7_acc_trace(tcg_env, tcg_constant_i64(pc));
     }''')
     # QEMU reserves fieldoffset=0 to mean no backing storage.
@@ -1203,6 +1205,14 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
         raise ValueError("CFI memory-operation source anchor changed")
     cfi_source = cfi_source.replace(wide_anchor,
         "    .valid.max_access_size = 8,\n    .impl.min_access_size = 1,\n    .impl.max_access_size = 4,")
+    # This virtual NOR programs bytes immediately; don't advertise the generic
+    # CFI device's slower byte-program timing to the original polling driver.
+    timing_anchor = "    pfl->cfi_table[0x1F] = 0x07;"
+    if cfi_source.count(timing_anchor) != 1:
+        raise ValueError("CFI byte-program timing source anchor changed")
+    cfi_source = cfi_source.replace(timing_anchor, timing_anchor +
+        '\n    if (!strcmp(pfl->name, "podium7-nvram-cfi")) {\n'
+        '        pfl->cfi_table[0x1F] = 0; /* 1-us virtual byte program */\n    }')
     cfi_path.write_text(cfi_source)
     kconfig = directory / "hw/arm/Kconfig"
     config = kconfig.read_text()

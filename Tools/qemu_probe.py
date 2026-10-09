@@ -196,7 +196,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                "-m", "2048", "-smp", "1", "-display", "none", "-monitor", "none", "-serial", "stdio",
                "-device", f"loader,file={image},cpu-num=0", "-d", "in_asm,int,guest_errors,unimp", "-D", str(trace)]
     if research_cfi_nvram:
-        command += ["-drive", f"if=none,id=podium7-nvram,format=raw,file={directory / 'nvram-flash.raw'}"]
+        command += ["-drive", f"if=none,id=podium7-nvram,format=raw,cache=writeback,file={directory / 'nvram-flash.raw'}"]
     if cpu == "podium7-research":
         command += ["-device", f"loader,addr=0x2000007e4,data={rorgn[0]},data-len=4",
                     "-device", f"loader,addr=0x2000007e8,data={rorgn[1]},data-len=4"]
@@ -308,6 +308,19 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                "returncode": process.returncode, "seconds": time.monotonic() - start,
                "console_tail": serial.read_text(errors="replace")[-4096:],
                "trace_bytes": trace.stat().st_size if trace.exists() else 0}
+    if research_cfi_nvram:
+        import hashlib
+        import zlib
+        flash_bytes = (directory / "nvram-flash.raw").read_bytes()
+        banks = []
+        for offset in (0, 8192):
+            bank = flash_bytes[offset:offset + 8192]
+            banks.append({"offset": offset, "generation": struct.unpack_from("<I", bank, 20)[0],
+                          "adler_valid": struct.unpack_from("<I", bank, 16)[0] == zlib.adler32(bank[20:]),
+                          "restore_outcome_variable_present": b"restore-outcome=" in bank})
+        # No guest variable values or raw key material are exported.
+        summary["nvram_backing_evidence"] = {"bytes": len(flash_bytes),
+            "sha256": hashlib.sha256(flash_bytes).hexdigest(), "banks": banks}
     (directory / "qemu-probe.json").write_text(json.dumps(summary, indent=2))
     print(json.dumps(summary, indent=2))
     if not trace.exists() or trace.stat().st_size == 0:

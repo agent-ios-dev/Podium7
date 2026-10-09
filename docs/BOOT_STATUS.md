@@ -1,3 +1,15 @@
+## Error-handler acknowledgment regression caught before kernel execution
+
+Run 37940003866 failed the genuine ARM64 MMIO check: writing all ones to
++0x10008 read back all ones. The generated handler retained the generic
+control latch because its replacement targeted a nonexistent `s` variable
+rather than `bank`. The replacement now uses the actual store and requires
+exactly one source match, so generation fails if that anchor changes.
+The existing ARM64 check covers the faulty behavior directly. A new kernel
+run is required; neither launchd recovery nor iOS desktop is yet confirmed.
+
+---
+
 ## Single-CPU topology releases AIC's CPU registration: run 37938836505
 
 With cpus=1 the original AIC registerInterrupt for source 0 returns success

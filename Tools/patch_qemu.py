@@ -921,10 +921,13 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
 '''
     # Observed original startup clears status with an all-one write at 0x10008.
     # No synthetic errors are raised; other control words remain latches.
-    error_handler = error_handler.replace("s->registers[address >> 2] = value;",
+    status_store = "bank->registers[address >> 2] = value;"
+    if error_handler.count(status_store) != 1:
+        raise ValueError("error-handler status-write source anchor changed")
+    error_handler = error_handler.replace(status_store,
         "if (address == 0x10008) {\n"
-        "        s->registers[address >> 2] &= ~value;\n"
-        "    } else {\n        s->registers[address >> 2] = value;\n    }")
+        "        bank->registers[address >> 2] &= ~value;\n"
+        "    } else {\n        bank->registers[address >> 2] = value;\n    }")
     i2s_switch = '''
 /* n112ap exposes 4-KiB main/AOP I2S banks and a 32-bit routing register.
  * Retain guest routing writes for bootstrap. No PCM/DMA/audio output yet.

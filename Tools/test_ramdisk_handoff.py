@@ -41,4 +41,4 @@ class RamdiskTests(unittest.TestCase):
     def test_root_argument_and_reserved_top(self):
         args = boot_args(0xfffffff004000000, 0xfffffff008000000, 100, 0x51000000, ramdisk=True)
         self.assertEqual(struct.unpack_from("<Q", args, 32)[0], 0x51000000)
-        self.assertEqual(args[108:716].split(b"\0", 1)[0], b"-v serial=3 debug=0x8 rd=md0")
+        self.assertEqual(args[108:716].split(b"\0", 1)[0], b"-v serial=3 debug=0x8 cpus=1 rd=md0")

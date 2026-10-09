@@ -1,3 +1,16 @@
+## PMP SRAM accepts firmware; next access is its control bank
+
+Run 37974361788 passes timer and mailbox/SRAM checks. Original RTBuddy
+writes its PMP firmware and advances to AppleA7IOP's boot-parameter helper
+at PC 0xfffffff005dc3760. The next data abort at physical 0x20e300018 maps
+to /arm-io/pmp reg[0], 128 KiB at 0x20e300000. Map this independently from
+firmware SRAM at reg[1]; the same observed AppleA7IOP control helper is
+already exercised for SIO. The ARM64 queue-isolation test now executes SEP,
+SIO and PMP in one machine before its SRAM check. Firmware execution and
+real IOP responses remain unimplemented. Next original kernel result pending.
+
+---
+
 ## PMP SRAM allocation ownership regression caught before kernel execution
 
 Run 37973912011 fails the first timer test before any guest executes. QEMU

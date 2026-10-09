@@ -11,7 +11,7 @@ from qemu_probe import elf_image
 def check(executable, report):
     assembly = """.text
 adr x10, banks
-mov x9, #2
+mov x9, #3
 next_bank:
 ldr x3, [x10], #8
 mov w5, #0x1234
@@ -130,12 +130,12 @@ success_exit:
 failure_exit:
 .quad 0x20026, 1
 banks:
-.quad 0x20da00000, 0x20ae00000
+.quad 0x20da00000, 0x20ae00000, 0x20e300000
 """
     with tempfile.TemporaryDirectory() as temporary:
         root = pathlib.Path(temporary)
         results = []
-        for bank in ["SEP and SIO in the same machine"]:
+        for bank in ["SEP, SIO and PMP in the same machine"]:
             source = assembly
             (root / "test.s").write_text(source)
             subprocess.run(["xcrun", "clang", "-arch", "arm64", "-c", str(root / "test.s"),

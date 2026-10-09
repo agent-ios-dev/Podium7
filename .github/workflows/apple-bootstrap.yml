@@ -64,7 +64,7 @@ jobs:
         run: python3 Tools/check_gfx.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify original ARM error-handler register ranges
         run: python3 Tools/check_error_handler.py --qemu .qemu/build/qemu-system-aarch64
-      - name: Verify original SEP and SIO mailbox controls and queues
+      - name: Verify original SEP, SIO and PMP mailbox controls and queues
         run: python3 Tools/check_sep_mailbox.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify original CPU debug and CLPC control banks
         run: python3 Tools/check_cpu_clpc.py --qemu .qemu/build/qemu-system-aarch64

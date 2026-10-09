@@ -74,6 +74,8 @@ jobs:
         run: python3 Tools/check_aic_irq.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify original DART discovery and stream controls
         run: python3 Tools/check_dart.py --qemu .qemu/build/qemu-system-aarch64
+      - name: Verify original PCIe controls and empty configuration space
+        run: python3 Tools/check_pcie.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify original CPU debug and CLPC control banks
         run: python3 Tools/check_cpu_clpc.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify T8010 AOP I2S routing register
@@ -186,6 +188,7 @@ jobs:
             .firmware/spi-checks.json
             .firmware/i2c-checks.json
             .firmware/dart-checks.json
+            .firmware/pcie-checks.json
             .firmware/cpu-clpc-checks.json
             .firmware/i2s-switch-checks.json
             .firmware/ktrr-checks.json

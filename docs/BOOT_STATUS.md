@@ -1,3 +1,17 @@
+## DART discovery passes; next access is PCIe common control
+
+Run 37979534877 passes DART programming tests and advances to original
+PCIe register write at PC 0xfffffff00681d708, physical 0x600000004,
+/devicetree/arm-io/apcie reg[9] (32-KiB common control). Provide the 11 exact
+control/PHY apertures independently from existing DART regions, plus the
+16-MiB configuration window at 0x610000000. No endpoint is attached:
+configuration reads return all ones for byte/halfword/word accesses, writes
+have no effect. No PHY-ready/link-up status or NVMe device is synthesized.
+ARM64 tests check all control banks, widths and the ECAM end boundary.
+Next kernel validation pending; restore root remains a real RAMDisk.
+
+---
+
 ## I2C pull-up regression passes; original ISP DART is the next device
 
 Run 37978974681 passes six-pin GPIO electrical tests. The original driver

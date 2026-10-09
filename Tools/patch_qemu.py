@@ -1129,6 +1129,49 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
     }
 }
 '''
+    pcie = mipi.replace("MIPI-DSIM", "PCIE").replace("mipi_dsim", "pcie")
+    pcie = pcie.replace("Podium7MIPIDSIMBank", "Podium7PCIeBank")
+    pcie = "\n/* T8010 PCIe discovery controls; no endpoint, PHY-ready or link-up synthesis. */\n" + pcie[pcie.index("typedef struct "):]
+    start = pcie.index("static void podium7_pcie_create(")
+    pcie = pcie[:start] + '''static uint64_t podium7_pcie_config_read(void *opaque, hwaddr address, unsigned size)
+{
+    /* No endpoint is attached: PCI configuration reads return all ones. */
+    return size == 4 ? 0xffffffffULL : ((1ULL << (size * 8)) - 1);
+}
+
+static void podium7_pcie_config_write(void *opaque, hwaddr address,
+                                      uint64_t data, unsigned size)
+{
+    /* Writes to a nonexistent PCI function have no effect. */
+}
+
+static const MemoryRegionOps podium7_pcie_config_ops = {
+    .read = podium7_pcie_config_read, .write = podium7_pcie_config_write,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+    .valid = { .min_access_size = 1, .max_access_size = 4 },
+    .impl = { .min_access_size = 1, .max_access_size = 4 },
+};
+
+static void podium7_pcie_create(MachineState *machine, MemoryRegion *memory)
+{
+    static const struct { hwaddr base; hwaddr size; } banks[] = {
+        { 0x601000000ULL, 0x4000 }, { 0x601004000ULL, 0x4000 },
+        { 0x602000000ULL, 0x4000 }, { 0x602004000ULL, 0x4000 },
+        { 0x603000000ULL, 0x4000 }, { 0x603004000ULL, 0x4000 },
+        { 0x604000000ULL, 0x4000 }, { 0x604004000ULL, 0x4000 },
+        { 0x600000000ULL, 0x8000 }, { 0x600008000ULL, 0x4000 },
+        { 0x6000a0000ULL, 0x4000 },
+    };
+    for (unsigned i = 0; i < ARRAY_SIZE(banks); i++) {
+        podium7_pcie_bank_create(machine, memory, banks[i].base, banks[i].size,
+                                 "podium7-t8010-pcie-control");
+    }
+    MemoryRegion *config = g_new0(MemoryRegion, 1);
+    memory_region_init_io(config, OBJECT(machine), &podium7_pcie_config_ops,
+        NULL, "podium7-t8010-pcie-empty-config", 0x1000000);
+    memory_region_add_subregion(memory, 0x610000000ULL, config);
+}
+'''
     i2s_switch = '''
 /* n112ap exposes 4-KiB main/AOP I2S banks and a 32-bit routing register.
  * Retain guest routing writes for bootstrap. No PCM/DMA/audio output yet.
@@ -1454,7 +1497,7 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + spi + i2c + pmp_system + dart + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + spi + i2c + pmp_system + dart + pcie + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
     timer_fiq = r'''
 /* Research A10 EL1 timers arrive as FIQ, not GIC PPIs. External AIC device
  * interrupts use a separate CPU IRQ route; EL2 timer-enable controls are absent. */
@@ -1554,6 +1597,7 @@ static void podium7_irq_or_set(void *opaque, int input, int level)
         podium7_i2c_create(machine, sysmem);
         podium7_pmp_system_create(machine, sysmem);
         podium7_dart_create(machine, sysmem);
+        podium7_pcie_create(machine, sysmem);
         podium7_i2s_switch_create(machine, sysmem);
         podium7_pmgr_bridges_create(machine, sysmem);
         podium7_pmgr_raw_create(machine, sysmem);

@@ -56,6 +56,18 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
                 else:
                     properties[existing] = (properties[existing][0], encoded_value)
                 changes.append({"path": path, "property": name.decode(), "value": hex(value), "source": "QEMU virt RAM"})
+        if research_bridge_handoff and path == "/device-tree/chosen":
+            # iBoot normally provides these. Keep real handoff bytes untouched.
+            # A proxy initializes IODTNVRAM; a persistent controller is separate.
+            if b"nvram-bank-size" not in names and b"nvram-proxy-data" not in names:
+                from nvram_handoff import empty_bank
+                bank = empty_bank()
+                properties.extend([
+                    (b"nvram-bank-size".ljust(32, b"\0"), struct.pack("<I", len(bank))),
+                    (b"nvram-proxy-data".ljust(32, b"\0"), bank)])
+                changes.append({"path": path, "source": "synthetic volatile CHRP v1 NVRAM proxy",
+                                "bytes": len(bank), "persistent_controller": False,
+                                "authentic_iboot_handoff": False})
         if research_bridge_handoff and path == "/device-tree/arm-io":
             frequencies = names.get(b"clock-frequencies")
             if frequencies is not None and len(frequencies) == 384 and not any(frequencies):

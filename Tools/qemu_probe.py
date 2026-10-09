@@ -13,6 +13,7 @@ import subprocess
 import time
 import tempfile
 from qmp_diagnostics import capture as capture_cpu
+from boot_milestones import inspect as inspect_boot_milestones
 from analyze_firmware import macho, device_tree
 from prepare_device_tree import prepare
 from ramdisk_handoff import attach_ramdisk, attach_memory_file, validate_hfs
@@ -253,6 +254,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
     (directory / "pmgr-handoff.json").write_text(json.dumps(handoff, indent=2))
     summary = {"research_bridge_handoff": research_bridge_handoff,
                "authentic_iboot_handoff": False, "pmgr_handoff": handoff, "booted_ios": False, "kernel_entry_seen": entry_seen, "physical_kernel_entry": hex(kernel_entry),
+               "boot_milestones": inspect_boot_milestones(serial.read_text(errors="replace"), trace_text),
                "last_translated_blocks": re.findall(r"^0x([0-9a-fA-F]+):", trace_text, re.MULTILINE)[-8:],
                "cpu_model": cpu, "aprr_permissions_enforced": False,
                "counter_frequency": COUNTER_FREQUENCY,

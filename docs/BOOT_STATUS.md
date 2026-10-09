@@ -1,3 +1,32 @@
+## Confirmed restore userland: run 37840981874
+
+The GPU startup command-completion fix passed its genuine guest regression.
+The explicit modified-root experiment now executes actual Apple userland:
+launchd prints `hello`, `Restore environment starting`, and `Early boot complete`.
+The QEMU trace contains 13,025 EL1-to-EL0 returns, beginning at 0x104f81170.
+Restore services including restored_extern run. The official restore trust
+cache permits this execution with AMFI validation enabled.
+
+This is the restore ramdisk environment, not SpringBoard, the regular system
+volume, or a usable IPA. The IOSecureBSDRoot experiment remains explicitly
+modified; the original kernel comparison remains separate.
+
+The next observed dependency is repeated IOResources/IONVRAM waiting.
+Original /chosen lacks nvram-bank-size and nvram-proxy-data. XNU's
+IODTNVRAM::init requires the former; start parses the latter. The research
+handoff now supplies an empty 8-KiB CHRP v1 bank with checked header sums,
+Adler-32, and empty common/system partitions. Existing handoff bytes are
+preserved. This is volatile proxy initialization only: no persistent NVRAM
+controller, nonce seeds, security-variable fabrication, or forced resource
+publication is included. Actual service availability needs the next run.
+
+The probe now records separate evidence fields for EL0 returns, launchd hello,
+restore environment, and NVRAM waits. It never labels these as desktop boot.
+
+Source: https://github.com/apple-oss-distributions/xnu/blob/xnu-8019.80.24/iokit/Kernel/IONVRAM.cpp
+
+---
+
 ## SGX/GFX command-completion stall: run 37839672173
 
 The restore probes now receive the official trust-cache region. No userland

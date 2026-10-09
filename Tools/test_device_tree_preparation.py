@@ -101,3 +101,23 @@ class ResearchBridgeHandoffTests(unittest.TestCase):
         properties = device_tree(prepared)[-1]["properties"]
         self.assertEqual(properties["voltage-states1"], levels.hex())
         self.assertFalse(any(c.get("property") == "voltage-states1" for c in changes))
+
+    def test_nvram_proxy_is_opt_in_and_preserves_supplied_handoff(self):
+        from nvram_handoff import empty_bank
+        base = self.make_tree()
+        # Add chosen to the root fixture, retaining its existing children.
+        count, children = struct.unpack_from("<II", base)
+        tree = struct.pack("<II", count, children + 1) + base[8:] + node([("name", b"chosen\0")])
+        normal, _ = prepare(tree, 24000000, random_seed=bytes(64))
+        chosen = next(n['properties'] for n in device_tree(normal) if n['path'].endswith('/chosen'))
+        self.assertNotIn('nvram-proxy-data', chosen)
+        prepared, _ = prepare(tree, 24000000, random_seed=bytes(64), research_bridge_handoff=True)
+        chosen = next(n['properties'] for n in device_tree(prepared) if n['path'].endswith('/chosen'))
+        self.assertIn(b'nvram-proxy-data'.ljust(32,b'\0') + struct.pack('<I',8192) + empty_bank(), prepared)
+        self.assertIn(b'nvram-bank-size'.ljust(32,b'\0') + struct.pack('<II',4,8192), prepared)
+        supplied = struct.pack("<II", count, children + 1) + base[8:] + node([
+            ("name", b"chosen\0"), ("nvram-bank-size", struct.pack('<I',16)),
+            ("nvram-proxy-data", b"existing handoff!")])
+        kept, _ = prepare(supplied, 24000000, random_seed=bytes(64), research_bridge_handoff=True)
+        chosen = next(n['properties'] for n in device_tree(kept) if n['path'].endswith('/chosen'))
+        self.assertIn(b'nvram-proxy-data'.ljust(32,b'\0') + struct.pack('<I',17) + b'existing handoff!', kept)

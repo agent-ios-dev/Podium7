@@ -91,6 +91,8 @@ jobs:
           cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/restore-userland-experiment/
           python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/restore-userland-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --trust-cache .firmware/RestoreTrustCache.im4p --research-ramdisk-root --seconds 120
           python3 Tools/inspect_boot_fault.py --directory .firmware/restore-userland-experiment
+      - name: Require actual restore launchd and EL0 execution
+        run: python3 Tools/verify_restore_userland.py .firmware/restore-userland-experiment
       - name: Verify MCC register lock and protected RAM
         timeout-minutes: 1
         run: python3 Tools/check_mcc.py --qemu .qemu/build/qemu-system-aarch64

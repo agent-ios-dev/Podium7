@@ -1,3 +1,31 @@
+## NVRAM proxy tested: run 37922572838
+
+The zero-placeholder replacement is active on the real n112ap DeviceTree.
+Restore launchd/userland still execute: 12,989 EL1-to-EL0 returns and all
+three launchd markers (hello, restore environment, early boot complete).
+No SpringBoard or regular system-volume boot is confirmed.
+
+IONVRAM resource waits remain. Original IOPlatformExpert::publishNVRAM at
+0xfffffff007780ddc is translated; neither IONVRAMController::registerService
+at 0xfffffff0077bfe10 nor IOPlatformExpert::registerNVRAMController at
+0xfffffff00777f8dc appears in the execution trace. Source publishes the
+IONVRAM resource on controller registration, not proxy initialization.
+Thus the proxy does not solve the missing controller. No forced resource
+publication or fabricated security variables are used.
+
+Restored services also report no enumerated IOMobileFramebuffer display,
+and restored_external exits after disable_watchdog fails. These are separate
+remaining hardware/service dependencies. The original-kernel comparison
+still does not reach EL0 within its 30-second bound.
+
+A CI regression gate now independently reads serial and execution traces:
+actual restore launchd and EL0 execution are required. Mere successful QEMU
+exit, a load attempt, or compiler success cannot pass this gate. Modified
+kernel provenance and absence of a desktop-boot claim are mandatory.
+47 local tests pass; the gate passes on both downloaded genuine traces.
+
+---
+
 ## Confirmed restore userland: run 37840981874
 
 The GPU startup command-completion fix passed its genuine guest regression.

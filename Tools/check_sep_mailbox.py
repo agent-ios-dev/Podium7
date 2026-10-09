@@ -14,6 +14,18 @@ adr x10, banks
 mov x9, #4
 next_bank:
 ldr x3, [x10], #8
+ldr w6, [x3, #0xb80]
+tbz w6, #17, failure
+str wzr, [x3, #0xb80]
+ldr w6, [x3, #0xb80]
+tbz w6, #17, failure
+mov w5, #0x1100
+str w5, [x3, #0xb80]
+ldr w6, [x3, #0xb80]
+tbz w6, #17, failure
+and w6, w6, #0xffff
+cmp w6, w5
+b.ne failure
 mov w5, #0x1234
 str w5, [x3, #0x18]
 ldr w6, [x3, #0x18]
@@ -168,7 +180,7 @@ banks:
                             "stdout": result.stdout, "stderr": result.stderr})
         passed = all(r["returncode"] == 0 for r in results)
         report.write_text(json.dumps({"passed": passed, "iop_firmware_execution": False,
-            "checks": ["observed IOP boot-parameter and IRQ-mask writes", "empty receive queue",
+            "checks": ["observed IOP boot-parameter and IRQ-mask writes", "empty modern and legacy ARM32 receive views",
                        "64-bit send occupies one slot without overwrite", "queue status cannot be forged", "each bank starts empty after filling the other",
                        "PMP SRAM firmware word, byte order and final 64-bit boundary; separate system bank"],
             "results": results}, indent=2))

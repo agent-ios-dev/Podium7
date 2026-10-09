@@ -1,3 +1,17 @@
+## PMP no longer data-aborts; legacy receive status caused endless zero-message draining
+
+Run 37986404202 executes 1330 real PMP blocks with no post-relocation data
+abort. It loops at 0x0100c432 calling 0x0100c6dc: reads legacy receive control
+at virtual 0xc0500b80, tests bit17 for empty, and reads a 64-bit message if
+clear. The passive model left bit17 clear, falsely reporting an endless
+queue of zero words. Implement empty-bit17 on legacy +0xb80 just as the
+modern +0x4020 view. Retain low control bits, but no AP message is fabricated.
+ARM64 tests verify reset-empty and that writing zero or control 0x1100 cannot
+clear derived emptiness. Next real firmware trace remains pending. A genuine
+AP/IOP peer and shared execution are still required for PMP/iOS boot.
+
+---
+
 ## PMP advances through AIC setup; next write is an existing PMGR aperture
 
 Run 37985453138 executes 1111 authentic ARM32 firmware blocks (previously

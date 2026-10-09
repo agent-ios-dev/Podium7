@@ -1,3 +1,24 @@
+## Verified checkpoint: run 37974713532, next missing device is SPI1
+
+The genuine ARM64 SEP/SIO/PMP checks pass in one machine: independent queue
+state, boot-parameter controls, 64-bit sends, immutable derived status, and
+PMP SRAM word/byte-order/end-boundary storage. Timer regression also passes.
+Actual kernel execution progresses beyond the previously fatal PMP control
+access. AppleSEPManager registers and AppleCredentialManager matches it.
+
+The next real data abort occurs at original PC 0xfffffff005d77b84, instruction
+word 0xb8214902, physical 0x20a084000. Original DeviceTree identifies
+/arm-io/spi1 reg[0], a 16-KiB SPI control aperture. This controller is not yet
+modeled; do not interpret the successful component tests as an iOS boot.
+The restore launchd/EL0 regression gate correctly fails in this single-CPU
+configuration. No SpringBoard, normal root-volume boot, or usable iOS IPA
+is confirmed. Passive mailbox and SRAM support does not execute coprocessor
+firmware or synthesize authentication/security responses.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/37974713532
+
+---
+
 ## PMP SRAM accepts firmware; next access is its control bank
 
 Run 37974361788 passes timer and mailbox/SRAM checks. Original RTBuddy

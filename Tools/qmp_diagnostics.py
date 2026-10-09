@@ -4,7 +4,7 @@ import re
 import socket
 
 
-def capture(path, virtual_addresses=()):
+def capture(path, virtual_addresses=(), memory_windows=()):
     family = getattr(socket, "AF_UNIX", None)
     if family is None:
         raise OSError("local QMP snapshots require Unix-domain sockets")
@@ -40,6 +40,12 @@ def capture(path, virtual_addresses=()):
                      "backend_result": request("human-monitor-command", {
                          "command-line": f"gva2gpa {hex(address)}"})}
                     for address in virtual_addresses]
+            if memory_windows:
+                result["memory_windows"] = [
+                    {"virtual_address": hex(address), "words": words,
+                     "backend_result": request("human-monitor-command", {
+                         "command-line": f"x/{words}wx {hex(address)}"})}
+                    for address, words in memory_windows]
             sp = re.search(r"\bSP=([0-9a-fA-F]{16})\b", result["registers"])
             result["stack"] = (request("human-monitor-command", {"command-line": f"x/256gx 0x{sp.group(1)}"})
                                if sp else "Stack capture unavailable: SP missing from CPU registers")

@@ -61,7 +61,7 @@ def probe(executable, directory, output):
                 faults = [int(address, 16) for address in re.findall(
                     r"DFAR\s+(0x[0-9a-fA-F]{8})\b", trace.read_text(errors="replace"))]
             addresses_to_translate = tuple(dict.fromkeys([0xc0500040, 0xc0500008] + faults[-8:]))
-            snapshot = capture_cpu(qmp, addresses_to_translate)
+            snapshot = capture_cpu(qmp, addresses_to_translate, ((0x010144b0, 44),))
         except (OSError, ValueError) as error:
             snapshot = {"error": str(error)}
         process.terminate()

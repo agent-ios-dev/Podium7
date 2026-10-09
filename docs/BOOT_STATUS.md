@@ -1,3 +1,16 @@
+## Legacy queue empty check passes; firmware loop still requires exact object mapping
+
+Run 37987144912 passes the +0xb80 empty-view regression, but firmware still
+loops in its receive-drain helper. The stopped R02=0xc0500b80 is the message
+address after the helper's pointer arithmetic, so it does not establish
+that the control read is at +0xb80. Preserve evidence and capture only the
+44-word firmware mailbox object at 0x010144b0; its +0x94/+0x9c pointers will
+identify actual control/data apertures. Do not claim the previous alias
+fixed real firmware execution. Main XNU still times out waiting for PMP.
+Next stopped-object diagnostic pending; no firmware/iOS boot confirmed.
+
+---
+
 ## PMP no longer data-aborts; legacy receive status caused endless zero-message draining
 
 Run 37986404202 executes 1330 real PMP blocks with no post-relocation data

@@ -55,7 +55,7 @@ def probe(executable, directory, output):
     snapshot = {}
     if process.poll() is None:
         try:
-            snapshot = capture_cpu(qmp)
+            snapshot = capture_cpu(qmp, (0xc0500040, 0xc0500008))
         except (OSError, ValueError) as error:
             snapshot = {"error": str(error)}
         process.terminate()
@@ -79,6 +79,8 @@ def probe(executable, directory, output):
         "pmp_hardware_or_mailbox_peer_implemented": False,
         "distinct_executed_blocks": len(addresses),
         "first_executed_pcs": [hex(pc) for pc in addresses[:32]],
+        "last_executed_pcs": [hex(int(pc, 16)) for pc in blocks[-16:]],
+        "fault_evidence": re.findall(r".*(?:DFSR|DFAR|IFSR|IFAR).*", text)[-12:],
         "trace_limit_hit": limit_hit, "returncode": process.returncode, "stderr": stderr,
         "limitations": "synthetic virt RAM map; no PMP peripherals, mailbox or ARM32/ARM64 integration"}
     (output / "qemu-probe.json").write_text(json.dumps(report, indent=2))

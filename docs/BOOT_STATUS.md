@@ -1,3 +1,18 @@
+## Actual ARM32 PMP code executes and relocates; next access needs private I/O map
+
+Run 37982337383 confirms reset-body execution and 483 distinct actual TBs
+from the authentic embedded firmware. It enables CP15/VFP and relocates
+execution into virtual 0x01000000. It then data-aborts with DFSR 0x210,
+DFAR 0xc0500040 (and subsequently 0xc0500008), and eventually enters the
+abort-stack validation loop at 0x01000834. This is not firmware-ready or
+PMP/iOS boot. Register r2=0x0e300008 suggests a private PMP control mapping,
+but it is not the fault address; inspect the active page tables before
+choosing a physical aperture. QMP snapshots now ask gva2gpa for the two
+observed fault VAs and retain the actual last executed PCs/DFAR evidence.
+Main XNU still waits for a genuine PMP response after 20 seconds.
+
+---
+
 ## Standalone PMP probe reserves virt bootloader DTB memory
 
 Run 37981854516 stops before ARM32 execution: generic virt loads its DTB at

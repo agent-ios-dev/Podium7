@@ -928,6 +928,46 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
         "if (address == 0x10008) {\n"
         "        bank->registers[address >> 2] &= ~value;\n"
         "    } else {\n        bank->registers[address >> 2] = value;\n    }")
+    # Original AppleA7IOP writes IRQ-mask controls at +0x4000/+0xc00.
+    # Its mailbox helpers inspect empty/full bits 17/16 and exchange 64-bit
+    # words at +0x4010/+0x4038. No SEP firmware or replies are synthesized.
+    sep = mipi.replace("MIPI-DSIM", "SEP-MAILBOX").replace("mipi_dsim", "sep_mailbox")
+    sep = sep.replace("Podium7MIPIDSIMBank", "Podium7SEPMailboxBank")
+    sep = sep.replace("    unsigned logged_accesses;", "    unsigned logged_accesses;\n    bool inbox_pending;")
+    sep = sep.replace("    uint32_t value = bank->registers[address >> 2];",
+        "    uint32_t value = bank->registers[address >> 2];\n"
+        "    if (address == 0x4008) {\n"
+        "        value = bank->inbox_pending ? (1U << 16) : (1U << 17);\n"
+        "    } else if (address == 0x4020) {\n"
+        "        value = (value & 1U) | (1U << 17);\n"
+        "    }")
+    sep_store = "bank->registers[address >> 2] = value;"
+    if sep.count(sep_store) != 1:
+        raise ValueError("SEP mailbox control-write source anchor changed")
+    sep = sep.replace(sep_store,
+        "if (address == 0x4008) {\n"
+        "        /* Queue status is read-only. */\n"
+        "    } else if (address == 0x4020) {\n"
+        "        bank->registers[address >> 2] = value & 1U;\n"
+        "    } else if (address == 0x4038 || address == 0x403c) {\n"
+        "        /* No SEP peer: AP cannot manufacture an incoming reply. */\n"
+        "    } else if (address == 0x4010 || address == 0x4014) {\n"
+        "        if (!bank->inbox_pending) {\n"
+        "            bank->registers[address >> 2] = value;\n"
+        "            if (address == 0x4014) { bank->inbox_pending = true; }\n"
+        "        }\n"
+        "    } else {\n        bank->registers[address >> 2] = value;\n    }")
+    sep = sep.replace(".valid = { .min_access_size = 4, .max_access_size = 4 },",
+        ".valid = { .min_access_size = 4, .max_access_size = 8 },\n"
+        "    .impl = { .min_access_size = 4, .max_access_size = 4 },")
+    sep = "\n/* Passive T8010 SEP mailbox aperture. No firmware, DMA or SEP IRQ replies. */\n" + sep[sep.index("typedef struct "):]
+    start = sep.index("static void podium7_sep_mailbox_create(")
+    sep = sep[:start] + '''static void podium7_sep_mailbox_create(MachineState *machine, MemoryRegion *memory)
+{
+    podium7_sep_mailbox_bank_create(machine, memory, 0x20da00000ULL, 0x10000,
+                                    "podium7-t8010-sep-mailbox");
+}
+'''
     i2s_switch = '''
 /* n112ap exposes 4-KiB main/AOP I2S banks and a 32-bit routing register.
  * Retain guest routing writes for bootstrap. No PCM/DMA/audio output yet.
@@ -1253,7 +1293,7 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
     timer_fiq = r'''
 /* Research A10 EL1 timers arrive as FIQ, not GIC PPIs. External AIC device
  * interrupts and Apple EL2 timer-enable controls are not modeled here. */
@@ -1323,6 +1363,7 @@ static void podium7_timer_fiq_set(void *opaque, int input, int level)
         podium7_gfx_create(machine, sysmem);
         podium7_cpu_clpc_create(machine, sysmem);
         podium7_error_handler_create(machine, sysmem);
+        podium7_sep_mailbox_create(machine, sysmem);
         podium7_i2s_switch_create(machine, sysmem);
         podium7_pmgr_bridges_create(machine, sysmem);
         podium7_pmgr_raw_create(machine, sysmem);

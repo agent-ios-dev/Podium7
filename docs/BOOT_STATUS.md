@@ -1,3 +1,22 @@
+## SEP manager registers; next original fault reaches its IOP mailbox
+
+Run 37972077876 passes chip-id initialization: AppleSEPManager reports
+control endpoints created, PM init done, registered, and starts power state
+0 -> 2. The next data abort is str w10 at original PC 0xfffffff005dc3544,
+physical 0x20da04000, inside /arm-io/sep's 64-KiB aperture. The adjacent
+original code writes 0x1111 at +0x4000/+0xc00. Original mailbox helpers use
+empty/full bits 17/16 at +0x4008/+0x4020 and 64-bit words +0x4010/+0x4038.
+
+The new research device models control storage and a bounded single-slot
+AP-to-SEP queue. Without a SEP peer, one sent message remains pending/full;
+the receive queue stays empty. Guest writes cannot manufacture responses
+or clear derived queue status. No SEP firmware, keys, DMA or completion IRQs
+are emulated. Genuine ARM64 checks exercise wide message transactions and
+queue invariants before another kernel probe. Kernel validation is pending;
+launchd has not recovered in the single-CPU configuration, no SpringBoard.
+
+---
+
 ## Original error-handler startup passes; next fatal check is SEP chip type
 
 Run 37971329013 passes the ARM64 status-acknowledgment regression and the

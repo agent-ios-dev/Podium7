@@ -960,12 +960,15 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
     sep = sep.replace(".valid = { .min_access_size = 4, .max_access_size = 4 },",
         ".valid = { .min_access_size = 4, .max_access_size = 8 },\n"
         "    .impl = { .min_access_size = 4, .max_access_size = 4 },")
-    sep = "\n/* Passive T8010 SEP mailbox aperture. No firmware, DMA or SEP IRQ replies. */\n" + sep[sep.index("typedef struct "):]
+    sep = "\n/* Passive T8010 SEP/SIO mailbox apertures. No firmware, DMA or IOP replies. */\n" + sep[sep.index("typedef struct "):]
     start = sep.index("static void podium7_sep_mailbox_create(")
     sep = sep[:start] + '''static void podium7_sep_mailbox_create(MachineState *machine, MemoryRegion *memory)
 {
     podium7_sep_mailbox_bank_create(machine, memory, 0x20da00000ULL, 0x10000,
                                     "podium7-t8010-sep-mailbox");
+    /* Same original AppleA7IOP helper, distinct SIO register aperture. */
+    podium7_sep_mailbox_bank_create(machine, memory, 0x20ae00000ULL, 0x10000,
+                                    "podium7-t8010-sio-mailbox");
 }
 '''
     i2s_switch = '''

@@ -1,3 +1,17 @@
+## Next reached IOP instance is SIO: run 37972738221
+
+The SEP mailbox ARM64 test passes, but the actual kernel reaches a separate
+AppleA7IOP instance for SmartIO and aborts at original PC 0xfffffff005dc3760,
+physical 0x20ae00018. DeviceTree identifies /arm-io/sio, reg index 0,
+64 KiB at 0x20ae00000. Original code writes boot configuration at +0x18,
++0x20, +0x28, +0x30, +8, +0x10 and +0x38. Add this distinct aperture to
+the passive mailbox model; each bank has separate controls and queue state.
+ARM64 checks now exercise both apertures and their boot-parameter writes.
+The mailbox report is explicitly retained in Actions evidence. No IOP
+firmware execution or success responses are claimed. Next probe pending.
+
+---
+
 ## SEP manager registers; next original fault reaches its IOP mailbox
 
 Run 37972077876 passes chip-id initialization: AppleSEPManager reports

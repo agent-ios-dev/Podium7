@@ -1165,6 +1165,14 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     cfi_source = cfi_path.read_text()
     cfi_source = cfi_source.replace("boff == 0x55 && cmd == 0x98",
         "(boff == 0x55 || boff == pfl->unlock_addr0) && cmd == 0x98")
+    anchor = "        switch (cmd) {\n        case 0x20:"
+    if cfi_source.count(anchor) != 1:
+        raise ValueError("CFI unlock-state source anchor changed")
+    cfi_source = cfi_source.replace(anchor,
+        "        switch (cmd) {\n        case 0x98: /* Apple AMD unlock/query sequence */\n"
+        "            pfl->wcycle = WCYCLE_CFI;\n"
+        "            pfl->cmd = 0x98;\n"
+        "            return;\n        case 0x20:")
     cfi_path.write_text(cfi_source)
     kconfig = directory / "hw/arm/Kconfig"
     config = kconfig.read_text()

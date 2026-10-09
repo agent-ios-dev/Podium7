@@ -40,7 +40,7 @@ def probe(executable, directory, output):
     socket_root = tempfile.TemporaryDirectory(prefix="pmp-qmp-")
     qmp = pathlib.Path(socket_root.name) / "qmp.sock"
     command = [executable, "-machine", "virt,secure=off,virtualization=off,gic-version=2",
-        "-cpu", "cortex-a7", "-m", "128", "-display", "none", "-monitor", "none",
+        "-cpu", "cortex-a7,cntfrq=24000000", "-m", "128", "-display", "none", "-monitor", "none",
         "-serial", "none", "-no-reboot", "-d", "in_asm,exec,int,guest_errors",
         "-D", str(trace), "-qmp", f"unix:{qmp},server=on,wait=off",
         "-drive", f"if=none,id=podium7-pmp-core,format=raw,read-only=on,file={blob}", "-device",
@@ -56,7 +56,12 @@ def probe(executable, directory, output):
     snapshot = {}
     if process.poll() is None:
         try:
-            snapshot = capture_cpu(qmp, (0xc0500040, 0xc0500008))
+            faults = []
+            if trace.exists():
+                faults = [int(address, 16) for address in re.findall(
+                    r"DFAR\s+(0x[0-9a-fA-F]{8})\b", trace.read_text(errors="replace"))]
+            addresses_to_translate = tuple(dict.fromkeys([0xc0500040, 0xc0500008] + faults[-8:]))
+            snapshot = capture_cpu(qmp, addresses_to_translate)
         except (OSError, ValueError) as error:
             snapshot = {"error": str(error)}
         process.terminate()

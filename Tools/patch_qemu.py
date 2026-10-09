@@ -1016,6 +1016,12 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
         ".valid = { .min_access_size = 4, .max_access_size = 8 },\n"
         "    .impl = { .min_access_size = 4, .max_access_size = 4 },")
     sep = "\n/* Passive T8010 SEP/SIO/PMP mailbox apertures. No firmware, DMA or IOP replies. */\n" + sep[sep.index("typedef struct "):]
+    sep = sep.replace("static void podium7_sep_mailbox_bank_create(",
+                      "static Podium7SEPMailboxBank *podium7_sep_mailbox_bank_create(")
+    bank_end = "    memory_region_add_subregion(memory, base, &bank->io);\n}"
+    if sep.count(bank_end) != 1:
+        raise ValueError("PMP mailbox factory source anchor changed")
+    sep = sep.replace(bank_end, "    memory_region_add_subregion(memory, base, &bank->io);\n    return bank;\n}")
     start = sep.index("static void podium7_sep_mailbox_create(")
     sep = sep[:start] + '''static void podium7_sep_mailbox_create(MachineState *machine, MemoryRegion *memory)
 {
@@ -1651,8 +1657,17 @@ static void podium7_irq_or_set(void *opaque, int input, int level)
     /* Standalone Cortex-A7 PMP firmware experiment only, explicitly opted in
      * by its guarded firmware backend. No ARM64 XNU integration or peer ACKs. */
     if (blk_by_name("podium7-pmp-core")) {
-        podium7_sep_mailbox_bank_create(machine, sysmem, 0x20e300000ULL, 0x20000,
-                                        "podium7-pmp-core-mailbox");
+        Podium7SEPMailboxBank *pmp = podium7_sep_mailbox_bank_create(
+            machine, sysmem, 0x20e300000ULL, 0x20000, "podium7-pmp-core-mailbox");
+        /* Mirror the original driver's boot descriptor, using this probe's
+         * actual synthetic load address. No firmware-ready/response flags. */
+        pmp->registers[0x08 >> 2] = 0x41000000U;
+        pmp->registers[0x10 >> 2] = 0;
+        pmp->registers[0x18 >> 2] = 0;
+        pmp->registers[0x20 >> 2] = 0;
+        pmp->registers[0x28 >> 2] = 0x20000;
+        pmp->registers[0x30 >> 2] = 0;
+        pmp->registers[0x38 >> 2] = 1;
         podium7_pmp_system_create(machine, sysmem);
     }''')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)

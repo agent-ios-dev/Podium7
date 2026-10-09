@@ -1,3 +1,19 @@
+## PMP code advances with mapped control aperture; supply authentic boot descriptor shape
+
+Run 37983815067 executes 755 distinct original firmware TBs (previously
+483), passing the first high-address mailbox faults. The next data abort
+has DFAR 0xc0101028; the snapshot's active page tables will now translate
+all observed DFARs automatically. The probe's mailbox boot descriptor was
+zero, while actual XNU writes load low/high at +8/+0x10, arguments at
++0x18/+0x20, reserved SRAM length 0x20000 at +0x28, and boot-enable at +0x38.
+Mirror these inputs in the standalone probe using its real load 0x41000000;
+keep all firmware response/status queues empty. This is boot input metadata,
+not a synthesized PMP-ready reply. ARMv7 counter frequency is 24 MHz to match
+the main research platform. Exact board and ARM64 integration remain absent.
+Next genuine firmware execution validation pending.
+
+---
+
 ## PMP firmware uses LPAE to address the same high physical mailbox
 
 Run 37983124660 executes the same 483 authentic firmware TBs. Stopped QMP

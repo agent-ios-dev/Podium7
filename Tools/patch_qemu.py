@@ -1026,6 +1026,12 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
                                     "podium7-t8010-sio-mailbox");
     podium7_sep_mailbox_bank_create(machine, memory, 0x20e300000ULL, 0x20000,
                                     "podium7-t8010-pmp-mailbox");
+    podium7_sep_mailbox_bank_create(machine, memory, 0x210800000ULL, 0x1c000,
+                                    "podium7-t8010-aop-mailbox");
+    /* Original AOP reg[1] is a separate 640-KiB firmware SRAM window. */
+    MemoryRegion *aop_sram = g_new0(MemoryRegion, 1);
+    memory_region_init_ram(aop_sram, NULL, "podium7-t8010-aop-sram", 0xa0000, &error_fatal);
+    memory_region_add_subregion(memory, 0x210e00000ULL, aop_sram);
     /* Original PMP reg[1] is firmware SRAM, not mailbox control registers.
      * RTBuddy copies real t8010pmp words here. No PMP CPU is realized yet. */
     MemoryRegion *pmp_sram = g_new0(MemoryRegion, 1);
@@ -1170,6 +1176,38 @@ static void podium7_pcie_create(MachineState *machine, MemoryRegion *memory)
     memory_region_init_io(config, OBJECT(machine), &podium7_pcie_config_ops,
         NULL, "podium7-t8010-pcie-empty-config", 0x1000000);
     memory_region_add_subregion(memory, 0x610000000ULL, config);
+}
+'''
+    aop_system = mipi.replace("MIPI-DSIM", "AOP-SYSTEM").replace("mipi_dsim", "aop_system")
+    aop_system = aop_system.replace("Podium7MIPIDSIMBank", "Podium7AOPSystemBank")
+    aop_system = "\n/* Original AOP reg[2] system controls; no firmware execution. */\n" + aop_system[aop_system.index("typedef struct "):]
+    start = aop_system.index("static void podium7_aop_system_create(")
+    aop_system = aop_system[:start] + '''static uint64_t podium7_aop_counter_read(void *opaque, hwaddr address, unsigned size)
+{
+    uint64_t ns = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
+    uint64_t ticks = (ns / 1000000000ULL) * 32768ULL +
+                     ((ns % 1000000000ULL) * 32768ULL) / 1000000000ULL;
+    return address == 0 ? (uint32_t)ticks : (uint32_t)(ticks >> 32);
+}
+static void podium7_aop_counter_write(void *opaque, hwaddr address,
+                                      uint64_t data, unsigned size)
+{
+    /* Free-running read-only AOP timebase. */
+}
+static const MemoryRegionOps podium7_aop_counter_ops = {
+    .read = podium7_aop_counter_read, .write = podium7_aop_counter_write,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+    .valid = { .min_access_size = 4, .max_access_size = 8 },
+    .impl = { .min_access_size = 4, .max_access_size = 4 },
+};
+static void podium7_aop_system_create(MachineState *machine, MemoryRegion *memory)
+{
+    podium7_aop_system_bank_create(machine, memory, 0x210000500ULL, 0x100,
+                                   "podium7-t8010-aop-system-control");
+    MemoryRegion *counter = g_new0(MemoryRegion, 1);
+    memory_region_init_io(counter, OBJECT(machine), &podium7_aop_counter_ops,
+        NULL, "podium7-t8010-aop-counter-32768hz", 8);
+    memory_region_add_subregion(memory, 0x210000408ULL, counter);
 }
 '''
     i2s_switch = '''
@@ -1497,7 +1535,7 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + spi + i2c + pmp_system + dart + pcie + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + spi + i2c + pmp_system + dart + pcie + aop_system + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
     timer_fiq = r'''
 /* Research A10 EL1 timers arrive as FIQ, not GIC PPIs. External AIC device
  * interrupts use a separate CPU IRQ route; EL2 timer-enable controls are absent. */
@@ -1598,6 +1636,7 @@ static void podium7_irq_or_set(void *opaque, int input, int level)
         podium7_pmp_system_create(machine, sysmem);
         podium7_dart_create(machine, sysmem);
         podium7_pcie_create(machine, sysmem);
+        podium7_aop_system_create(machine, sysmem);
         podium7_i2s_switch_create(machine, sysmem);
         podium7_pmgr_bridges_create(machine, sysmem);
         podium7_pmgr_raw_create(machine, sysmem);

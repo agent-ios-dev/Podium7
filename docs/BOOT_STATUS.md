@@ -1,3 +1,21 @@
+## Original AOP time synchronization reaches its missing free-running counter
+
+Run 37980153266 passes PCIe controls and ECAM widths. Next kernel fault is
+PC 0xfffffff005e1e3e8 reading physical 0x21000040c, AOP reg[3] high counter.
+Original code reads high/low/high and retries on high rollover. Constructor
+constants at 0xfffffff0055da960 give offsets 0/4; default conversion pair at
+0xfffffff0055da970 is 15625/512 microseconds per tick (32768 Hz). Optional
+aop-fr-timebase uses 1/24 microseconds (24 MHz), but original DT lacks it.
+
+Provide the read-only 32768-Hz counter from QEMU virtual nanoseconds, with
+split 32-bit access and monotonic progress. Add distinct AOP system control
+reg[2] at 0x210000500/0x100, mailbox reg[0] at 0x210800000/0x1c000, and
+640-KiB firmware SRAM reg[1] at 0x210e00000. Counter is not a success flag;
+firmware execution and mailbox replies remain absent. ARM64 tests cover
+stable reads, time progress, ignored writes, and system/SRAM bounds. Pending.
+
+---
+
 ## DART discovery passes; next access is PCIe common control
 
 Run 37979534877 passes DART programming tests and advances to original

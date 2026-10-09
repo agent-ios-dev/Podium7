@@ -1,3 +1,26 @@
+## Original NVRAM driver registers: run 37926905157
+
+The separate CFI experiment now executes original AppleARMCHRPNVRAM startup:
+`bank size=0x2000, bank count=0x2, current bank=0`. Actual controller
+registerService at 0xfffffff0077bfe10 is translated, and restored reports
+`NVRAM access available on initial check`. IOResources/IONVRAM waits disappear.
+The guest sets and reads restore-outcome in its NVRAM service.
+
+Persistent synchronization is NOT yet successful: original CHRP sync returns
+0xe00002d0 (kIOReturnNotAligned), before CFI programming. The next trace captures
+the original CFI write alignment check at 0xfffffff005b898e4, including real
+length, offset, erase geometry and mask. No alignment check is removed.
+The assembler guest CFI QRY/program/persistent-byte regression passed.
+
+Userland remains real: 17,099 EL1-to-EL0 returns and launchd early boot markers.
+The next explicit kernel panic is `cannot find IOAESAccelerator: timeout = 90
+seconds`. This is another missing service/device dependency; the existing
+minimal AES register-window model is not a working IOAESAccelerator.
+No SpringBoard or regular iOS system-volume boot is claimed. CFI NOR remains
+an opt-in alternative research provider, not the original n112ap NVMe board.
+
+---
+
 ## Separate synthetic NOR NVRAM experiment
 
 Original AppleARMPlatform.kext contains AppleARMCFIFlashController matching

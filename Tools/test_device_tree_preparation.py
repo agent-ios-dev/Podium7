@@ -132,3 +132,32 @@ class ResearchBridgeHandoffTests(unittest.TestCase):
         prepared, changes = prepare(tree, 24000000, random_seed=bytes(64), research_bridge_handoff=True)
         self.assertIn(empty_bank(), prepared)
         self.assertTrue(next(c for c in changes if 'NVRAM' in c.get('source',''))['replaced_zero_iboot_placeholder'])
+
+
+class ChipTypeHandoffTests(unittest.TestCase):
+    def fixture(self, chip=bytes(4), platform=b"arm-io,t8010\0"):
+        return node([("name", b"device-tree\0")], [
+            node([("name", b"cpu0\0"), ("device_type", b"cpu\0")]),
+            node([("name", b"chosen\0"), ("chip-id", chip),
+                  ("unique-chip-id", bytes(8))]),
+            node([("name", b"arm-io\0"), ("compatible", platform)], [
+                node([("name", b"pmgr\0"), ("compatible", b"pmgr1,t8010\0"),
+                      ("#bridges", struct.pack("<I", 14))])])])
+
+    def test_zero_chip_type_is_opt_in_and_does_not_manufacture_ecid(self):
+        normal, _ = prepare(self.fixture(), 24000000, random_seed=bytes(64))
+        props = next(n["properties"] for n in device_tree(normal) if n["path"].endswith("/chosen"))
+        self.assertEqual(props["chip-id"], "00000000")
+        prepared, changes = prepare(self.fixture(), 24000000, random_seed=bytes(64), research_bridge_handoff=True)
+        props = next(n["properties"] for n in device_tree(prepared) if n["path"].endswith("/chosen"))
+        self.assertEqual(props["chip-id"], "10800000")
+        self.assertIn(b"unique-chip-id".ljust(32, b"\0") + struct.pack("<I", 8) + bytes(8), prepared)
+        self.assertEqual(next(c for c in changes if c.get("property") == "chip-id")["value"], "0x8010")
+
+    def test_supplied_chip_type_preserved_and_other_soc_rejected(self):
+        chip = struct.pack("<I", 0x8010)
+        prepared, changes = prepare(self.fixture(chip), 24000000, random_seed=bytes(64), research_bridge_handoff=True)
+        self.assertFalse(any(c.get("property") == "chip-id" for c in changes))
+        self.assertIn(chip, prepared)
+        with self.assertRaises(ValueError):
+            prepare(self.fixture(platform=b"arm-io,t8011\0"), 24000000, random_seed=bytes(64), research_bridge_handoff=True)

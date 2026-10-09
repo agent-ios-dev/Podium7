@@ -11,7 +11,7 @@ from analyze_firmware import device_tree
 def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, dram_size=2 * 1024 * 1024 * 1024, research_bridge_handoff=False):
     if not 1_000_000 <= counter_frequency <= 1_000_000_000:
         raise ValueError("invalid counter frequency")
-    device_tree(data)  # Fully validate bounds/depth before rewriting.
+    original_nodes = device_tree(data)  # Validate bounds/depth before rewriting.
     seed = secrets.token_bytes(64) if random_seed is None else random_seed
     if len(seed) != 64:
         raise ValueError("XNU requires 64 bootloader seed bytes")
@@ -57,6 +57,19 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
                     properties[existing] = (properties[existing][0], encoded_value)
                 changes.append({"path": path, "property": name.decode(), "value": hex(value), "source": "QEMU virt RAM"})
         if research_bridge_handoff and path == "/device-tree/chosen":
+            # SEPROMPanicBuffer requires a nonzero SoC type, not an ECID.
+            # Populate only the exact iBoot placeholder on a verified T8010.
+            if names.get(b"chip-id") == bytes(4):
+                arm_io = next((n for n in original_nodes if
+                               n["path"] == "/device-tree/arm-io"), None)
+                if arm_io is None or arm_io["properties"].get("compatible") != b"arm-io,t8010\0".hex():
+                    raise ValueError("zero chip-id handoff requires original T8010 arm-io")
+                position = next(i for i, (raw, _) in enumerate(properties)
+                                if raw.split(b"\0")[0] == b"chip-id")
+                properties[position] = (properties[position][0], struct.pack("<I", 0x8010))
+                changes.append({"path": path, "property": "chip-id", "value": "0x8010",
+                                "source": "SoC type from original arm-io,t8010 compatibility",
+                                "authentic_iboot_handoff": False})
             # iBoot normally provides these. Keep real handoff bytes untouched.
             # A proxy initializes IODTNVRAM; a persistent controller is separate.
             missing = b"nvram-bank-size" not in names and b"nvram-proxy-data" not in names

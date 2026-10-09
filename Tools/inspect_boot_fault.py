@@ -1,22 +1,9 @@
 """Disassemble the first actual exception PC from the captured QEMU trace."""
 import pathlib
 import re
-import subprocess
 import sys
 import json
 from analyze_firmware import macho
-
-
-def run_diagnostic(command, **kwargs):
-    """Run optional disassembly tools without hiding the primary boot result."""
-    try:
-        result = subprocess.run(command, capture_output=True, text=True, **kwargs)
-        output = result.stdout + result.stderr
-        if result.returncode:
-            output += f"\n(disassembler exited with status {result.returncode})\n"
-        return output
-    except OSError as error:
-        return f"Disassembler unavailable: {error}\n"
 
 
 import argparse
@@ -77,19 +64,8 @@ if panic:
     (root / "panic-context.json").write_text(json.dumps(report, indent=2))
     print(json.dumps(report, indent=2))
     if fault_pc >= 0xfffffff000000000 and kernel_path.exists() and "segment" in report:
-        segment = next(item for item in segments if item["name"] == report["segment"] and
-                       int(item["address"], 16) <= fault_pc < int(item["address"], 16) + item["length"])
-        base = int(segment["address"], 16)
-        window_start = max(base, fault_pc - 32) & ~3
-        window_end = min(base + segment["file_size"], fault_pc + 96) & ~3
-        source_offset = segment["offset"] + window_start - base
-        code = kernel[source_offset:source_offset + window_end - window_start]
-        encoded = "\n".join(" ".join(f"0x{byte:02x}" for byte in code[index:index + 4])
-                            for index in range(0, len(code) - 3, 4)) + "\n"
-        disassembly = run_diagnostic(["xcrun", "llvm-mc", "--disassemble",
-            "--triple=arm64-apple-ios"], input=encoded)
-        text = (f"Code window starts at {hex(window_start)}; panic instruction at {hex(fault_pc)}\n" +
-                disassembly)
+        from disassemble_assertion import instruction_window
+        text = instruction_window(kernel, fault_pc)
         (root / "panic-disassembly.txt").write_text(text)
         print(text)
 
@@ -133,9 +109,9 @@ if first:
         print("\n".join(strings))
     address = int(first.group(1), 16)
     if address >= 0xfffffff000000000:
-        command = ["xcrun", "llvm-objdump", "--disassemble", f"--start-address={hex(address - 64)}",
-                   f"--stop-address={hex(address + 256)}", str(root / "KernelCache.macho")]
-        disassembly = run_diagnostic(command)
+        from disassemble_assertion import instruction_window
+        disassembly = instruction_window((root / "KernelCache.macho").read_bytes(),
+                                         address, before=64, after=256)
         (root / "first-fault-disassembly.txt").write_text(disassembly)
         print(disassembly)
 else:
@@ -143,7 +119,7 @@ else:
     blocks = re.findall(r"^0x([0-9a-fA-F]+):", trace, re.MULTILINE)
     if blocks and int(blocks[-1], 16) >= 0xfffffff000000000:
         address = int(blocks[-1], 16)
-        disassembly = run_diagnostic(["xcrun", "llvm-objdump", "--disassemble",
-            f"--start-address={hex(address - 64)}", f"--stop-address={hex(address + 192)}",
-            str(root / "KernelCache.macho")])
+        from disassemble_assertion import instruction_window
+        disassembly = instruction_window((root / "KernelCache.macho").read_bytes(),
+                                         address, before=64, after=192)
         (root / "last-block-disassembly.txt").write_text(disassembly)

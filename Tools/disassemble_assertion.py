@@ -17,6 +17,26 @@ def branch_target(word, pc):
     return pc + immediate * 4
 
 
+def instruction_window(kernel, pc, before=32, after=96):
+    """Decode only the file-backed segment containing the observed guest PC."""
+    import capstone
+    segment = next((s for s in macho(kernel)["segments"] if
+                    int(s["address"], 16) <= pc <
+                    int(s["address"], 16) + s["file_size"]), None)
+    if segment is None:
+        return f"No file-backed instruction window for {pc:#x}\n"
+    base = int(segment["address"], 16)
+    start = max(base, pc - before) & ~3
+    end = min(base + segment["file_size"], pc + after) & ~3
+    offset = segment["offset"] + start - base
+    decoder = capstone.Cs(capstone.CS_ARCH_ARM64, capstone.CS_MODE_ARM)
+    decoder.skipdata = True
+    lines = [f"Original code at observed PC {pc:#x}; window starts {start:#x}"]
+    lines.extend(f"{i.address:#x}: {i.mnemonic} {i.op_str}" for i in
+                 decoder.disasm(kernel[offset:offset + end - start], start))
+    return "\n".join(lines) + "\n"
+
+
 def assertion_evidence(kernel, caller):
     import capstone
     decoder = capstone.Cs(capstone.CS_ARCH_ARM64, capstone.CS_MODE_ARM)

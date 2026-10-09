@@ -1,3 +1,22 @@
+## Original error-handler startup passes; next fatal check is SEP chip type
+
+Run 37971329013 passes the ARM64 status-acknowledgment regression and the
+original error-handler no longer data-aborts. The kernel reaches
+AppleSEPManager and panics in SEPROMPanicBuffer because /chosen/chip-id is
+still the four-byte all-zero iBoot placeholder. Original code looks up
+/chosen, requires four bytes, reads chip-id, and asserts it is nonzero.
+The opt-in research handoff initializes exactly that placeholder to 0x8010,
+verified against original arm-io,t8010 compatibility. Nonzero supplied
+values and unique-chip-id remain untouched. No working SEP, ECID, nonce or
+security state is fabricated. Next kernel validation remains pending.
+
+Fault diagnostics now decode bounded file-backed instruction windows with
+the existing Capstone dependency instead of unavailable Xcode llvm-mc.
+Replaying run 37938836505's real panic decodes the original faulting
+str w10, [x8, x9] at 0xfffffff006d0792c correctly.
+
+---
+
 ## Error-handler acknowledgment regression caught before kernel execution
 
 Run 37940003866 failed the genuine ARM64 MMIO check: writing all ones to

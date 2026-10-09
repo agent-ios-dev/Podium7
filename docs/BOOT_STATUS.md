@@ -1,3 +1,20 @@
+## PMP firmware loading reaches previously missing SRAM: run 37973299612
+
+Both SEP/SIO ARM64 tests pass, including queue independence in the same
+machine. The actual kernel advances to RTBuddy(PMP) and finds t8010pmp
+firmware. Its copy loop at original PC 0xfffffff005dd7da4 data-aborts on the
+first word at physical 0x20e500000. Original DeviceTree /arm-io/pmp reg[1]
+is a 128-KiB firmware aperture. The observed word is ARM32 branch ea000018.
+
+Map this window as zero-initialized RAM suitable for loading firmware,
+rather than a control-register bank. ARM64 checks exercise the observed
+word, byte order, wide storage, and the final 64-bit boundary. This does
+not implement the PMP coprocessor, RTKit responses or firmware execution.
+No launchd recovery or normal iOS desktop has been confirmed; next kernel
+probe pending.
+
+---
+
 ## Next reached IOP instance is SIO: run 37972738221
 
 The SEP mailbox ARM64 test passes, but the actual kernel reaches a separate

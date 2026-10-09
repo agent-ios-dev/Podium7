@@ -84,6 +84,37 @@ cmp w5, w6
 b.ne failure
 subs x9, x9, #1
 b.ne next_bank
+movz x3, #0
+movk x3, #0xe50, lsl #16
+movk x3, #2, lsl #32
+ldr x6, [x3]
+cbnz x6, failure
+movz w5, #0x18
+movk w5, #0xea00, lsl #16
+str w5, [x3]
+ldr w6, [x3]
+cmp w5, w6
+b.ne failure
+movz x5, #0x1234
+movk x5, #0xabcd, lsl #48
+str x5, [x3, #8]
+ldr x6, [x3, #8]
+cmp x5, x6
+b.ne failure
+mov x4, #0xfff8
+movk x4, #1, lsl #16
+ldr x6, [x3, x4]
+cbnz x6, failure
+str x5, [x3, x4]
+ldr x6, [x3, x4]
+cmp x5, x6
+b.ne failure
+ldrb w6, [x3]
+cmp w6, #0x18
+b.ne failure
+ldrb w6, [x3, #3]
+cmp w6, #0xea
+b.ne failure
 mov x0, #0x20
 adr x1, success_exit
 hlt #0xf000
@@ -121,7 +152,8 @@ banks:
         passed = all(r["returncode"] == 0 for r in results)
         report.write_text(json.dumps({"passed": passed, "iop_firmware_execution": False,
             "checks": ["observed IOP boot-parameter and IRQ-mask writes", "empty receive queue",
-                       "64-bit send occupies one slot without overwrite", "queue status cannot be forged", "each bank starts empty after filling the other"],
+                       "64-bit send occupies one slot without overwrite", "queue status cannot be forged", "each bank starts empty after filling the other",
+                       "PMP SRAM firmware word, byte order and final 64-bit boundary"],
             "results": results}, indent=2))
         if not passed:
             raise RuntimeError("T8010 SEP/SIO mailbox MMIO checks failed")

@@ -70,6 +70,8 @@ jobs:
         run: python3 Tools/check_pmgr_bridges.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify PMGR desired and actual power-state fields
         run: python3 Tools/check_pmgr_power.py --qemu .qemu/build/qemu-system-aarch64
+      - name: Verify synthetic CFI NVRAM query and persistent programming
+        run: python3 Tools/check_cfi_nvram.py --qemu .qemu/build/qemu-system-aarch64
       - name: Execute original kernel and retain the next failure
         run: python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research
       - name: Probe synthetic bridge handoff separately from original metadata
@@ -93,6 +95,12 @@ jobs:
           python3 Tools/inspect_boot_fault.py --directory .firmware/restore-userland-experiment
       - name: Require actual restore launchd and EL0 execution
         run: python3 Tools/verify_restore_userland.py .firmware/restore-userland-experiment
+      - name: Probe original CHRP driver with synthetic NOR separately
+        run: |
+          mkdir .firmware/cfi-nvram-experiment
+          cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/cfi-nvram-experiment/
+          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/cfi-nvram-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --trust-cache .firmware/RestoreTrustCache.im4p --research-ramdisk-root --research-cfi-nvram --seconds 120
+          python3 Tools/inspect_boot_fault.py --directory .firmware/cfi-nvram-experiment
       - name: Verify MCC register lock and protected RAM
         timeout-minutes: 1
         run: python3 Tools/check_mcc.py --qemu .qemu/build/qemu-system-aarch64
@@ -110,6 +118,9 @@ jobs:
           name: apple-bootstrap-evidence
           include-hidden-files: true
           path: |
+            .firmware/cfi-nvram-checks.json
+            .firmware/cfi-nvram-experiment/*.json
+            .firmware/cfi-nvram-experiment/*.txt
             .firmware/restore-userland-experiment/*.json
             .firmware/restore-userland-experiment/*.txt
             .firmware/ramdisk-experiment/*.json

@@ -24,3 +24,19 @@ class NVRAMTests(unittest.TestCase):
         self.assertEqual(partitions, [(b'nvram',32),(b'common',2048),(b'system',6112)])
         self.assertFalse(any(bank[48:2080]))
         self.assertFalse(any(bank[2096:]))
+
+    def test_cfi_provider_is_explicit_and_bounded_by_existing_armio_ranges(self):
+        from test_device_tree_preparation import node
+        from cfi_nvram_handoff import attach, flash_image, SIZE
+        from analyze_firmware import device_tree
+        tree = node([('name',b'device-tree\0')], [
+            node([('name',b'chosen\0'),('nvram-bank-count',bytes(4)),('nvram-current-bank',bytes(4))]),
+            node([('name',b'arm-io\0'),('ranges',struct.pack('<QQQ',0,0x200000000,0x100000000))])])
+        result = attach(tree)
+        controllers = [n for n in device_tree(result) if n['path'].endswith('/podium7-nvram-cfi')]
+        self.assertEqual(len(controllers),1)
+        self.assertEqual(bytes.fromhex(controllers[0]['properties']['reg']),struct.pack('<QQ',0xf0000000,32768))
+        self.assertEqual(len(flash_image()),SIZE)
+        self.assertEqual(flash_image()[:8192],empty_bank())
+        with self.assertRaises(ValueError): attach(result)
+        with self.assertRaises(ValueError): attach(node([('name',b'device-tree\0')]))

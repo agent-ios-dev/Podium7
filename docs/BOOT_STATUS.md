@@ -1,3 +1,35 @@
+## Separate synthetic NOR NVRAM experiment
+
+Original AppleARMPlatform.kext contains AppleARMCFIFlashController matching
+nor-flash,cfi on AppleARMIODevice, and AppleARMCHRPNVRAM matching nvram,chrp
+on AppleARMNORFlashDevice. Disassembly confirms #device-bytes/#port-devices
+properties, 8-byte (UInt32 offset/length) child reg tuples, and an AMD CFI
+query at command address 0x5555. This provides an alternative research
+provider; it does not reproduce the n112ap NVMe NVRAM hardware.
+
+The new opt-in --research-cfi-nvram probe adds a 32-KiB NOR device at synthetic
+physical 0x2f0000000, using the original arm-io address range. It passes two
+8-KiB CHRP banks to the original driver and supplies a writable raw backing
+file. Standard probes do not get the controller. Existing backing contents
+are retained. QEMU's CFI02 implementation handles query, programming and
+erase; its query address check additionally accepts the configured AMD
+unlock address used by the Apple driver. No forced IONVRAM publication or
+Apple driver/kernel instruction modification is added by this experiment.
+
+An assembler-built ARM64 regression checks QRY, programming and the changed
+byte in the host backing file. The separate real-kernel probe is pending;
+driver registration, guest variable writes and reboot persistence are not
+yet claimed. 48 local Python tests pass.
+
+The native application's fixed 16-GiB sparse backing file passes macOS Swift
+tests, including holes, boundary rejection, existing-image preservation,
+and persistent writes above 4 GiB. iPhone app build run 37926551859 passed.
+This backing file is not yet connected to a guest NVMe controller.
+
+Source: https://github.com/qemu/qemu/blob/7c949c53e936aa3a658d84ab53bae5cadaa5d59c/hw/block/pflash_cfi02.c
+
+---
+
 ## NVRAM proxy tested: run 37922572838
 
 The zero-placeholder replacement is active on the real n112ap DeviceTree.

@@ -1158,6 +1158,23 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
 
 '''
 
+    # Match the original Apple CFI driver's query at unlock address 0x5555.
+    # QEMU compares only low 11 address bits; preserve standard query at 0x55.
+    cfi_path = directory / "hw/block/pflash_cfi02.c"
+    cfi_source = cfi_path.read_text()
+    cfi_source = cfi_source.replace("boff == 0x55 && cmd == 0x98",
+        "(boff == 0x55 || boff == pfl->unlock_addr0) && cmd == 0x98")
+    cfi_path.write_text(cfi_source)
+    kconfig = directory / "hw/arm/Kconfig"
+    config = kconfig.read_text()
+    start = config.index("config ARM_VIRT\n")
+    end = config.index("\nconfig ", start + 1)
+    block = config[start:end]
+    if "select PFLASH_CFI02" not in block:
+        block += "    select PFLASH_CFI02\n"
+    kconfig.write_text(config[:start] + block + config[end:])
+    replace_once(directory / "hw/arm/virt.c", '#include "hw/block/flash.h"',
+                 '#include "hw/block/flash.h"\n#include "system/block-backend.h"')
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
@@ -1234,6 +1251,12 @@ static void podium7_timer_fiq_set(void *opaque, int input, int level)
         podium7_pmgr_bridges_create(machine, sysmem);
         podium7_pmgr_raw_create(machine, sysmem);
         podium7_pmgr_power_create(machine, sysmem);
+        BlockBackend *nvram = blk_by_name("podium7-nvram");
+        if (nvram) {
+            pflash_cfi02_register(0x2f0000000ULL, "podium7-nvram-cfi",
+                                 0x8000, nvram, 0x2000, 1, 1,
+                                 0x01, 0x7e, 0, 0, 0x5555, 0x2aaa, 0);
+        }
     }''')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")

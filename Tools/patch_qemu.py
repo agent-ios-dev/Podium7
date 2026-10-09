@@ -979,6 +979,20 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
     memory_region_add_subregion(memory, 0x20e500000ULL, pmp_sram);
 }
 '''
+    # Original Samsung SPI starts by disabling +0/+0xc and setting +8.
+    # Discovery/control storage only; no codec/touch traffic or fake IRQs.
+    spi = mipi.replace("MIPI-DSIM", "SPI").replace("mipi_dsim", "spi")
+    spi = spi.replace("Podium7MIPIDSIMBank", "Podium7SPIBank")
+    spi = "\n/* T8010 SPI discovery controls; transfers and slave devices absent. */\n" + spi[spi.index("typedef struct "):]
+    start = spi.index("static void podium7_spi_create(")
+    spi = spi[:start] + '''static void podium7_spi_create(MachineState *machine, MemoryRegion *memory)
+{
+    podium7_spi_bank_create(machine, memory, 0x20a084000ULL, 0x4000,
+                            "podium7-t8010-spi1-control");
+    podium7_spi_bank_create(machine, memory, 0x20a088000ULL, 0x4000,
+                            "podium7-t8010-spi2-control");
+}
+'''
     i2s_switch = '''
 /* n112ap exposes 4-KiB main/AOP I2S banks and a 32-bit routing register.
  * Retain guest routing writes for bootstrap. No PCM/DMA/audio output yet.
@@ -1304,7 +1318,7 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + spi + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
     timer_fiq = r'''
 /* Research A10 EL1 timers arrive as FIQ, not GIC PPIs. External AIC device
  * interrupts and Apple EL2 timer-enable controls are not modeled here. */
@@ -1375,6 +1389,7 @@ static void podium7_timer_fiq_set(void *opaque, int input, int level)
         podium7_cpu_clpc_create(machine, sysmem);
         podium7_error_handler_create(machine, sysmem);
         podium7_sep_mailbox_create(machine, sysmem);
+        podium7_spi_create(machine, sysmem);
         podium7_i2s_switch_create(machine, sysmem);
         podium7_pmgr_bridges_create(machine, sysmem);
         podium7_pmgr_raw_create(machine, sysmem);

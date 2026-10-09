@@ -66,6 +66,8 @@ jobs:
         run: python3 Tools/check_error_handler.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify original SEP, SIO and PMP mailbox controls and queues
         run: python3 Tools/check_sep_mailbox.py --qemu .qemu/build/qemu-system-aarch64
+      - name: Verify original SPI1 and SPI2 control banks
+        run: python3 Tools/check_spi.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify original CPU debug and CLPC control banks
         run: python3 Tools/check_cpu_clpc.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify T8010 AOP I2S routing register
@@ -174,6 +176,7 @@ jobs:
             .firmware/gfx-checks.json
             .firmware/error-handler-checks.json
             .firmware/sep-mailbox-checks.json
+            .firmware/spi-checks.json
             .firmware/cpu-clpc-checks.json
             .firmware/i2s-switch-checks.json
             .firmware/ktrr-checks.json

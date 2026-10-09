@@ -1,3 +1,17 @@
+## Original SPI driver discovery/control apertures
+
+Run 37974713532 data-aborts in Samsung SPI register write at physical
+0x20a084000, original PC 0xfffffff005d77b84. The calling routine disables
++0 and +0xc, then writes its configuration at +8. DeviceTree has two
+spi-1,samsung banks: SPI1 at 0x20a084000/0x4000 and SPI2 at
+0x20a088000/0x4000, with IRQs 215/216. Provide separate zero-initialized
+32-bit discovery/control storage. No codec/touch packets, SPI transfer
+completion, FIFO contents or interrupts are fabricated. Genuine ARM64
+checks execute the observed disable/configure sequence and verify bank
+independence and end-of-window storage before another real kernel probe.
+
+---
+
 ## Verified checkpoint: run 37974713532, next missing device is SPI1
 
 The genuine ARM64 SEP/SIO/PMP checks pass in one machine: independent queue

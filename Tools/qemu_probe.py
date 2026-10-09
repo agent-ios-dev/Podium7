@@ -277,6 +277,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                "counter_frequency": COUNTER_FREQUENCY,
                "first_faults": faults[:12],
                "exception_tail": exception_tail,
+               "interrupt_controller_diagnostics": [line for line in trace_text.splitlines() if "PODIUM7 IRQ-CONTROLLER " in line][:64],
                "outside_harness_ram_kernel_mappings": outside_harness_ram_mappings,
                "mcc_transactions": mcc_transactions[:128],
                "acc_argument_diagnostics": acc_arguments[:128],

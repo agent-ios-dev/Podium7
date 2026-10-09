@@ -31,9 +31,31 @@ def patch(directory):
         output.write("\n#ifdef TARGET_AARCH64\nDEF_HELPER_2(podium7_acc_trace, void, env, i64)\n#endif\n")
     with (directory / "target/arm/tcg/helper-a64.c").open("a") as output:
         output.write(r'''
+#include "exec/cpu-common.h"
+#include "qemu/bswap.h"
 void HELPER(podium7_acc_trace)(CPUARMState *env, uint64_t pc)
 {
     static unsigned logged;
+    static unsigned irq_logged;
+    if ((pc == 0xfffffff00777f958ULL || pc == 0xfffffff00777f8ecULL) &&
+        irq_logged++ < 64) {
+        uint8_t raw[8];
+        char name[49] = { 0 };
+        CPUState *cpu = env_cpu(env);
+        if (cpu_memory_rw_debug(cpu, env->xregs[1] + 0x10, raw, 8, 0) == 0) {
+            uint64_t pointer = ldq_le_p(raw);
+            if (pointer >= 0xffffffe000000000ULL &&
+                cpu_memory_rw_debug(cpu, pointer, (uint8_t *)name, 48, 0) == 0) {
+                for (unsigned i = 0; i < 48 && name[i]; i++) {
+                    if ((unsigned char)name[i] < 32 || (unsigned char)name[i] > 126) {
+                        name[i] = '.';
+                    }
+                }
+            }
+        }
+        qemu_log("PODIUM7 IRQ-CONTROLLER pc=%016" PRIx64 " name=%s object=%016" PRIx64 "\n",
+                 pc, name, env->xregs[2]);
+    }
     if (logged++ < 256 || pc == 0xfffffff0069445c4ULL ||
         pc == 0xfffffff005b898e4ULL ||
         (pc >= 0xfffffff0077b9084ULL && pc <= 0xfffffff0077b910cULL)) {
@@ -53,7 +75,8 @@ void HELPER(podium7_acc_trace)(CPUARMState *env, uint64_t pc)
     s->base.pc_next = pc + 4;
     if (pc == 0xfffffff0069459f4ULL || pc == 0xfffffff006945b6cULL || pc == 0xfffffff0069445c4ULL ||
         pc == 0xfffffff0077b9084ULL || pc == 0xfffffff0077b9108ULL ||
-        pc == 0xfffffff0077b910cULL || pc == 0xfffffff005b898e4ULL) {
+        pc == 0xfffffff0077b910cULL || pc == 0xfffffff005b898e4ULL ||
+        pc == 0xfffffff00777f958ULL || pc == 0xfffffff00777f8ecULL) {
         gen_helper_podium7_acc_trace(tcg_env, tcg_constant_i64(pc));
     }''')
     # QEMU reserves fieldoffset=0 to mean no backing storage.

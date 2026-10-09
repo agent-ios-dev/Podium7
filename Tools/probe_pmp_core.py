@@ -76,12 +76,19 @@ def probe(executable, directory, output):
     blocks = re.findall(r"Trace.*?\[[^/]*/([0-9a-fA-F]+)/", text)
     addresses = sorted({int(pc, 16) for pc in blocks})
     reset_executed = 0x41000068 in addresses
+    # Guarded firmware bytes: THUMB DSB/WFI/BX LR at offset 0x7712.
+    wait_code = firmware[0x7712:0x771a] == bytes.fromhex("bff34f8f30bf7047")
+    stopped_pc = re.search(r"R15=([0-9a-fA-F]{8})", snapshot.get("registers", ""))
+    scheduler_wait = wait_code and stopped_pc is not None and int(stopped_pc.group(1), 16) in (0x01007716, 0x01007718)
+    data_fault = "DFAR" in text
     report = {"firmware_sha256": FIRMWARE_SHA256, "firmware_bytes": len(firmware),
         "cpu_model": "generic Cortex-A7 ARMv7-A research baseline",
         "synthetic_load_address": "0x41000000",
         "cpu_snapshot": snapshot,
         "exact_pmp_cpu_model": False, "firmware_reset_body_executed": reset_executed,
         "pmp_boot_confirmed": False, "ios_boot_confirmed": False,
+        "firmware_scheduler_wfi_observed": scheduler_wait,
+        "firmware_data_abort_seen": data_fault,
         "pmp_hardware_or_mailbox_peer_implemented": False,
         "mapped_discovery_apertures": ["0x20e300000/0x20000", "0x20e400000/0x10000"],
         "distinct_executed_blocks": len(addresses),

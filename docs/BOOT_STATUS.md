@@ -1,3 +1,29 @@
+## Verified PMP milestone: original firmware reaches scheduler WFI
+
+Run 37988746111 executes 1516 distinct authentic ARM32 blocks. The corrected
+legacy status +0xb88 ends the zero-message drain. There is no data abort;
+the stopped PC 0x01007718 follows THUMB DSB/WFI at 0x01007712/0x01007716
+and returns via BX LR. Calling code at 0x01009b30 belongs to the scheduler.
+Register patterns deadc0de/b0bed0ff alone are not evidence of a panic.
+The original firmware is now waiting for a real interrupt/message. Reports
+separately track scheduler-WFI and data-abort evidence, keeping full PMP
+boot and iOS boot unconfirmed. Firmware-hash guarded instruction bytes
+avoid treating arbitrary register patterns as completion.
+
+All individual research hardware checks pass in this run: SPI controls,
+I2C empty-bus NACK/W1C, GPIO pull-ups, genuine AIC IRQ/ERET, DART controls,
+PCIe discovery, AOP timebase and firmware RAM boundaries. Main ARM64 XNU
+still times out after 20 seconds waiting for PMP (_iopStatus=4), since the
+ARM32 experiment is a separate process with no connected AP peer. Next
+substantial implementation is shared or bridged AP/IOP message queues,
+interrupts and memory ownership between the real firmware and ARM64 XNU.
+Normal root storage, graphical SpringBoard and a usable iOS IPA are still
+unconfirmed. Fixed native 16-GiB backing disk remains unchanged.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/37988746111
+
+---
+
 ## Correct arithmetic of the captured legacy mailbox object
 
 Run 37988260194 still drains zero messages. Re-read the captured structure:

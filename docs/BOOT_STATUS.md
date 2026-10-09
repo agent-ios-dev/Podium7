@@ -1,3 +1,23 @@
+## Initial device apertures pass; real kernel now waits for PMP firmware
+
+Run 37980997607 passes all device checks including the monotonic AOP counter.
+Original kernel gets past prior missing-register aborts, then RTBuddy(PMP)
+asserts after 20 seconds without a firmware response (_iopStatus 4).
+The passive mailbox/SRAM controls never realized a coprocessor; a fake
+ready message would hide rather than implement the missing firmware.
+
+The next bounded experiment extracts the actual 123296-byte embedded PMP
+image at kernel VA 0xfffffff007b01000 (hash guarded) and executes it on a
+generic Cortex-A7 ARMv7-A baseline in a separate QEMU virt process. Original
+reset branches to offset 0x68 and uses CP15/VFP/translation registers.
+Execution trace must show the reset body actually entering a TB, not just
+being disassembled. This is not an exact PMP CPU/board or completed firmware
+boot: peripherals, private memory map, mailbox peer and integration into
+ARM64 XNU remain necessary. Reports explicitly keep PMP/iOS boot false.
+No raw Apple firmware is uploaded in evidence. Prototype validation pending.
+
+---
+
 ## Original AOP time synchronization reaches its missing free-running counter
 
 Run 37980153266 passes PCIe controls and ECAM widths. Next kernel fault is

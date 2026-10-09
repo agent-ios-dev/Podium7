@@ -88,6 +88,8 @@ jobs:
         run: python3 Tools/check_pmgr_power.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify synthetic CFI NVRAM query and persistent programming
         run: python3 Tools/check_cfi_nvram.py --qemu .qemu/build/qemu-system-aarch64
+      - name: Probe actual embedded PMP firmware on an ARMv7 core
+        run: python3 Tools/probe_pmp_core.py --qemu .qemu/build/qemu-system-aarch64
       - name: Execute original kernel and retain the next failure
         run: python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research
       - name: Probe synthetic bridge handoff separately from original metadata
@@ -192,6 +194,8 @@ jobs:
             .firmware/dart-checks.json
             .firmware/pcie-checks.json
             .firmware/aop-checks.json
+            .firmware/pmp-core-experiment/qemu-probe.json
+            .firmware/pmp-core-experiment/qemu-trace.txt
             .firmware/cpu-clpc-checks.json
             .firmware/i2s-switch-checks.json
             .firmware/ktrr-checks.json

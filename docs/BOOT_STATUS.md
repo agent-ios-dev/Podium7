@@ -1,4 +1,4 @@
-## AES SecureRoot dependency isolated; software-key crypto verification pending
+## AES software-key known answers, DMA guards and IRQ verified; iOS boot pending
 
 Run 38032593352 confirms original PMP startup in both normal fresh-machine
 probes and mounts genuine restore md0. Its independent 180-second CFI
@@ -20,8 +20,13 @@ DART/SART translation and cycle-accurate FIFO timing remain unimplemented.
 AES-128 NIST ECB encryption and CBC encryption/decryption are mandatory ARM64
 guest checks before the original-kernel experiment.
 
-62 local Python tests pass. QEMU compile and NIST guest checks are pending in
-run 38034381202. No EL0, launchd, SpringBoard or usable IPA is verified.
+Run 38034381202 exposed a pinned-QEMU cipher enum mismatch, corrected in
+67fb4a3. Run 38034538374 successfully builds QEMU and passes ARM64 NIST ECB
+encryption/CBC encryption/decryption, real AIC source 237 assertion/deassertion,
+and out-of-RAM/partial-block/unknown-key refusal without changing output.
+63 local Python tests pass, including bounded physical QMP snapshot coverage.
+Original-kernel boot experiments are running. No EL0, launchd, SpringBoard or
+usable IPA is verified.
 Original-firmware PMP startup evidence remains intermittently incomplete;
 its strict gate stays enabled and independent CFI evidence stays separate.
 

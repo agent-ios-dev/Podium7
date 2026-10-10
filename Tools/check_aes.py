@@ -154,6 +154,20 @@ cmp x4, x6
 b.ne failure
 cmp x5, x7
 b.ne failure
+// CBC decryption must retain the final ciphertext IV and DMA it back.
+mov w5, #1
+str w5, [x3, #8]
+movz w5, #0x6000, lsl #16
+str w5, [x3, #0x200]
+adr x14, saved_iv
+str w14, [x3, #0x200]
+ldp x4, x5, [x14]
+adr x10, source2
+ldp x8, x9, [x10]
+cmp x4, x8
+b.ne failure
+cmp x5, x9
+b.ne failure
 // The completed operation must reach the actual AIC source, then deassert.
 movz x12, #0
 movk x12, #0xe10, lsl #16
@@ -250,6 +264,8 @@ failure_exit:
 .quad 0x20026, 1
 output:
 .space 16
+saved_iv:
+.space 16
 key0:
 .byte 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f
 source0:
@@ -290,6 +306,7 @@ iv2:
             "model": "T8010 AES-v2 software-key ECB/CBC with physical RAM DMA",
             "checks": ["AES-128 ECB NIST encryption known answer",
                        "AES-128 CBC NIST encryption and decryption known answers",
+                       "CBC chaining IV stored by real STORE_IV DMA command",
                        "completion status and real AIC IRQ assertion/deassertion",
                        "out-of-RAM DMA and partial-block rejection without writes",
                        "unsupported hardware key rejection without DMA writes"],

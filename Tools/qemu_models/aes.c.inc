@@ -97,6 +97,14 @@ static void podium7_aes_packet(Podium7AES *s)
         if (cipher) { qcrypto_cipher_free(cipher); }
         if (error) { error_free(error); }
         g_free(data);
+    } else if (operation == 6) {
+        unsigned iv_ctx = (command >> 26) & 3;
+        uint64_t target = ((uint64_t)(command & 0xff) << 32) | s->packet[1];
+        if (!podium7_aes_dma_range(s, target, 16) ||
+            address_space_write(&address_space_memory, target, MEMTXATTRS_UNSPECIFIED,
+                                s->iv[iv_ctx], 16) != MEMTX_OK) {
+            podium7_aes_error(s, 1U << 4);
+        }
     } else if (operation == 8) {
         s->registers[0x30 >> 2] = command & 0xffff;
         if (command & (1U << 27)) { s->registers[6] |= 1U << 5; }
@@ -134,7 +142,7 @@ static void podium7_aes_write(void *opaque, hwaddr address, uint64_t data, unsig
         if (!s->packet_words) {
             unsigned op = value >> 28;
             s->packet_words = op == 1 ? (((value >> 24) & 7) ? 1 : (5 + 2 * ((value >> 22) & 3))) :
-                              op == 2 ? 5 : op == 5 ? 4 : op == 8 ? 1 : 0;
+                              op == 2 ? 5 : op == 5 ? 4 : op == 6 ? 2 : op == 8 ? 1 : 0;
             if (!s->packet_words || s->packet_words > ARRAY_SIZE(s->packet)) {
                 s->packet_words = 0; podium7_aes_error(s, 1U << 2); return;
             }

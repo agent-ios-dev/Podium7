@@ -1,3 +1,34 @@
+## AES SecureRoot dependency isolated; software-key crypto verification pending
+
+Run 38032593352 confirms original PMP startup in both normal fresh-machine
+probes and mounts genuine restore md0. Its independent 180-second CFI
+experiment panics with `cannot find IOAESAccelerator`. Original disassembly
+identifies an unmet SecureRoot callback: the earlier restore-only
+IOSecureBSDRoot research return omits that callback.
+
+A separately opted-in, whole-kernel-hash and instruction-signature guarded
+experiment returns kIOReturnUnsupported from AES SecureRoot registration.
+It does not alter ordinary probes or native IPA. Run 38033374188 then reaches
+`AppleS8000AESAccelerator::_enableAES: DPA has not been seeded!`, proving the
+next initialization dependency. This is not a successful iOS boot.
+
+The external model now implements software-key AES-v2 ECB/CBC commands and
+bounded physical RAM DMA through QEMU crypto. Unknown UID/GID and wrapped
+keys remain errors. No encrypted payload is accepted as plaintext. DPA-ready
+bits represent explicit research initialization, not physical hardware seeding.
+DART/SART translation and cycle-accurate FIFO timing remain unimplemented.
+AES-128 NIST ECB encryption and CBC encryption/decryption are mandatory ARM64
+guest checks before the original-kernel experiment.
+
+62 local Python tests pass. QEMU compile and NIST guest checks are pending in
+run 38034381202. No EL0, launchd, SpringBoard or usable IPA is verified.
+Original-firmware PMP startup evidence remains intermittently incomplete;
+its strict gate stays enabled and independent CFI evidence stays separate.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38033374188
+
+---
+
 ## Restore md0 mounted; VXD NULL dereference removed, userland still absent
 
 Run 38031635420 passed UART discovery and mounted the genuine restore HFS

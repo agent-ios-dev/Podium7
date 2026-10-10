@@ -154,6 +154,63 @@ cmp x4, x6
 b.ne failure
 cmp x5, x7
 b.ne failure
+// The completed operation must reach the actual AIC source, then deassert.
+movz x12, #0
+movk x12, #0xe10, lsl #16
+movk x12, #2, lsl #32
+mov w5, #1
+str w5, [x12, #0x33b4]
+add x13, x12, #4, lsl #12
+mov w5, #0x2000
+str w5, [x13, #0x19c]
+ldr w4, [x12, #0x2004]
+movz w5, #0xed
+movk w5, #1, lsl #16
+cmp w4, w5
+b.ne failure
+mov w5, #0x20
+str w5, [x3, #0x18]
+mov w5, #0x2000
+str w5, [x13, #0x19c]
+ldr w4, [x12, #0x2004]
+cbnz w4, failure
+// Reject DMA outside guest RAM without changing previous output.
+mov w5, #1
+str w5, [x3, #8]
+movz w5, #0x10
+movk w5, #0x5000, lsl #16
+str w5, [x3, #0x200]
+str wzr, [x3, #0x200]
+movz w5, #0x4800, lsl #16
+str w5, [x3, #0x200]
+adr x11, output
+str w11, [x3, #0x200]
+ldr w4, [x3, #0x18]
+cmp w4, #0x18
+b.ne failure
+ldp x4, x5, [x11]
+cmp x4, x6
+b.ne failure
+cmp x5, x7
+b.ne failure
+// Reject partial AES blocks rather than silently truncating them.
+mov w5, #-1
+str w5, [x3, #0x18]
+movz w5, #0xf
+movk w5, #0x5000, lsl #16
+str w5, [x3, #0x200]
+str wzr, [x3, #0x200]
+adr x10, source0
+str w10, [x3, #0x200]
+str w11, [x3, #0x200]
+ldr w4, [x3, #0x18]
+cmp w4, #0x40
+b.ne failure
+ldp x4, x5, [x11]
+cmp x4, x6
+b.ne failure
+cmp x5, x7
+b.ne failure
 // Unsupported hardware key must produce an error and leave output intact.
 mov w5, #1
 str w5, [x3, #8]
@@ -233,7 +290,9 @@ iv2:
             "model": "T8010 AES-v2 software-key ECB/CBC with physical RAM DMA",
             "checks": ["AES-128 ECB NIST encryption known answer",
                        "AES-128 CBC NIST encryption and decryption known answers",
-                       "completion status and unsupported hardware key rejection without DMA writes"],
+                       "completion status and real AIC IRQ assertion/deassertion",
+                       "out-of-RAM DMA and partial-block rejection without writes",
+                       "unsupported hardware key rejection without DMA writes"],
             "returncode": result.returncode, "stdout": result.stdout,
             "stderr": result.stderr}, indent=2))
         if not passed:

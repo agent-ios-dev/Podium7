@@ -72,8 +72,8 @@ static void podium7_aes_packet(Podium7AES *s)
         if (!podium7_aes_dma_range(s, source, length) || !podium7_aes_dma_range(s, target, length)) {
             podium7_aes_error(s, (1U << 3) | (1U << 4)); return;
         }
-        QCryptoCipherAlgorithm algorithm = s->key_bytes[ctx] == 16 ? QCRYPTO_CIPHER_ALG_AES_128 :
-            s->key_bytes[ctx] == 24 ? QCRYPTO_CIPHER_ALG_AES_192 : QCRYPTO_CIPHER_ALG_AES_256;
+        QCryptoCipherAlgo algorithm = s->key_bytes[ctx] == 16 ? QCRYPTO_CIPHER_ALGO_AES_128 :
+            s->key_bytes[ctx] == 24 ? QCRYPTO_CIPHER_ALGO_AES_192 : QCRYPTO_CIPHER_ALGO_AES_256;
         Error *error = NULL;
         QCryptoCipher *cipher = qcrypto_cipher_new(algorithm,
             s->mode[ctx] ? QCRYPTO_CIPHER_MODE_CBC : QCRYPTO_CIPHER_MODE_ECB,

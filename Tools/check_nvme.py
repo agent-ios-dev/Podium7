@@ -320,6 +320,13 @@ str x1, [x0], #8
 add x1, x1, #1, lsl #12
 subs x2, x2, #1
 b.ne dart_leaf
+// Original sector-buffer format: only bytes0..511 of this page may be DMA.
+movz x0, #0x1160
+movk x0, #0x4503, lsl #16
+movz x1, #0xc001
+movk x1, #0x4502, lsl #16
+movk x1, #0x1ff0, lsl #32
+str x1, [x0]
 movz x3, #0x8000
 movk x3, #0x100, lsl #16
 movk x3, #6, lsl #32
@@ -381,6 +388,26 @@ ldr x2, [x0], #8
 cbnz x2, failure
 subs x1, x1, #8
 b.ne unchanged
+mov x20, #12
+movz w0, #2
+movk w0, #8, lsl #16
+str w0, [x23]
+mov w0, #1
+str w0, [x23, #4]
+movz x0, #0xc200
+movk x0, #0x8002, lsl #16
+str x0, [x23, #24]
+mov x0, #8
+str x0, [x23, #40]
+bl submit_io
+movz x0, #0xc200
+movk x0, #0x4502, lsl #16
+mov x1, #0xe00
+subpage_unchanged:
+ldr x2, [x0], #8
+cbnz x2, failure
+subs x1, x1, #8
+b.ne subpage_unchanged
 '''
         source = source.replace("mov x20, #0\nb finish", negative + "mov x20, #0\nb finish")
     if msi:
@@ -521,7 +548,8 @@ def check(executable, report, dart=False, msi=False):
             persisted = stream.read(512) == bytes(range(256)) * 2
         trace_text = (root / "nvme-trace.txt").read_text(errors="replace") if (root / "nvme-trace.txt").exists() else ""
         fault_evidence = ("NVME-DART rejected permission iova=000000008002e" in trace_text and
-                          "NVME-DART rejected unmapped iova=000000008002f" in trace_text)
+                          "NVME-DART rejected unmapped iova=000000008002f" in trace_text and
+                          "NVME-DART rejected subpage iova=000000008002c2" in trace_text)
         passed = result.returncode == 0 and persisted and disk.stat().st_size == DISK_BYTES and (not dart or fault_evidence)
         report.write_text(json.dumps({"passed": passed, "disk_bytes": disk.stat().st_size,
             "allocated_disk_bytes": disk.stat().st_blocks * 512 if hasattr(disk.stat(), "st_blocks") else None,

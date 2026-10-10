@@ -31,17 +31,35 @@ static IOMMUTLBEntry podium7_storage_translate(IOMMUMemoryRegion *mr,
     entry.perm = IOMMU_NONE;
     uint64_t iova = address & 0x7fffffffULL;
     uint32_t ttbr = podium7_storage_dart->registers[(0x40 >> 2) + (iova >> 30)];
+    uint64_t l1_address = ((uint64_t)(ttbr & 0xffffffU) << 12) +
+                          (((iova >> 21) & 0x1ff) << 3);
     uint64_t first = 0, leaf = 0;
+    bool subpage_fault = false;
     if (address <= 0xffffffffULL && (ttbr & 0x80000000U) &&
         podium7_storage_read_pte(((uint64_t)(ttbr & 0xffffffU) << 12) +
                                  (((iova >> 21) & 0x1ff) << 3), &first) &&
-        podium7_storage_read_pte((first & 0xfffffff000ULL) +
+        podium7_storage_read_pte((first & 0xffffff000ULL) +
                                  (((iova >> 12) & 0x1ff) << 3), &leaf)) {
-        uint64_t physical = leaf & 0xfffffff000ULL;
+        /* Original T8010 descriptors use 36-bit physical addresses. Upper
+         * fields encode inclusive byte start/end, not physical address bits.
+         * bit1 bypasses subpage protection for whole-page queue mappings. */
+        uint64_t physical = leaf & 0xffffff000ULL;
         if (physical >= 0x40000000ULL && physical <= podium7_storage_ram_end - 4096) {
             entry.translated_addr = physical;
             entry.perm = ((leaf & (1U << 8)) ? 0 : IOMMU_RO) |
                          ((leaf & (1U << 7)) ? 0 : IOMMU_WO);
+            if (!(leaf & 2)) {
+                unsigned start = (leaf >> 48) & 0xfff;
+                unsigned end = (leaf >> 36) & 0xfff;
+                unsigned offset = address & 0xfff;
+                entry.addr_mask = (start % 4 == 0 && end % 4 == 3) ? 3 : 0;
+                entry.iova = address & ~entry.addr_mask;
+                entry.translated_addr = physical + (offset & ~entry.addr_mask);
+                if (start > end || offset < start || offset > end) {
+                    entry.perm = IOMMU_NONE;
+                    subpage_fault = true;
+                }
+            }
         }
     }
     if (podium7_storage_dma_logged++ < 256) {
@@ -51,11 +69,15 @@ static IOMMUTLBEntry podium7_storage_translate(IOMMUMemoryRegion *mr,
                  leaf, (unsigned)entry.perm, (unsigned)flags);
     }
     if ((entry.perm & flags) != flags) {
-        unsigned kind = 1U << ((entry.perm ? 1 : 0) + (flags == IOMMU_WO ? 0 : 2));
+        unsigned kind = 1U << (subpage_fault ? 4 : ((entry.perm ? 1 : 0) + (flags == IOMMU_WO ? 0 : 2)));
         if (!(podium7_storage_dma_fault_seen & kind)) {
             podium7_storage_dma_fault_seen |= kind;
             qemu_log("PODIUM7 NVME-DART rejected %s iova=%016" PRIx64 " access=%u\n",
-                     entry.perm ? "permission" : "unmapped", (uint64_t)address, (unsigned)flags);
+                     subpage_fault ? "subpage" : entry.perm ? "permission" : "unmapped", (uint64_t)address, (unsigned)flags);
+            qemu_log("PODIUM7 NVME-DART fault-pt ttbr=%08x l1_address=%016" PRIx64
+                     " l1=%016" PRIx64 " l2_address=%016" PRIx64 " leaf=%016" PRIx64 "\n",
+                     ttbr, l1_address, first, (first & 0xffffff000ULL) +
+                     (((iova >> 12) & 0x1ff) << 3), leaf);
         }
     }
     return entry;

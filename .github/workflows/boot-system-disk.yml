@@ -35,7 +35,7 @@ jobs:
           path: .ccache
           key: qemu10-arm64-research-v1-${{ github.sha }}
           restore-keys: qemu10-arm64-research-v1-
-      - run: python3 Tools/fetch_firmware.py --system-trust-cache
+      - run: python3 Tools/fetch_firmware.py --system-trust-cache --system-volume
       - run: python3 Tools/analyze_firmware.py
       - run: brew install glib pixman ninja pkgconf ccache
       - name: Build pinned verified research backend
@@ -73,7 +73,7 @@ jobs:
           mkdir .firmware/system-boot
           cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/system-boot/
           python3 Tools/inspect_system_disk.py .firmware/system-disk/storage-16g.raw --output .firmware/system-boot/system-disk-layout.json
-          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/system-boot --research-bridge-handoff --trust-cache .firmware/StaticTrustCache.im4p --research-system-root "$RESEARCH_ROOT" --research-pmp-core --research-cfi-nvram --research-aes-root-fallback --research-nvme --research-nvme-dart --research-nvme-msi --research-nvme-image .firmware/system-disk/storage-16g.raw --seconds 300
+          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/system-boot --research-bridge-handoff --trust-cache .firmware/StaticTrustCache.im4p --system-volume .firmware/SystemVolume.im4p --research-system-root "$RESEARCH_ROOT" --research-pmp-core --research-cfi-nvram --research-aes-root-fallback --research-nvme --research-nvme-dart --research-nvme-msi --research-nvme-image .firmware/system-disk/storage-16g.raw --seconds 300
           python3 Tools/inspect_boot_fault.py --directory .firmware/system-boot
           python3 Tools/inspect_system_disk.py .firmware/system-disk/storage-16g.raw --trace .firmware/system-boot/qemu-trace.txt --output .firmware/system-boot/system-disk-layout.json
           python3 Tools/verify_system_userland.py .firmware/system-boot

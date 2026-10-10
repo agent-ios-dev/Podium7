@@ -70,7 +70,7 @@ class RemoteZIP(io.RawIOBase):
         return b"".join(parts)
 
 
-def stage(output, url=URL, size=SIZE, *, restore_ramdisk=False, system_trust_cache=False):
+def stage(output, url=URL, size=SIZE, *, restore_ramdisk=False, system_trust_cache=False, system_volume=False):
     output.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(RemoteZIP(url, size)) as archive:
         manifest_data = archive.read("BuildManifest.plist")  # zipfile verifies member CRC.
@@ -84,12 +84,14 @@ def stage(output, url=URL, size=SIZE, *, restore_ramdisk=False, system_trust_cac
         report = {"url": url, "version": manifest["ProductVersion"], "build": manifest["ProductBuildVersion"],
                   "device": "iPod9,1", "identity": identity["Info"], "components": {}}
         (output / "BuildManifest.plist").write_bytes(manifest_data)
-        for component in ["KernelCache", "DeviceTree"] + (["RestoreRamDisk", "RestoreTrustCache"] if restore_ramdisk else []) + (["StaticTrustCache"] if system_trust_cache else []):
+        for component in ["KernelCache", "DeviceTree"] + (["RestoreRamDisk", "RestoreTrustCache"] if restore_ramdisk else []) + (["StaticTrustCache"] if system_trust_cache else []) + (["SystemVolume"] if system_volume else []):
             source = identity["Manifest"][component]["Info"]["Path"]
             info = archive.getinfo(source)
             if info.file_size > 128 * 1024 * 1024:
                 raise ValueError("oversized component")
             data = archive.read(info)
+            if component == "SystemVolume" and hashlib.sha384(data).digest() != identity["Manifest"][component]["Digest"]:
+                raise ValueError("official SystemVolume digest differs from BuildManifest")
             filename = component + ".im4p"
             (output / filename).write_bytes(data)
             report["components"][component] = {"source": source, "file": filename, "bytes": len(data),
@@ -104,5 +106,6 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=pathlib.Path, default=pathlib.Path(".firmware"))
     parser.add_argument("--restore-ramdisk", action="store_true", help="Also fetch the bounded restore disk, never the full OS volume")
     parser.add_argument("--system-trust-cache", action="store_true", help="Fetch official full-system StaticTrustCache")
+    parser.add_argument("--system-volume", action="store_true", help="Fetch official system root hash auth payload")
     args = parser.parse_args()
-    stage(args.output, restore_ramdisk=args.restore_ramdisk, system_trust_cache=args.system_trust_cache)
+    stage(args.output, restore_ramdisk=args.restore_ramdisk, system_trust_cache=args.system_trust_cache, system_volume=args.system_volume)

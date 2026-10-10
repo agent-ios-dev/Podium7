@@ -91,7 +91,7 @@ jobs:
       - name: Verify real NVMe admin DMA and persistent 16 GiB disk I/O
         id: nvme_check
         run: python3 Tools/check_nvme.py --qemu .qemu/build/qemu-system-aarch64
-      - name: Verify nonidentity DART DMA and denied or invalid-page errors
+      - name: Verify nonidentity DART DMA and unchanged denied or invalid pages
         id: nvme_dart_check
         run: python3 Tools/check_nvme.py --qemu .qemu/build/qemu-system-aarch64 --dart --report .firmware/nvme-dart-checks.json
       - uses: actions/upload-artifact@v4

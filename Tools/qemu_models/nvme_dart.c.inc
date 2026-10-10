@@ -3,6 +3,7 @@
  * Other streams, fault IRQs, DAPF and MSI delivery are not implemented. */
 static uint64_t podium7_storage_ram_end;
 static unsigned podium7_storage_dma_logged;
+static unsigned podium7_storage_dma_fault_seen;
 
 static bool podium7_storage_read_pte(uint64_t address, uint64_t *value)
 {
@@ -47,6 +48,14 @@ static IOMMUTLBEntry podium7_storage_translate(IOMMUMemoryRegion *mr,
                  " leaf=%016" PRIx64 " perm=%u access=%u\n",
                  (uint64_t)address, (uint64_t)entry.translated_addr,
                  leaf, (unsigned)entry.perm, (unsigned)flags);
+    }
+    if ((entry.perm & flags) != flags) {
+        unsigned kind = 1U << ((entry.perm ? 1 : 0) + (flags == IOMMU_WO ? 0 : 2));
+        if (!(podium7_storage_dma_fault_seen & kind)) {
+            podium7_storage_dma_fault_seen |= kind;
+            qemu_log("PODIUM7 NVME-DART rejected %s iova=%016" PRIx64 " access=%u\n",
+                     entry.perm ? "permission" : "unmapped", (uint64_t)address, (unsigned)flags);
+        }
     }
     return entry;
 }

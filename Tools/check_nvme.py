@@ -271,11 +271,9 @@ b.ne completion
 b failure
 completed:
 lsr w0, w0, #1
-cbnz x27, expected_error
+cbnz x27, completion_id
 cbnz w0, failure
 b completion_id
-expected_error:
-cbz w0, failure
 completion_id:
 // Verify this completion belongs to the submitted command.
 ldrh w0, [x24, #12]
@@ -338,7 +336,8 @@ dsb sy
         if changed != 8:
             raise ValueError(f"NVMe DMA pointer anchors changed: {changed}")
         source = source.replace("movz w0, #0xf\nmovk w0, #0xf, lsl #16", setup + "movz w0, #0xf\nmovk w0, #0xf, lsl #16")
-        negative = '''// Denied write permissions and invalid leaf must produce actual CQ errors.
+        negative = '''// Posted DMA writes may complete at NVMe despite a host IOMMU fault.
+// Require unchanged physical destination pages; verify mapper rejection in trace.
 mov x20, #10
 mov x27, #1
 movz x0, #0x1170
@@ -410,7 +409,10 @@ def check(executable, report, dart=False):
         with disk.open("rb") as stream:
             stream.seek(8 * 512)
             persisted = stream.read(512) == bytes(range(256)) * 2
-        passed = result.returncode == 0 and persisted and disk.stat().st_size == DISK_BYTES
+        trace_text = (root / "nvme-trace.txt").read_text(errors="replace") if (root / "nvme-trace.txt").exists() else ""
+        fault_evidence = ("NVME-DART rejected permission iova=000000008002e" in trace_text and
+                          "NVME-DART rejected unmapped iova=000000008002f" in trace_text)
+        passed = result.returncode == 0 and persisted and disk.stat().st_size == DISK_BYTES and (not dart or fault_evidence)
         report.write_text(json.dumps({"passed": passed, "disk_bytes": disk.stat().st_size,
             "allocated_disk_bytes": disk.stat().st_blocks * 512 if hasattr(disk.stat(), "st_blocks") else None,
             "persistent_write_verified": persisted, "returncode": result.returncode,
@@ -421,9 +423,10 @@ def check(executable, report, dart=False):
                        "host-side exact persisted sector verification"],
             "interrupt_delivery_tested": False, "research_port0_dart_tested": dart,
             "dma_permission_and_invalid_leaf_checked": dart,
+            "mapper_fault_evidence_confirmed": fault_evidence if dart else None,
+            "dart_hardware_fault_irq_tested": False,
             "stdout": result.stdout, "stderr": result.stderr,
-            "nvme_trace_tail": (root / "nvme-trace.txt").read_text(errors="replace")[-8192:]
-                if (root / "nvme-trace.txt").exists() else ""}, indent=2))
+            "nvme_trace_tail": trace_text[-8192:]}, indent=2))
         if not passed:
             raise RuntimeError(f"Real NVMe DMA checks failed at stage {result.returncode}")
 

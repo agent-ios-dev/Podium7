@@ -7,7 +7,10 @@ from prepare_install_layout import SYSTEM_UUID, command, fixture_container, moun
 
 FIELDS = ('Label', 'Program', 'ProgramArguments', 'UserName', 'GroupName',
           'Disabled', 'RunAtLoad', 'KeepAlive', 'LaunchEvents', 'MachServices',
-          'LimitLoadToSessionType', 'ProcessType', 'EnableTransactions')
+          'LimitLoadToSessionType', 'ProcessType', 'EnableTransactions',
+          'POSIXSpawnType', 'LaunchOnlyOnce', 'EnablePressuredExit',
+          'WaitForDebugger', 'SessionCreate', 'LaunchConstraints',
+          'ThrottleInterval', 'ExitTimeOut', 'IOKitMatching')
 TARGETS = ('springboard', 'backboard', 'frontboard', 'runningboard',
            'keybag', 'usermanager', 'loginwindow', 'graphics', 'display', 'iomobile')
 
@@ -50,6 +53,7 @@ def collect(source):
                                 ('Label', 'Program', 'ProgramArguments')) + ' ' + candidate.name
             if any(target in identity.lower() for target in TARGETS):
                 files.append({'path': candidate.relative_to(source).as_posix(),
+                              'configuration_keys': sorted(data),
                               'configuration': {key: bounded(data[key]) for key in FIELDS if key in data}})
     return {'read_only': True, 'binary_exported': False, 'plists_scanned': count, 'services': files}
 

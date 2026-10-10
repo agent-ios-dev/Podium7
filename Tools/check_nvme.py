@@ -24,15 +24,18 @@ movk x3, #0x100, lsl #16
 movk x3, #6, lsl #32
 ldr w0, [x3, #0x208]
 tbnz w0, #6, failure
+tbnz w0, #0, failure
 mov w0, #1
 str w0, [x3, #0x80]
 mov w0, #0x80000000
 str w0, [x3, #0x140]
 ldr w0, [x3, #0x208]
 tbz w0, #6, failure
+tbz w0, #0, failure
 str wzr, [x3, #0x80]
 ldr w0, [x3, #0x208]
 tbnz w0, #6, failure
+tbnz w0, #0, failure
 movz x21, #0
 movk x21, #0x1000, lsl #16
 movk x21, #6, lsl #32

@@ -1367,7 +1367,7 @@ static void podium7_pmp_start(void)
         "    if (bank->base == 0x600008000ULL && address == 0xc) { value = podium7_pcie_lane_requests; }\n"
         "    if (bank->base == 0x601000000ULL && address == 0x208) {\n"
         "        bool requested = (bank->registers[0x80 >> 2] & 1) && (bank->registers[0x140 >> 2] & 0x80000000U);\n"
-        "        value = (value & ~0x40U) | ((requested && podium7_storage_link_active()) ? 0x40U : 0);\n"
+        "        value = (value & ~0x41U) | ((requested && podium7_storage_link_active()) ? 0x41U : 0);\n"
         "    }")
     pcie = pcie.replace("    uint32_t value = (uint32_t)data;",
         "    uint32_t value = (uint32_t)data;\n"

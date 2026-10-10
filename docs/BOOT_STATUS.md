@@ -1,3 +1,24 @@
+## Real NVMe read/write verified; original driver link-state accessor corrected
+
+Run 38038770887 successfully enumerates the real root-port/NVMe endpoint,
+identifies namespace1 as exactly 17179869184 bytes (16 GiB), creates I/O queues,
+DMA-writes LBA8 and reads it back. Independent host file inspection confirms
+all 512 persisted bytes. This is real stock QEMU block I/O, not a register ACK.
+Polling was tested; Apple DART, MSI and native IPA integration are still absent.
+
+Original PCIe trace shows _waitForLinkUp uses PC0xfffffff00694e36c and reads
+port0+0x208 bit0, while the separate link-state accessor reads bit6. Both bits
+now derive from actual QEMU root-port DLLLA and the original port-enable
+controls. Empty-port guest tests reject forged link bits. The independent iOS
+NVMe experiment remains gated on genuine admin/I/O DMA guest success.
+
+Restore launchd hello and SpringBoard are still unverified. Original mandatory
+PMP and restore launchd boot gates remain unchanged.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38038770887
+
+---
+
 ## Real NVMe backend experiment; original PCIe link timeout isolated
 
 Run 38037759808 passes the exact original DeviceTree PCIe aperture guest

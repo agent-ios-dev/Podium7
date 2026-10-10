@@ -82,10 +82,11 @@ mov w5, #1
 str w5, [x3, #0x80]
 mov w5, #0x80000000
 str w5, [x3, #0x140]
-mov w5, #0x40
+mov w5, #0x41
 str w5, [x3, #0x208]
 ldr w4, [x3, #0x208]
 tbnz w4, #6, failure
+tbnz w4, #0, failure
 str wzr, [x3, #0x80]
 str wzr, [x3, #0x140]
 str wzr, [x3, #0x208]

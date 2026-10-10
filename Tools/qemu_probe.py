@@ -222,6 +222,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
         if disk_path.stat().st_size != 16 << 30:
             raise ValueError("research storage must be exactly 16 GiB; existing disk preserved")
         command += ["-drive", f"if=none,id=podium7-storage,format=raw,file={disk_path}"]
+        command += ["-trace", "enable=pci_nvme*"]
     if cpu == "podium7-research":
         command += ["-device", f"loader,addr=0x2000007e4,data={rorgn[0]},data-len=4",
                     "-device", f"loader,addr=0x2000007e8,data={rorgn[1]},data-len=4"]

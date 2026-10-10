@@ -14,6 +14,8 @@ jobs:
           bless --help > snapshot-tools/bless-help.txt 2>&1 || true
           diskutil apfs > snapshot-tools/diskutil-apfs-help.txt 2>&1 || true
           asr help restore > snapshot-tools/asr-restore-help.txt 2>&1 || true
+          asr restore --help > snapshot-tools/asr-options.txt 2>&1 || true
+          man asr | col -b > snapshot-tools/asr-man.txt || true
           codesign -d --entitlements :- /usr/sbin/asr > snapshot-tools/asr-entitlements.txt 2>&1 || true
           /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs_checkseal -h > snapshot-tools/apfs-checkseal-help.txt 2>&1 || true
           /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -h > snapshot-tools/apfs-util-help.txt 2>&1 || true

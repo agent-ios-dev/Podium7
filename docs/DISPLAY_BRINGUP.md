@@ -34,3 +34,37 @@ To claim a visible SpringBoard, the backend must provide a coherent panel
 mode, framebuffer allocation/mapping, guest framebuffer updates and actual
 host readback/display. Kernel log messages or a host-rendered imitation
 are insufficient evidence. No display or SpringBoard success is claimed.
+
+## Concrete timing register ABI recovered
+
+The original framebuffer profile getter at `0xfffffff005d0f494` returns the
+static object at `0xfffffff007a2a028`; its initializer sets vtable
+`0xfffffff006da44c8`. Factory slot +0x40 calls `0xfffffff005d0f4b8`, whose
+constructor at `0xfffffff005d33e00` sets concrete driver vtable
+`0xfffffff006da97e8`. This resolves the earlier indirect-call ambiguity.
+
+Its timing setter (+0x1d0) is `0xfffffff005d38a64`, getter (+0x1e0) is
+`0xfffffff005d38b64`. They exchange all eight words symmetrically:
+
+| MMIO byte offset | low 16 bits | high 16 bits |
+| --- | --- | --- |
+| 0x0c | word 0 | word 4 |
+| 0x10 | word 2 | word 6 |
+| 0x14 | word 3 | word 7 |
+| 0x18 | word 1 | word 5 |
+
+Read slot +0xb8 resolves to `0xfffffff005d36388`; write slot +0xc0 to
+`0xfffffff005d363ac`. Both access the mapped pointer in driver object +0x10
+and require its register-access-enabled byte +0x30. The setter truncates each
+component to 16 bits; the getter returns zero-extended components through
+ARM64 x8 structure-return storage. This is a recovered packing ABI, not yet a
+validated panel timing, register bank physical address or working scanout.
+The meanings of porch/sync words and framebuffer mapping remain to be verified.
+
+The concrete driver init `0xfffffff005d38958` calls the generic register mapper
+`0xfffffff005d36184` with region kind 1. Profile virtual +0xa8 resolves to
+`0xfffffff005d0f71c`; its index table at `0xfffffff0055b25e4` maps kind 1 to
+DeviceTree `disp0` reg tuple 2 (zero-based), offset 0x06400000, size 0x4000.
+With the original arm-io aperture base 0x200000000, the timing bank therefore
+maps to physical 0x206400000. Runtime MMIO tracing must still confirm this
+before claiming the controller is working.

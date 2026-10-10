@@ -4,7 +4,7 @@ import re
 import socket
 
 
-def capture(path, virtual_addresses=(), memory_windows=(), physical_windows=(), *, resume_after=False):
+def capture(path, virtual_addresses=(), memory_windows=(), physical_windows=(), *, resume_after=False, kernel_process_metadata=False):
     family = getattr(socket, "AF_UNIX", None)
     if family is None:
         raise OSError("local QMP snapshots require Unix-domain sockets")
@@ -56,6 +56,24 @@ def capture(path, virtual_addresses=(), memory_windows=(), physical_windows=(), 
                             "physical_address": hex(address), "words": words,
                             "backend_result": request("human-monitor-command", {
                                 "command-line": f"xp/{words}wx {hex(address)}"})})
+                if kernel_process_metadata:
+                    from guest_processes import inspect
+                    def read_metadata(address, size):
+                        count = (size + 7) // 8
+                        reply = request("human-monitor-command", {
+                            "command-line": f"x/{count}gx {hex(address)}", "cpu-index": 0})
+                        words = []
+                        for line in reply.splitlines():
+                            if ":" in line:
+                                words.extend(int(value, 16) for value in
+                                    re.findall(r"0x([0-9a-fA-F]{16})", line.split(":", 1)[1]))
+                        if len(words) != count:
+                            raise ValueError("unreadable kernel process metadata")
+                        return b"".join(value.to_bytes(8, "little") for value in words)[:size]
+                    try:
+                        result["guest_process_metadata"] = inspect(read_metadata)
+                    except ValueError as error:
+                        result["guest_process_metadata"] = {"capture_error": str(error)}
                 sp = re.search(r"\bSP=([0-9a-fA-F]{16})\b", result["registers"])
                 result["stack"] = (request("human-monitor-command", {"command-line": f"x/256gx 0x{sp.group(1)}"})
                                    if sp else "Stack capture unavailable: SP missing from CPU registers")

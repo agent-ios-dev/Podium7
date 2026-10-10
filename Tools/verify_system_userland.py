@@ -36,6 +36,7 @@ def verify(directory):
     result['unsealed_root_diagnostic'] = any(edit.get('name') == 'research unsealed system root diagnostic'
         for patch in patches for edit in patch.get('additional_edits', []))
     probe = json.loads((directory/'qemu-probe.json').read_text()) if (directory/'qemu-probe.json').exists() else {}
+    result['guest_process_metadata'] = (probe.get('cpu_snapshot') or {}).get('guest_process_metadata', {})
     result['probe_stop_reason'] = probe.get('stop')
     result['probe_trace_budget_exhausted'] = 'trace limit reached' in (probe.get('stop') or '')
     tree_report = json.loads((directory/'device-tree-preparation.json').read_text()) if (directory/'device-tree-preparation.json').exists() else {}

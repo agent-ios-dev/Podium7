@@ -5,6 +5,7 @@ unsupported system-register/device accesses instead of treating them as success.
 boot_args layout: Apple's xnu-8019.80.24 pexpert/pexpert/arm64/boot.h.
 """
 import argparse
+import hashlib
 import json
 import pathlib
 import re
@@ -339,7 +340,11 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                         controls += tuple((0x610000000 + (port << 15), 64) for port in range(4))
                         controls += ((0x610100000, 64), (0x601000208, 3),
                                      (0x601004000, 16), (0x601000100, 32))
-                    snapshot = capture_cpu(monitor_path, addresses, physical_windows=controls)
+                    from guest_processes import KERNEL_SHA256
+                    process_layout_verified = bool(research_system_root) and hashlib.sha256(
+                        (directory / "KernelCache.macho").read_bytes()).hexdigest() == KERNEL_SHA256
+                    snapshot = capture_cpu(monitor_path, addresses, physical_windows=controls,
+                                           kernel_process_metadata=process_layout_verified)
                     if dma_submitted:
                         from nvme_dma_diagnostics import inspect as inspect_nvme_dma
                         dma_snapshot = inspect_nvme_dma(monitor_path, dma_trace, dump_root_pages=True)

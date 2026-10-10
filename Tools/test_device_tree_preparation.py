@@ -171,6 +171,17 @@ class ResearchBridgeHandoffTests(unittest.TestCase):
         self.assertEqual(bytes.fromhex(clocks["clock-frequencies-nclk"]), struct.pack("<I", 2) * 96)
         self.assertFalse(next(c for c in changes if c.get("source") == "synthetic research bridge model")["authentic_iboot_handoff"])
 
+    def test_missing_uvlo_intermediate_state_rejected(self):
+        # A monotonic P table with correct endpoints can still be unusable by
+        # the original UVLO selector. Reject it before running the guest.
+        original = struct.pack("<8I", 756 << 16, 1390 << 16, 1056 << 16, 2195 << 16,
+                               1356 << 16, 3630 << 16, 1644 << 16, 5260 << 16)
+        missing_middle = struct.pack("<8I", 756 << 16, 1390 << 16, 1356 << 16, 2195 << 16,
+                                     1456 << 16, 3630 << 16, 1644 << 16, 5260 << 16)
+        tree = self.make_tree().replace(original, missing_middle)
+        with self.assertRaisesRegex(ValueError, "UVLO intermediate"):
+            prepare(tree, 24000000, random_seed=bytes(64), research_bridge_handoff=True)
+
     def test_other_platforms_rejected(self):
         with self.assertRaises(ValueError):
             prepare(self.make_tree(b"pmgr,t8103\0"), 24000000, random_seed=bytes(64), research_bridge_handoff=True)

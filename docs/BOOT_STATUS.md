@@ -1,3 +1,22 @@
+## CPU UVLO panic resolved in real boot; SpringBoard remains open
+
+Run 38067643433 on f7dc7d3 completes 300 seconds without kernel panic, missing
+APFS roles, launchd boot-task failure or trace-budget exhaustion. All 22 original
+early-boot tasks complete; keybag diagnostic skip and `Early boot complete` are
+confirmed. There are 99,599 EL0 returns. The separate ARM64 guest PMGR checks
+pass for all seven E/P records, maximum and intermediate P-state transitions,
+and invalid requests. No original PMGR assertion was patched out.
+
+This confirms the previous CPU UVLO panic is resolved in this diagnostic run.
+It does not establish SpringBoard, display scanout, SEP protection or authenticated
+boot. Serial after early boot primarily contains thermal sensor-off warnings.
+A bounded read-only process metadata snapshot is being added to identify which
+original system services are running, independently of serial verbosity.
+Only PID/name metadata is retained; raw process memory is not exported.
+The recovered display timing ABI is documented in DISPLAY_BRINGUP.md.
+
+---
+
 ## Original early boot completes; CPU UVLO transition blocks full boot
 
 Run 38065904495 confirms the original keybag diagnostic path and all 22

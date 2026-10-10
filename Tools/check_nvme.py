@@ -386,12 +386,7 @@ b.ne unchanged
     if msi:
         if not dart:
             raise ValueError("MSI research requires the verified DART DMA path")
-        setup = '''// MSI-X table uses genuine QEMU PCI capabilities and BAR4.
-movz w0, #4
-movk w0, #0x2008, lsl #16
-str w0, [x21, #0x20]
-mov w0, #6
-str w0, [x21, #0x24]
+        setup = '''// Locate MSI-X table through its genuine capability BIR.
 ldrb w0, [x21, #0x34]
 mov x1, #48
 msix_next:
@@ -407,11 +402,22 @@ b failure
 msix_found:
 ldr w0, [x2, #4]
 and w1, w0, #7
+cbz w1, msix_bar0
 cmp w1, #4
 b.ne failure
-and w0, w0, #0xfffffff8
+movz w1, #4
+movk w1, #0x2008, lsl #16
+str w1, [x21, #0x20]
+mov w1, #6
+str w1, [x21, #0x24]
 movz x1, #0
 movk x1, #0x2008, lsl #16
+b msix_base
+msix_bar0:
+movz x1, #0
+movk x1, #0x2000, lsl #16
+msix_base:
+and w0, w0, #0xfffffff8
 movk x1, #6, lsl #32
 add x1, x1, x0
 movz x0, #0xf000

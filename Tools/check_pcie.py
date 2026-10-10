@@ -50,7 +50,7 @@ cbnz w4, failure
 mov w5, #1
 str w5, [x3, #0x124]
 ldr w4, [x3, #0x28]
-cmp w4, #0x10
+cmp w4, #0x11
 b.ne failure
 str wzr, [x3, #0x124]
 ldr w4, [x3, #0x28]

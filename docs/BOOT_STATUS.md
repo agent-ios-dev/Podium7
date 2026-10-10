@@ -1,3 +1,22 @@
+## SPI fix validated; next stop is original PCIe control acknowledgement
+
+Run 38035420066 passes the SPI W1C guest check and its normal 120-second boot
+records 34 EL0 returns. The stopped stack now waits in original AppleT8010PCIe
+at 0xfffffff00694d69c instead of the previous Samsung SPI acknowledgement loop.
+The earlier independent CFI/AES experiment recorded 595 EL0 returns and actual
+AES work without the prior AES panic. Neither confirms launchd or SpringBoard.
+
+Original PCIe code writes bit0 to common-control +0x124 and loops until bit4
+appears at +0x28, with a 10-us delay and no finite retry bound. A research
+request acknowledgement now derives that status bit from the request and
+clears it when the request clears. It does not advertise PCI link-up, PHY
+calibration, endpoints or NVMe. An ARM64 guest checks both request transitions;
+real kernel validation is pending in run 38035660772.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38035420066
+
+---
+
 ## First genuine EL0 execution observed; Samsung SPI polling livelock fixed
 
 Run 38035038416 passes QEMU build and all mandatory hardware guests, including

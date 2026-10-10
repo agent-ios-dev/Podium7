@@ -9,13 +9,16 @@ cache exists in System and is empty; its original empty structure was copied.
 Early boot complete and SpringBoard are NOT confirmed. The last task is
 keybag; the kernel snapshot shows a wait path, not a crash.
 
-Next opt-in experiment changes only the debug boot profile from 0x8 to 0x14e,
-as used in primary qemu-t8030 research logs that report keybag diagnostic skip:
-https://github.com/TrungNguyen1909/qemu-t8030/issues/45
-Its effect in this exact firmware remains to be tested. This is a diagnostic
-path, not working SEP/keybag support. Default boot arguments remain unchanged,
-and CLI requires the explicit no-SEP/unsealed experiment. Reports distinguish
-diagnostic keybag skip, early boot completion, userland and SpringBoard.
+Run 38063364985 tested the explicit debug=0x14e profile. It does NOT skip
+keybag initialization in this exact firmware: 15,605 genuine EL0 returns,
+no panic, but no diagnostic skip and no early boot completion after 300 seconds.
+Default boot arguments remain unchanged. No SEP/keybag support is claimed.
+
+A read-only host inspection now locates original keybag diagnostic conditions
+in selected executables and the shared cache. It records bounded decoded branch
+windows and metadata only; no original executable or cache is exported.
+The source disk is attached and mounted read-only, with System UUID validation.
+This is static analysis, not another successful boot claim.
 Original boot-tool metadata (name, size and SHA-256) is recorded without exporting executables.
 106 local tests pass. Full boot and protected storage remain open gates.
 

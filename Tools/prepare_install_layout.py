@@ -27,7 +27,7 @@ def fixture_container(whole):
 
 
 def mount_volume(volume, path, *, readonly=False):
-    path.mkdir(exist_ok=False)
+    path.mkdir(exist_ok=True)
     args = ['diskutil', 'mount'] + (['readOnly'] if readonly else [])
     command(args + ['-mountPoint', str(path), volume['DeviceIdentifier']])
     info = plistlib.loads(command(['diskutil', 'info', '-plist', str(path)]))
@@ -70,9 +70,13 @@ def prepare(image):
         report = {'system_fstab': (source/'private/etc/fstab').read_text() if (source/'private/etc/fstab').is_file() else None,
                   'source_var_present': (source/'private/var').is_dir(),
                   'source_firmware_present': (source/'usr/standalone/firmware').is_dir()}
+        report['container_before'] = container
         print(json.dumps(report), flush=True)
+        # A lone read-only mounted volume can keep its container read-only.
+        # Detach that mount before asking APFS to allocate new volumes.
+        command(['diskutil', 'unmount', system['DeviceIdentifier']])
         for role, name in [('D', 'Data'), ('B', 'Preboot'), ('X', 'xART')]:
-            args = ['diskutil', 'apfs', 'addVolume', container['ContainerReference'], 'APFSX', name, '-role', role, '-nomount']
+            args = ['sudo', 'diskutil', 'apfs', 'addVolume', container['ContainerReference'], 'APFSX', name, '-role', role, '-nomount']
             if role == 'D': args += ['-groupWith', system['DeviceIdentifier']]
             command(args)
         updated = fixture_container(whole)
@@ -81,6 +85,7 @@ def prepare(image):
             volumes = [v for v in updated['Volumes'] if v.get('Roles') == [role]]
             if len(volumes) != 1: raise ValueError('created role not uniquely present: ' + role)
             mounted[role] = mount_volume(volumes[0], root / ('install-' + label))
+        source = mount_volume(system, root / 'install-system', readonly=True)
         # iOS mounts the Data volume at /private/var, unlike macOS.
         if report['source_var_present']:
             command(['sudo', 'ditto', '--rsrc', '--extattr', str(source/'private/var'), str(mounted['Data'])])

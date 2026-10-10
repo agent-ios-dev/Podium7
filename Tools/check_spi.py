@@ -25,6 +25,15 @@ str wzr, [x3, #0xc]
 mov w5, #0x24c0
 str w5, [x3, #8]
 ldr w4, [x3, #8]
+cbnz w4, failure
+movz w5, #0xf
+movk w5, #0x40, lsl #16
+str w5, [x3, #8]
+ldr w4, [x3, #8]
+cbnz w4, failure
+mov w5, #0x4038
+str w5, [x3, #4]
+ldr w4, [x3, #4]
 cmp w4, w5
 b.ne failure
 mov x6, #0x3ffc
@@ -69,7 +78,8 @@ failure_exit:
         passed = result.returncode == 0
         report.write_text(json.dumps({"passed": passed,
             "model": "original T8010 SPI1/SPI2 control apertures",
-            "checks": ["original driver disable and configuration sequence",
+            "checks": ["original driver disable/configuration and W1C interrupt acknowledge",
+                       "acknowledge cannot fabricate events or overwrite configuration",
                        "separate zero-initialized SPI banks and final control-word bounds"],
             "returncode": result.returncode, "stdout": result.stdout,
             "stderr": result.stderr}, indent=2))

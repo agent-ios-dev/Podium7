@@ -1250,6 +1250,11 @@ static void podium7_pmp_start(void)
     spi = mipi.replace("MIPI-DSIM", "SPI").replace("mipi_dsim", "spi")
     spi = spi.replace("Podium7MIPIDSIMBank", "Podium7SPIBank")
     spi = "\n/* T8010 SPI discovery controls; transfers and slave devices absent. */\n" + spi[spi.index("typedef struct "):]
+    # Original AppleSamsungSPIController repeatedly acknowledges +8 in its
+    # polling path. Latching that write fabricates permanent pending events.
+    spi = spi.replace("    bank->registers[address >> 2] = value;",
+        "    if (address == 8) { bank->registers[2] &= ~value; }\n"
+        "    else { bank->registers[address >> 2] = value; }")
     start = spi.index("static void podium7_spi_create(")
     spi = spi[:start] + '''static void podium7_spi_create(MachineState *machine, MemoryRegion *memory)
 {

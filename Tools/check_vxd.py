@@ -27,6 +27,29 @@ str w6, [x3, #4]
 ldr w5, [x3, #4]
 cmp w5, w6
 b.ne failure
+cmp x7, #2
+b.ne skip_geometry
+ldr w6, [x3, #0x500]
+movz w5, #0x100
+movk w5, #0xe00, lsl #16
+cmp w6, w5
+b.ne failure
+str wzr, [x3, #0x500]
+ldr w6, [x3, #0x500]
+cmp w6, w5
+b.ne failure
+ubfx w8, w6, #8, #4
+ubfx w9, w6, #16, #4
+ubfx w11, w6, #24, #4
+sub w8, w8, #1
+mov w5, #4
+lsl w9, w5, w9
+lsl w11, w5, w11
+madd w8, w8, w9, w11
+mov w5, #0x10000
+cmp w8, w5
+b.ne failure
+skip_geometry:
 sub x4, x4, #4
 ldr w6, [x3, x4]
 cbnz w6, failure
@@ -75,7 +98,7 @@ banks:
         passed = result.returncode == 0
         report.write_text(json.dumps({"passed": passed,
             "model": "original T8010 vxd0 primary/secondary discovery/reset apertures",
-            "checks": ["original vxd reset writes and zero initial controls",
+            "checks": ["original controls and read-only explicit research 64-KiB SRAM geometry",
                        "word/doubleword controls, bank independence and exact aperture boundaries"],
             "returncode": result.returncode, "stdout": result.stdout,
             "stderr": result.stderr}, indent=2))

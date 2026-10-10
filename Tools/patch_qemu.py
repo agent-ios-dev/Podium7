@@ -1257,6 +1257,15 @@ static void podium7_pmp_start(void)
                             "podium7-t8010-vxd-power-control");
 }
 '''
+    # Original AppleD5500 SRAM-size formula at 0xfffffff006461738 derives
+    # capacity from +0x500. Zero yields no firmware descriptor then a NULL
+    # dereference. Explicit research geometry: one 64-KiB bank, large enough
+    # for the original embedded 0xa1a0-byte image. Exact ASIC geometry unknown.
+    vxd = vxd.replace("    uint32_t value = bank->registers[address >> 2];",
+        "    uint32_t value = bank->registers[address >> 2];\n"
+        "    if (bank->base == 0x208100000ULL && address == 0x500) { value = 0x0e000100; }")
+    vxd = vxd.replace("bank->registers[address >> 2] = value;",
+        "if (!(bank->base == 0x208100000ULL && address == 0x500)) { bank->registers[address >> 2] = value; }")
     # Original ISP reads revision at +0xa0000 (run 38030604802).
     # One exact 0x140000 n112ap register window; no camera firmware or frames.
     isp = scaler.replace("SCALER", "ISP").replace("scaler", "isp").replace("Podium7ScalerBank", "Podium7ISPBank")

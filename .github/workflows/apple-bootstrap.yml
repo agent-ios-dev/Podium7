@@ -110,6 +110,15 @@ jobs:
           python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/pmp-integrated-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --trust-cache .firmware/RestoreTrustCache.im4p --research-ramdisk-root --research-pmp-core --seconds 120
           python3 Tools/inspect_boot_fault.py --directory .firmware/pmp-integrated-experiment
           python3 Tools/verify_pmp_integration.py .firmware/pmp-integrated-experiment
+      - name: Save first kernel fault before repeat probe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pmp-first-boot-evidence
+          path: |
+            .firmware/pmp-integrated-experiment/*.json
+            .firmware/pmp-integrated-experiment/*.txt
+          if-no-files-found: warn
       - name: Repeat genuine PMP startup in a fresh machine to catch queue races
         run: |
           mkdir .firmware/pmp-integrated-repeat

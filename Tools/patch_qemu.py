@@ -1966,6 +1966,15 @@ static void podium7_irq_or_set(void *opaque, int input, int level)
         '    if (blk_by_name("podium7-storage")) {\n'
         '        qdev_prop_set_int32(DEVICE(&s->gpex_root), "addr", PCI_DEVFN(31, 0));\n'
         '    }\n    qdev_realize(DEVICE(&s->gpex_root), BUS(pci->bus), &error_fatal);')
+    # Record the actual MSI-X payload before the normal DMA send. This changes
+    # neither interrupt routing nor completion, and never invents an IRQ.
+    replace_once(directory / "hw/pci/msix.c",
+        '    msg = msix_get_message(dev, vector);',
+        '    msg = msix_get_message(dev, vector);\n'
+        '    if (!strcmp(object_get_typename(OBJECT(dev)), "nvme")) {\n'
+        '        qemu_log("PODIUM7 NVME-MSI vector=%u address=%016" PRIx64\n'
+        '                 " data=%08x\\n", vector, msg.address, msg.data);\n'
+        '    }')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")
 

@@ -1,3 +1,28 @@
+## Verified DART I/O and original Identify completion; MSI routing still missing
+
+Run38041269540 passes both actual ARM64 NVMe guests. The DART guest performs
+nonidentity queue/buffer DMA, writes and reads a sector, verifies its persisted
+bytes independently on the host, and leaves both denied-write and invalid-leaf
+destination pages unchanged. Actual mapper rejection logs are required. A
+posted DMA write failure need not produce a failing NVMe CQ status; the test
+checks memory protection and the mapper instead. Fault IRQs are not implemented.
+The sparse disk has exactly17179869184 logical bytes and16384 allocated bytes.
+
+The original iOS driver now submits Identify Controller opcode6/CNS1, obtains
+a successful completion, and QEMU emits MSI-X vector0. The destination
+0xbffff000 has no valid ordinary DART mapping, so interrupt delivery is absent
+and the original driver times out. The research restore profile nevertheless
+runs launchd and restored_extern. This is not SpringBoard or full iOS boot.
+The ordinary PMP integration gate still fails; overall CI is not green.
+
+Next instrumentation records the genuine NVMe MSI-X address/data and includes
+read-only original port/channel control snapshots. It does not synthesize
+interrupts, completion or readiness. These measurements must precede routing.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38041269540
+
+---
+
 ## Original Identify queue located through observed port0 DART mapping
 
 Run38040341863 diagnostic captures ASQ IOVA0x86d30000. The observed31-bit PCIe
@@ -10,7 +35,7 @@ A separately opted-in research port0 mapper now walks original little-endian
 4K tables, bounds tables/output to RAM and enforces leaf read/write permission.
 It preserves direct controls when disabled and reports unmapped DMA as errors.
 The new real NVMe guest uses nonidentity IOVAs for all queues/buffers and checks
-persistent sector I/O plus denied-write and invalid-leaf errors without changing
+persistent sector I/O plus denied-write and invalid-leaf rejections without changing
 destination pages. Original-kernel translation runs only after this guest passes.
 MSI, other streams, DAPF and hardware fault IRQ behavior remain unimplemented.
 

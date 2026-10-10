@@ -152,7 +152,7 @@ def device_tree(data, *, clear_bootloader_flags=False):
             properties[name] = data[cursor:cursor + size]
             cursor += (size + 3) & ~3
         path = parent + "/" + properties.get("name", b"?").split(b"\0")[0].decode("ascii", errors="replace")
-        interesting = {key: value.hex() for key, value in properties.items() if path == "/device-tree/arm-io/pmgr" or key in ("reg", "ranges", "compatible", "device_type", "interrupts", "ipid-mask", "chip-id", "board-id", "model", "product-name", "clock-frequencies", "clock-frequencies-nclk", "clock-frequency")}
+        interesting = {key: value.hex() for key, value in properties.items() if path == "/device-tree/arm-io/pmgr" or key in ("reg", "ranges", "compatible", "device_type", "interrupts", "ipid-mask", "chip-id", "board-id", "model", "product-name", "osenvironment", "boot-ios-diagnostics", "clock-frequencies", "clock-frequencies-nclk", "clock-frequency")}
         nodes.append({"path": path, "properties": interesting})
         for _ in range(children):
             cursor = node(cursor, path, depth + 1)

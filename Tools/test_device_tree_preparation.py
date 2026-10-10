@@ -23,11 +23,23 @@ class DeviceTreePreparationTests(unittest.TestCase):
             prepare(tree, 24000000, research_keybag_diagnostics=True)
         normal, changes = prepare(tree, 24000000, random_seed=bytes(64))
         self.assertNotIn(b'boot-ios-diagnostics', normal)
+        self.assertNotIn(b'osenvironment', normal)
         diagnostic, changes = prepare(tree, 24000000, random_seed=bytes(64),
             research_fastsim=True, research_no_sep=True, research_keybag_diagnostics=True)
         self.assertIn(b'boot-ios-diagnostics'.ljust(32, b'\0') + struct.pack('<II', 4, 1), diagnostic)
         self.assertIn(b'ephemeral-storage'.ljust(32, b'\0') + struct.pack('<I', 4) + bytes(4), diagnostic)
         self.assertEqual(next(c for c in changes if c.get('property') == 'boot-ios-diagnostics')['path'], '/device-tree/product')
+        properties = next(n['properties'] for n in device_tree(diagnostic) if n['path'] == '/device-tree/chosen')
+        self.assertEqual(properties['osenvironment'], b'normal\0'.hex())
+        for environment, expected in ((bytes(32), b'normal\0'),
+                                      (b'normal\0', b'normal\0'),
+                                      (b'diagnostics\0', b'diagnostics\0')):
+            original_environment = node([('name', b'chosen\0'), ('osenvironment', environment)])
+            original_tree = node([('name', b'device-tree\0')], [cpu, arm, original_environment, product])
+            preserved, _ = prepare(original_tree, 24000000, random_seed=bytes(64),
+                research_fastsim=True, research_no_sep=True, research_keybag_diagnostics=True)
+            properties = next(n['properties'] for n in device_tree(preserved) if n['path'] == '/device-tree/chosen')
+            self.assertEqual(properties['osenvironment'], expected.hex())
         invalid = tree[:-len(product)] + node([('name', b'product\0'), ('boot-ios-diagnostics', b'bad')])
         with self.assertRaisesRegex(ValueError, 'unexpected original'):
             prepare(invalid, 24000000, research_fastsim=True, research_no_sep=True, research_keybag_diagnostics=True)

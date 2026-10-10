@@ -72,6 +72,18 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
                     properties[existing] = (properties[existing][0], value)
                 changes.append({"path": path, "property": clock.decode(), "frequency": counter_frequency})
         if path.endswith("/chosen"):
+            if research_keybag_diagnostics and not names.get(b'osenvironment', b'').rstrip(b'\0'):
+                # Original 19H422 sysctl_load_devicetree_entries reads this
+                # independently of product/boot-ios-diagnostics. Without it,
+                # hw.osenvironment has no value. SpringBoard's original launch
+                # plist consults that sysctl through LimitLoadFromHardware.
+                key = b'osenvironment'
+                properties = [(raw, value) for raw, value in properties if raw.split(b'\0')[0] != key]
+                properties.append((key.ljust(32, b'\0'), b'normal\0'))
+                changes.append({'path': path, 'property': 'osenvironment', 'value': 'normal',
+                                'source': 'explicit normal userspace handoff in no-SEP diagnostic',
+                                'authentic_iboot_handoff': False,
+                                'springboard_confirmed': False})
             name = b"random-seed"
             existing = next((i for i, (raw_name, _) in enumerate(properties) if raw_name.split(b"\0")[0] == name), None)
             if existing is None:

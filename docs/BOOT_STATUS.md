@@ -1,3 +1,23 @@
+## Original SpringBoard launch restriction and missing environment handoff
+
+Read-only run 38084032951 scans 425 original launch plists. SpringBoard and
+backboardd both request RunAtLoad/KeepAlive as mobile. SpringBoard additionally
+has LimitLoadFromHardware={osenvironment:[diagnostics]}; backboardd has no such
+restriction. The original /chosen/osenvironment handoff is a 32-byte zero placeholder.
+These are facts, not proof that the current environment is diagnostics.
+
+Original 19H422 code at 0xfffffff00780fb44 reads /chosen/osenvironment and calls
+sysctl_set_osenvironment at 0xfffffff0076007c8 only when the property exists.
+Apple's public bsd/kern/kern_mib.c confirms hw.osenvironment returns EINVAL
+without a supplied value. The next experiment supplies normal only when that
+handoff is absent/zero, independently of product/boot-ios-diagnostics; original
+nonempty values and launch plists remain unchanged. SEP/authenticated boot and
+SpringBoard remain unconfirmed. The change is not yet validated in real boot.
+
+The analysis script also fixes an observed macOS APFS publication race with
+bounded retries and strict System UUID checks. 127 local tests pass. The macOS
+probe test now resolves /var versus /private/var before mocking fixture size.
+
 ## Process snapshot diagnostic repair
 
 Run 38068590109 executed the original guest for 300 seconds but its host probe

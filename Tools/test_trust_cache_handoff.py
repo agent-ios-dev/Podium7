@@ -39,6 +39,14 @@ class TrustCacheTests(unittest.TestCase):
         self.assertEqual(region[8:8+len(raw)], raw)
         self.assertEqual(report["entries"], 2)
 
+    def test_system_cache_requires_explicit_correct_container_kind(self):
+        raw = self.module()
+        region, report = serialize(container(raw, b"trst"), kind=b"trst")
+        self.assertEqual(region[8:8+len(raw)], raw)
+        self.assertEqual(report["kind"], "trst")
+        with self.assertRaises(ValueError):serialize(container(raw, b"trst"))
+        with self.assertRaises(ValueError):serialize(container(raw), kind=b"trst")
+
     def test_trust_cache_and_ramdisk_reservations_coexist(self):
         tree = node([("name", b"device-tree\0")], [node([("name", b"chosen\0")])])
         tree = attach_memory_file(tree, 0x454e0000, 16384, "TrustCache")

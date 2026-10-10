@@ -10,8 +10,10 @@ import struct
 from analyze_firmware import payload
 
 
-def serialize(container):
-    raw = payload(container, b"rtsc")
+def serialize(container, *, kind=b"rtsc"):
+    if kind not in (b"rtsc", b"trst"):
+        raise ValueError("only official restore/system trust cache types supported")
+    raw = payload(container, kind)
     if len(raw) < 24:
         raise ValueError("short restore trust cache header")
     version, uuid, count = struct.unpack_from("<I16sI", raw)
@@ -25,7 +27,7 @@ def serialize(container):
     # Serialized region contains module count and offsets from region start.
     region = struct.pack("<II", 1, 8) + raw
     region += bytes((-len(region)) & 0x3fff)
-    return region, {"version": version, "entries": count, "uuid": uuid.hex(),
+    return region, {"kind": kind.decode(), "version": version, "entries": count, "uuid": uuid.hex(),
                     "module_sha256": hashlib.sha256(raw).hexdigest(),
                     "region_bytes": len(region), "module_offset": 8,
                     "guest_registration_confirmed": False, "authenticated_iboot_handoff": False}

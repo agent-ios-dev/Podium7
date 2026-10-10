@@ -124,7 +124,8 @@ def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, resear
     cache_region = None
     cache_address = None
     if trust_cache is not None:
-        cache_region, cache_report = serialize_trust_cache(trust_cache.read_bytes())
+        cache_region, cache_report = serialize_trust_cache(trust_cache.read_bytes(),
+            kind=b"trst" if research_system_root else b"rtsc")
         cache_address = align(minimum - virtual_base + PHYSICAL_BASE) - len(cache_region)
         if cache_address < PHYSICAL_BASE:
             raise ValueError("trust cache does not fit below kernel in harness RAM")

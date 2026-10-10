@@ -88,3 +88,31 @@ class QMPTests(unittest.TestCase):
             result = capture("local.sock", physical_windows=((0x20e300b84, 2),))
         self.assertEqual(stream.sent[-1]["arguments"]["command-line"], "xp/2wx 0x20e300b84")
         self.assertEqual(result["physical_windows"][0]["physical_address"], "0x20e300b84")
+
+    def test_process_metadata_rounds_short_reads_without_exporting_raw_words(self):
+        node = 0xffffffe100001000
+        name = b"SpringBoard\0".ljust(32, b"\0")
+        name_words = [int.from_bytes(name[i:i+8], "little") for i in range(0, 32, 8)]
+        def memory(address, values):
+            return f"{address:016x}: " + " ".join(f"0x{value:016x}" for value in values)
+        replies = [{"QMP": {}}, {"id": "qmp_capabilities", "return": {}},
+            {"id": "stop", "return": {}},
+            {"id": "query-cpus-fast", "return": [{"cpu-index": 0}]},
+            {"id": "human-monitor-command", "return": "PC=fffffff0071904e8"}]
+        for address, values in [(0xfffffff007137440, [0xffffffe100000000]),
+            (0xfffffff007137448, [0]), (0xffffffe100000000, [node]),
+            (node + 0x68, [23]), (node + 0x370, name_words), (node + 0xa8, [0])]:
+            replies.append({"id": "human-monitor-command", "return": memory(address, values)})
+        stream = Stream(replies)
+        connection = MagicMock()
+        connection.__enter__.return_value = connection
+        connection.makefile.return_value = stream
+        with patch("qmp_diagnostics.socket.AF_UNIX", 1, create=True), patch("qmp_diagnostics.socket.socket", return_value=connection):
+            result = capture("local.sock", kernel_process_metadata=True)
+        metadata = result["guest_process_metadata"]
+        self.assertEqual(metadata["processes"], [{"pid": 23, "name": "SpringBoard"}])
+        self.assertTrue(metadata["springboard_process_seen"])
+        self.assertFalse(metadata["visible_springboard_confirmed"])
+        self.assertNotIn("backend_result", metadata)
+        self.assertEqual(stream.sent[-3]["arguments"], {
+            "command-line": f"x/1gx {hex(node + 0x68)}", "cpu-index": 0})

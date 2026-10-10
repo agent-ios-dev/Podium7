@@ -434,7 +434,6 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                "console_tail": serial.read_text(errors="replace")[-4096:],
                "trace_bytes": trace.stat().st_size if trace.exists() else 0}
     if research_cfi_nvram:
-        import hashlib
         import zlib
         flash_bytes = (directory / "nvram-flash.raw").read_bytes()
         banks = []

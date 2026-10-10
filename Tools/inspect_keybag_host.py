@@ -40,8 +40,15 @@ def adrp_page(word, pc):
     return (pc & ~4095) + (immediate << 12)
 
 
+def adr_target(word, pc):
+    if word & 0x9f000000 != 0x10000000: return None
+    immediate = ((word >> 5 & 0x7ffff) << 2) | (word >> 29 & 3)
+    if immediate & (1 << 20): immediate -= 1 << 21
+    return pc + immediate
+
+
 def string_references(data, regions, targets):
-    """Find bounded ADRP/ADD references, with matching source register."""
+    """Find bounded ADR and ADRP/ADD references, with matching source register."""
     pages = {target & ~4095 for target in targets}
     references = {target: [] for target in targets}
     for address, size, offset, protection in regions:
@@ -52,8 +59,12 @@ def string_references(data, regions, targets):
             length -= length % 4
             chunk = data[offset + chunk_offset:offset + chunk_offset + length]
             for index, (word,) in enumerate(struct.iter_unpack('<I', chunk)):
-                if word & 0x9f000000 != 0x90000000: continue
                 position = chunk_offset + index * 4
+                target = adr_target(word, address + position)
+                if target in references and len(references[target]) < 8:
+                    references[target].append({'address': address + position, 'offset': offset + position,
+                                               'mapping_start': offset, 'mapping_end': offset + size})
+                if word & 0x9f000000 != 0x90000000: continue
                 page = adrp_page(word, address + position)
                 if page not in pages: continue
                 register = word & 31
@@ -74,6 +85,8 @@ def string_references(data, regions, targets):
 def inspect_bytes(data, *, cache=False):
     from capstone import Cs, CS_ARCH_ARM64, CS_MODE_LITTLE_ENDIAN
     regions = mappings(data) if cache else []
+    symbol_table = indirect_table = None
+    stub_sections, import_targets = [], {}
     if not cache:
         if len(data) < 32 or struct.unpack_from('<II', data) != (0xfeedfacf, 0x100000c):
             raise ValueError('expected original ARM64 executable')
@@ -89,7 +102,39 @@ def inspect_bytes(data, *, cache=False):
                 address, _, offset, file_size, maximum, initial = struct.unpack_from('<QQQQII', data, cursor + 24)
                 if offset + file_size > len(data): raise ValueError('Mach-O segment exceeds file')
                 if file_size: regions.append((address, file_size, offset, initial))
+                section_count = struct.unpack_from('<I', data, cursor + 64)[0]
+                if 72 + section_count * 80 > size: raise ValueError('Mach-O sections exceed command')
+                for section in range(section_count):
+                    position = cursor + 72 + section * 80
+                    section_address, section_size = struct.unpack_from('<QQ', data, position + 32)
+                    flags, first_index, stride = struct.unpack_from('<III', data, position + 64)
+                    if flags & 255 == 8:
+                        if not 4 <= stride <= 64 or section_size % stride: raise ValueError('invalid symbol stub stride')
+                        stub_sections.append((section_address, section_size // stride, first_index, stride))
+            elif kind == 2:
+                if size < 24: raise ValueError('short symbol table command')
+                symbol_table = struct.unpack_from('<IIII', data, cursor + 8)
+            elif kind == 0xb:
+                if size < 80: raise ValueError('short indirect symbol command')
+                indirect_table = struct.unpack_from('<II', data, cursor + 56)
             cursor += size
+        if symbol_table and indirect_table:
+            symbols, symbol_count, strings, string_size = symbol_table
+            indirect, indirect_count = indirect_table
+            if symbols + symbol_count * 16 > len(data) or strings + string_size > len(data) or indirect + indirect_count * 4 > len(data):
+                raise ValueError('symbol table exceeds file')
+            for address, count, first, stride in stub_sections:
+                if first + count > indirect_count or count > 10000: raise ValueError('stub index exceeds table')
+                for index in range(count):
+                    symbol = struct.unpack_from('<I', data, indirect + (first + index) * 4)[0]
+                    if symbol & 0xc0000000: continue
+                    if symbol >= symbol_count: raise ValueError('indirect symbol exceeds table')
+                    name_index = struct.unpack_from('<I', data, symbols + symbol * 16)[0]
+                    if name_index >= string_size: raise ValueError('symbol string exceeds table')
+                    end = data.find(b'\0', strings + name_index, min(strings + string_size, strings + name_index + 256))
+                    if end < 0: continue
+                    name = data[strings + name_index:end].decode('ascii', errors='replace')
+                    import_targets[address + index * stride] = name
     found = []
     for marker in MARKERS:
         cursor = 0
@@ -100,7 +145,10 @@ def inspect_bytes(data, *, cache=False):
             owners = [r for r in regions if r[2] <= position < r[2] + r[1]]
             if len(owners) != 1: continue
             region = owners[0]
-            found.append({'marker': marker.decode(), 'address': region[0] + position - region[2], 'offset': position})
+            # A marker may follow a log prefix; code references the C-string start.
+            start = data.rfind(b'\0', max(region[2], position - 128), position) + 1
+            if start < max(region[2], position - 128): start = position
+            found.append({'marker': marker.decode(), 'address': region[0] + start - region[2], 'offset': start})
     references = string_references(data, regions, {item['address'] for item in found}) if found else {}
     decoder = Cs(CS_ARCH_ARM64, CS_MODE_LITTLE_ENDIAN)
     for item in found:
@@ -112,6 +160,10 @@ def inspect_bytes(data, *, cache=False):
             pc = ref['address'] + start - ref['offset']
             instructions = [{'address': hex(ins.address), 'mnemonic': ins.mnemonic, 'operands': ins.op_str}
                             for ins in decoder.disasm(data[start:end], pc)]
+            for instruction in instructions:
+                if instruction['mnemonic'] in ('bl', 'b') and instruction['operands'].startswith('#0x'):
+                    callee = import_targets.get(int(instruction['operands'][1:], 16))
+                    if callee: instruction['imported_callee'] = callee
             item['references'].append({'address': hex(ref['address']), 'instructions': instructions})
         item['address'] = hex(item['address'])
     return {'bytes': len(data), 'markers': found, 'binary_exported': False}

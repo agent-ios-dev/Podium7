@@ -1,0 +1,23 @@
+name: Inspect signed host snapshot tooling
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - name: Read installed Apple snapshot interfaces and entitlements
+        run: |
+          mkdir snapshot-tools
+          bless --help > snapshot-tools/bless-help.txt 2>&1 || true
+          diskutil apfs > snapshot-tools/diskutil-apfs-help.txt 2>&1 || true
+          /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -h > snapshot-tools/apfs-util-help.txt 2>&1 || true
+          for tool in /usr/sbin/bless /usr/sbin/diskutil /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util; do
+            codesign -d --entitlements :- "$tool" > "snapshot-tools/$(basename "$tool")-entitlements.txt" 2>&1 || true
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed-host-snapshot-tools
+          path: snapshot-tools

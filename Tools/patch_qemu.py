@@ -479,7 +479,7 @@ static void podium7_aic_create(MachineState *machine, MemoryRegion *memory)
 }
 
 '''
-    aic = aic.replace("    MemoryRegion io;", "    MemoryRegion io;\n    qemu_irq output;\n    uint32_t external_state[32];")
+    aic = aic.replace("    MemoryRegion io;", "    MemoryRegion io;\n    qemu_irq output;\n    uint32_t external_state[32];\n    uint32_t edge_state[32];")
     start = aic.index("static uint32_t podium7_aic_event(")
     aic = aic[:start] + '''static Podium7AIC *podium7_aic_device;
 
@@ -489,7 +489,7 @@ static void podium7_aic_update(Podium7AIC *aic)
     for (unsigned irq = 0; irq < PODIUM7_AIC_IRQ_COUNT && !pending; irq++) {
         uint32_t bit = 1U << (irq & 31);
         pending = (aic->target_cpu[irq] & 1) &&
-            ((aic->irq_state[irq >> 5] | aic->external_state[irq >> 5]) & bit) &&
+            ((aic->irq_state[irq >> 5] | aic->external_state[irq >> 5] | aic->edge_state[irq >> 5]) & bit) &&
             !(aic->irq_mask[irq >> 5] & bit);
     }
     qemu_set_irq(aic->output, pending);
@@ -505,6 +505,14 @@ static void podium7_aic_set_external(unsigned irq, bool level)
     podium7_aic_update(aic);
 }
 
+static void podium7_aic_raise_edge(unsigned irq)
+{
+    Podium7AIC *aic = podium7_aic_device;
+    if (!aic || irq >= PODIUM7_AIC_IRQ_COUNT) { return; }
+    aic->edge_state[irq >> 5] |= 1U << (irq & 31);
+    podium7_aic_update(aic);
+}
+
 ''' + aic[start:]
     aic_view = "    if (address >= 0x5000 && address < 0x5080) {"
     if aic.count(aic_view) != 2:
@@ -514,7 +522,10 @@ static void podium7_aic_set_external(unsigned irq, bool level)
         "        address = address - 0x1000 + 0x2000; /* Observed PMP CPU view. */\n"
         "    }\n" + aic_view)
     aic = aic.replace("(aic->irq_state[irq >> 5] & bit)",
-                      "((aic->irq_state[irq >> 5] | aic->external_state[irq >> 5]) & bit)")
+                      "((aic->irq_state[irq >> 5] | aic->external_state[irq >> 5] | aic->edge_state[irq >> 5]) & bit)")
+    aic = aic.replace("            aic->irq_mask[irq >> 5] |= bit; /* AIC auto-masks on event read */",
+                      "            aic->edge_state[irq >> 5] &= ~bit; /* Consume latched edge only. */\n"
+                      "            aic->irq_mask[irq >> 5] |= bit; /* AIC auto-masks on event read */")
     aic = aic.replace("    if (aic->logged_accesses < 512) {",
                       "    podium7_aic_update(aic);\n    if (aic->logged_accesses < 512) {")
     aic = aic.replace("    memset(aic->irq_mask, 0xff, sizeof(aic->irq_mask));",

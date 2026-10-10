@@ -86,6 +86,28 @@ static const PCIIOMMUOps podium7_storage_iommu_ops = {
     .get_address_space = podium7_storage_dma_as,
 };
 
+/* Separate research MSI aperture from the original n112ap DeviceTree:
+ * msi-address=bffff000, msi-vector-offset=288, #msi-vectors=32.
+ * No interrupt is generated without an actual valid endpoint MSI write.
+ * Restricted to port0's eight vectors; other ports remain unsupported. */
+static void podium7_storage_msi_write(void *opaque, hwaddr offset,
+                                      uint64_t data, unsigned size)
+{
+    if (offset || size != 4 || data >= 8) {
+        qemu_log("PODIUM7 NVME-MSI rejected offset=%" PRIx64 " data=%" PRIx64 "\n",
+                 (uint64_t)offset, data);
+        return;
+    }
+    qemu_log("PODIUM7 NVME-MSI delivered data=%" PRIu64 " aic=%" PRIu64 "\n", data, 288 + data);
+    podium7_aic_raise_edge(288 + data);
+}
+
+static const MemoryRegionOps podium7_storage_msi_ops = {
+    .write = podium7_storage_msi_write, .endianness = DEVICE_LITTLE_ENDIAN,
+    .valid = { .min_access_size = 4, .max_access_size = 4 },
+    .impl = { .min_access_size = 4, .max_access_size = 4 },
+};
+
 static void podium7_storage_iommu_setup(VirtMachineState *vms, PCIHostState *pci)
 {
     if (g_strcmp0(g_getenv("PODIUM7_RESEARCH_NVME_DART"), "1")) { return; }
@@ -94,7 +116,16 @@ static void podium7_storage_iommu_setup(VirtMachineState *vms, PCIHostState *pci
     memory_region_init_iommu(iommu, sizeof(*iommu), "podium7-storage-dart-iommu",
                              OBJECT(vms), "podium7-storage-dart", UINT64_MAX);
     AddressSpace *space = g_new0(AddressSpace, 1);
-    address_space_init(space, MEMORY_REGION(iommu), "podium7-storage-dma");
+    MemoryRegion *dma_root = g_new0(MemoryRegion, 1);
+    memory_region_init(dma_root, OBJECT(vms), "podium7-storage-dma-root", UINT64_MAX);
+    memory_region_add_subregion(dma_root, 0, MEMORY_REGION(iommu));
+    if (!g_strcmp0(g_getenv("PODIUM7_RESEARCH_NVME_MSI"), "1")) {
+        MemoryRegion *msi = g_new0(MemoryRegion, 1);
+        memory_region_init_io(msi, OBJECT(vms), &podium7_storage_msi_ops, NULL,
+                             "podium7-storage-msi", 4096);
+        memory_region_add_subregion_overlap(dma_root, 0xbffff000ULL, msi, 1);
+    }
+    address_space_init(space, dma_root, "podium7-storage-dma");
     pci->bypass_iommu = false;
     pci_setup_iommu(pci->bus, &podium7_storage_iommu_ops, space);
 }

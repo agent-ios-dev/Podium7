@@ -17,7 +17,7 @@ from qemu_probe import elf_image
 DISK_BYTES = 16 << 30
 
 
-def assembly(dart=False):
+def assembly(dart=False, msi=False):
     source = '''.text
 mov x20, #1
 // Apple port0 link bit reflects the real root port, only while enabled.
@@ -383,17 +383,120 @@ subs x1, x1, #8
 b.ne unchanged
 '''
         source = source.replace("mov x20, #0\nb finish", negative + "mov x20, #0\nb finish")
+    if msi:
+        if not dart:
+            raise ValueError("MSI research requires the verified DART DMA path")
+        setup = '''// MSI-X table uses genuine QEMU PCI capabilities and BAR4.
+movz w0, #4
+movk w0, #0x2008, lsl #16
+str w0, [x21, #0x20]
+mov w0, #6
+str w0, [x21, #0x24]
+ldrb w0, [x21, #0x34]
+mov x1, #48
+msix_next:
+cbz w0, failure
+add x2, x21, x0
+ldrb w3, [x2]
+cmp w3, #0x11
+b.eq msix_found
+ldrb w0, [x2, #1]
+subs x1, x1, #1
+b.ne msix_next
+b failure
+msix_found:
+ldr w0, [x2, #4]
+and w1, w0, #7
+cmp w1, #4
+b.ne failure
+and w0, w0, #0xfffffff8
+movz x1, #0
+movk x1, #0x2008, lsl #16
+movk x1, #6, lsl #32
+add x1, x1, x0
+movz x0, #0xf000
+movk x0, #0xbfff, lsl #16
+str x0, [x1]
+str wzr, [x1, #8]
+str wzr, [x1, #12]
+ldrh w0, [x2, #2]
+and w0, w0, #0xbfff
+orr w0, w0, #0x8000
+strh w0, [x2, #2]
+dsb sy
+'''
+        source = source.replace('movz x22, #0', setup + 'movz x22, #0', 1)
+        # Enable interrupts for the I/O CQ as well as the admin CQ.
+        source = source.replace('mov w0, #1\nstr w0, [x23, #44]\nbl submit_admin',
+                                'mov w0, #3\nstr w0, [x23, #44]\nbl submit_admin', 1)
+        prefix = '''msr daifset, #15
+msr spsel, #1
+movz x0, #0
+movk x0, #0x4504, lsl #16
+mov sp, x0
+adr x0, msi_vectors
+msr vbar_el1, x0
+isb
+mov x28, #0
+mov x29, #0
+movz x16, #0
+movk x16, #0xe10, lsl #16
+movk x16, #2, lsl #32
+mov w17, #1
+str w17, [x16, #0x3480]
+add x16, x16, #4, lsl #12
+str w17, [x16, #0x1a4]
+msr daifclr, #2
+'''
+        source = source.replace('.text\n', '.text\n' + prefix, 1)
+        source = source.replace('submit:\nadd x25', 'submit:\nadd x29, x29, #1\nadd x25', 1)
+        wait = '''// A CQ entry alone does not pass: a real EL1 IRQ is required.
+mov x1, #0x1000000
+msi_wait:
+cmp x28, x29
+b.eq msi_received
+subs x1, x1, #1
+b.ne msi_wait
+b failure
+msi_received:
+'''
+        source = source.replace('completed:\n', 'completed:\n' + wait, 1)
+        unmask = '''movz x16, #0
+movk x16, #0xe10, lsl #16
+movk x16, #2, lsl #32
+add x16, x16, #4, lsl #12
+mov w17, #1
+str w17, [x16, #0x1a4]
+'''
+        source = source.replace('str w25, [x22, x26]\nadd x23',
+                                'str w25, [x22, x26]\ndsb sy\n' + unmask + 'add x23', 1)
+        source += '''msi_handler:
+movz x16, #0
+movk x16, #0xe10, lsl #16
+movk x16, #2, lsl #32
+ldr w17, [x16, #0x2004]
+movz w16, #0x120
+movk w16, #1, lsl #16
+cmp w17, w16
+b.ne failure
+add x28, x28, #1
+eret
+.p2align 11
+msi_vectors:
+'''
+        for slot in range(16):
+            source += ('b msi_handler' if slot in (1, 5, 9, 13) else 'b failure') + '\n.space 124\n'
     return source
 
 
-def check(executable, report, dart=False):
+def check(executable, report, dart=False, msi=False):
     report.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as temporary:
         root = pathlib.Path(temporary)
         disk = root / "scratch-16g.raw"
         with disk.open("xb") as stream:
             stream.truncate(DISK_BYTES)
-        (root / "test.s").write_text(assembly(dart))
+        (root / "test.s").write_text(assembly(dart, msi))
         subprocess.run(["xcrun", "clang", "-arch", "arm64", "-c", str(root / "test.s"),
                         "-o", str(root / "test.o")], check=True)
         code = text_section((root / "test.o").read_bytes())
@@ -405,7 +508,8 @@ def check(executable, report, dart=False):
             "-drive", f"if=none,id=podium7-storage,format=raw,file={disk}",
             "-trace", "enable=pci_nvme*", "-D", str(root / "nvme-trace.txt"),
             "-device", f"loader,file={image},cpu-num=0"], capture_output=True, text=True, timeout=25,
-            env={**os.environ, "PODIUM7_RESEARCH_NVME_DART": "1" if dart else "0"})
+            env={**os.environ, "PODIUM7_RESEARCH_NVME_DART": "1" if dart else "0",
+                 "PODIUM7_RESEARCH_NVME_MSI": "1" if msi else "0"})
         with disk.open("rb") as stream:
             stream.seek(8 * 512)
             persisted = stream.read(512) == bytes(range(256)) * 2
@@ -421,7 +525,7 @@ def check(executable, report, dart=False):
                        "admin queue DMA: identify controller and 16 GiB namespace",
                        "I/O queue creation, 512-byte write and independent read comparison",
                        "host-side exact persisted sector verification"],
-            "interrupt_delivery_tested": False, "research_port0_dart_tested": dart,
+            "interrupt_delivery_tested": msi, "research_port0_dart_tested": dart,
             "dma_permission_and_invalid_leaf_checked": dart,
             "mapper_fault_evidence_confirmed": fault_evidence if dart else None,
             "dart_hardware_fault_irq_tested": False,
@@ -436,5 +540,6 @@ if __name__ == "__main__":
     parser.add_argument("--qemu", required=True)
     parser.add_argument("--report", type=pathlib.Path, default=pathlib.Path(".firmware/nvme-checks.json"))
     parser.add_argument("--dart", action="store_true", help="Verify nonidentity IOVA DMA, read-only and invalid-page errors")
+    parser.add_argument("--msi", action="store_true", help="Require real NVMe MSI-X delivery into EL1 IRQ vectors")
     args = parser.parse_args()
-    check(args.qemu, args.report, args.dart)
+    check(args.qemu, args.report, args.dart, args.msi)

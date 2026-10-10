@@ -1249,6 +1249,16 @@ static void podium7_pmp_start(void)
                             "podium7-t8010-vxd-power-control");
 }
 '''
+    # Original ISP reads revision at +0xa0000 (run 38030604802).
+    # One exact 0x140000 n112ap register window; no camera firmware or frames.
+    isp = scaler.replace("SCALER", "ISP").replace("scaler", "isp").replace("Podium7ScalerBank", "Podium7ISPBank")
+    start = isp.index("static void podium7_isp_create(")
+    isp = isp[:start] + '''static void podium7_isp_create(MachineState *machine, MemoryRegion *memory)
+{
+    podium7_isp_bank_create(machine, memory, 0x205b00000ULL, 0x140000,
+                            "podium7-t8010-isp-control");
+}
+'''
     # Original Samsung SPI starts by disabling +0/+0xc and setting +8.
     # Discovery/control storage only; no codec/touch traffic or fake IRQs.
     spi = mipi.replace("MIPI-DSIM", "SPI").replace("mipi_dsim", "spi")
@@ -1746,7 +1756,7 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"\n#include "qemu/timer.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + jpeg + scaler + vxd + spi + i2c + pmp_system + dart + pcie + aop_system + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + jpeg + scaler + vxd + isp + spi + i2c + pmp_system + dart + pcie + aop_system + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
     timer_fiq = r'''
 /* Research A10 EL1 timers arrive as FIQ, not GIC PPIs. External AIC device
  * interrupts use a separate CPU IRQ route; EL2 timer-enable controls are absent. */
@@ -1845,6 +1855,7 @@ static void podium7_irq_or_set(void *opaque, int input, int level)
         podium7_jpeg_create(machine, sysmem);
         podium7_scaler_create(machine, sysmem);
         podium7_vxd_create(machine, sysmem);
+        podium7_isp_create(machine, sysmem);
         podium7_spi_create(machine, sysmem);
         podium7_i2c_create(machine, sysmem);
         podium7_pmp_system_create(machine, sysmem);

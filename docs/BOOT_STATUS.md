@@ -1,3 +1,22 @@
+## Preboot allocation works; next guest mount task under test
+
+Run 38055238180 confirms the source APFS container permits 14 volumes and
+native diskutil successfully creates Preboot. Creating xART fails with
+-69624. Earlier runs show grouped Data creation also failing. Removing the
+read-only source mount before allocation did not resolve grouped Data.
+
+Original guest mount in run 38053476211 explicitly reports missing Data
+as not required in environment 1, then exits 66 on the missing Preboot
+firmware path. The next isolated experiment therefore requires real Preboot,
+records any grouped Data creation failure, and does not create xART on the
+host. It verifies that failed Data allocation did not partially create a
+volume. Missing optional roles are reported, never claimed as prepared.
+
+Run 38055578574 tests the actual guest mount phase with that layout.
+96 local tests pass. SpringBoard and authenticated boot remain unconfirmed.
+
+---
+
 ## System userland proceeds to mount-phase-1; installed volumes missing
 
 Run 38053476211 executes 10,497 EL0 returns and passes the real fsck quick

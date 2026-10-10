@@ -11,7 +11,7 @@ on:
         type: boolean
         default: false
       prepare_install_layout:
-        description: Create missing Data, Preboot and xART on isolated diagnostic disk
+        description: Create Preboot and attempt grouped Data on isolated diagnostic disk
         type: boolean
         default: false
       root_device:

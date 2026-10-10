@@ -74,6 +74,7 @@ def capture(path, virtual_addresses=(), memory_windows=(), physical_windows=(), 
                         return read_words(address, size)
                     try:
                         result["guest_process_metadata"] = inspect(read_metadata, thread_metadata=True,
+                            thread_backtraces=True,
                             read_physical=lambda address, size: read_words(address, size, True),
                             service_labels=service_labels)
                     except ValueError as error:

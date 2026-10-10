@@ -10,7 +10,7 @@ def pointer(value):
     return 0xffffffe000000000 <= value < 0xfffffffffffffff8 and value % 8 == 0
 
 
-def inspect(read, *, thread_metadata=False, read_physical=None, service_labels=()):
+def inspect(read, *, thread_metadata=False, thread_backtraces=False, read_physical=None, service_labels=()):
     """read(address, size) returns bytes; never write or export raw memory."""
     def data(address, size):
         if not pointer(address) or not 1 <= size <= 512:
@@ -47,9 +47,36 @@ def inspect(read, *, thread_metadata=False, read_physical=None, service_labels=(
                     0xffffffe000000000 <= continuation < 0xffffffffffffffff
                     and continuation % 4 == 0):
                 raise ValueError("invalid thread identity or continuation")
-            result.append({"tid": tid, "scheduler_state": state,
-                           "kernel_continuation": hex(continuation)})
+            thread = {"tid": tid, "scheduler_state": state,
+                      "kernel_continuation": hex(continuation)}
+            if thread_backtraces and not continuation and state & 1:
+                try:
+                    thread['kernel_return_addresses'] = backtrace(current)
+                except (ValueError, KeyError) as error:
+                    thread['backtrace_capture_error'] = str(error)
+            result.append(thread)
             current = word(current + 0x3a8)
+        return result
+    def backtrace(thread):
+        # Original _Switch_context 0xfffffff0071946e4 uses thread +0x130
+        # and stores FP/LR/SP at context +0x50/+0x58/+0x60. Retain only
+        # kernel return addresses, never locals, general registers or stacks.
+        context = word(thread + 0x130)
+        frame, link, stack = struct.unpack('<QQQ', data(context + 0x50, 24))
+        if not pointer(stack):
+            raise ValueError('invalid stopped thread stack pointer')
+        end = (stack & ~0x3fff) + 0x4000
+        result = []
+        for _ in range(16):
+            if not (0xffffffe000000000 <= link < 0xffffffffffffffff and link % 4 == 0):
+                break
+            result.append(hex(link))
+            if not pointer(frame) or frame < stack or frame + 16 > end:
+                break
+            next_frame, link = struct.unpack('<QQ', data(frame, 16))
+            if next_frame <= frame:
+                break
+            stack, frame = frame + 16, next_frame
         return result
     base, mask = word(HASH_POINTER), word(HASH_MASK)
     if not pointer(base) or mask > 8191 or mask & (mask + 1):

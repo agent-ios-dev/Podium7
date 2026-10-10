@@ -70,6 +70,28 @@ class GuestProcessesTests(unittest.TestCase):
         result = inspect(lambda address, size: memory[address], thread_metadata=True)
         self.assertEqual(result['processes'][0]['threads'], [])
 
+    def test_stopped_thread_backtrace_retains_only_kernel_return_addresses(self):
+        memory, task, thread = self.thread_fixture()
+        context, stack = task + 0x2000, task + 0x4000
+        memory[thread + 0xd0] = struct.pack('<Q', 0)
+        memory[thread + 0x130] = struct.pack('<Q', context)
+        memory[context + 0x50] = struct.pack('<QQQ', stack+0x80, 0xfffffff007194734, stack)
+        memory[stack + 0x80] = struct.pack('<QQ', stack+0x100, 0xfffffff0071ea680)
+        memory[stack + 0x100] = struct.pack('<QQ', 0, 0x100000000)
+        result = inspect(lambda a,s: memory[a], thread_metadata=True, thread_backtraces=True)
+        self.assertEqual(result['processes'][0]['threads'][0]['kernel_return_addresses'],
+                         ['0xfffffff007194734', '0xfffffff0071ea680'])
+
+    def test_frame_outside_stack_is_never_read(self):
+        memory, task, thread = self.thread_fixture()
+        context, stack = task + 0x2000, task + 0x4000
+        memory[thread + 0xd0] = struct.pack('<Q', 0)
+        memory[thread + 0x130] = struct.pack('<Q', context)
+        memory[context + 0x50] = struct.pack('<QQQ', stack+0x10000, 0xfffffff007194734, stack)
+        result = inspect(lambda a,s: memory[a], thread_metadata=True, thread_backtraces=True)
+        self.assertEqual(result['processes'][0]['threads'][0]['kernel_return_addresses'],
+                         ['0xfffffff007194734'])
+
     def test_credential_requires_kernel_pointer_and_matching_process(self):
         memory, nodes = self.fixture()
         memory[nodes[0] + 0x500] = struct.pack('<Q', nodes[1])

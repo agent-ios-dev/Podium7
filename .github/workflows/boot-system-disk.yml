@@ -6,6 +6,14 @@ on:
         description: Successful official system disk preparation run
         required: true
         type: string
+      root_device:
+        description: Explicit research root-device name
+        required: true
+        default: disk0s1s1
+        type: choice
+        options:
+          - disk0s1s1
+          - disk0s1
 permissions:
   contents: read
   actions: read
@@ -59,11 +67,13 @@ jobs:
           run-id: ${{ inputs.disk_run_id }}
           github-token: ${{ github.token }}
       - name: Boot original kernel with official system trust cache and APFS disk
+        env:
+          RESEARCH_ROOT: ${{ inputs.root_device }}
         run: |
           mkdir .firmware/system-boot
           cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/system-boot/
           python3 Tools/inspect_system_disk.py .firmware/system-disk/storage-16g.raw --output .firmware/system-boot/system-disk-layout.json
-          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/system-boot --research-bridge-handoff --trust-cache .firmware/StaticTrustCache.im4p --research-system-root disk0s1s1 --research-pmp-core --research-cfi-nvram --research-aes-root-fallback --research-nvme --research-nvme-dart --research-nvme-msi --research-nvme-image .firmware/system-disk/storage-16g.raw --seconds 300
+          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/system-boot --research-bridge-handoff --trust-cache .firmware/StaticTrustCache.im4p --research-system-root "$RESEARCH_ROOT" --research-pmp-core --research-cfi-nvram --research-aes-root-fallback --research-nvme --research-nvme-dart --research-nvme-msi --research-nvme-image .firmware/system-disk/storage-16g.raw --seconds 300
           python3 Tools/inspect_boot_fault.py --directory .firmware/system-boot
           python3 Tools/inspect_system_disk.py .firmware/system-disk/storage-16g.raw --trace .firmware/system-boot/qemu-trace.txt --output .firmware/system-boot/system-disk-layout.json
           python3 Tools/verify_system_userland.py .firmware/system-boot

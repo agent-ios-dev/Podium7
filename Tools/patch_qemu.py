@@ -37,6 +37,24 @@ void HELPER(podium7_acc_trace)(CPUARMState *env, uint64_t pc)
 {
     static unsigned logged;
     static unsigned irq_logged;
+    static unsigned partition_logged;
+    if ((pc == 0xfffffff005b7b99cULL || pc == 0xfffffff005b7b02cULL) &&
+        partition_logged++ < 16) {
+        char hint[37] = { 0 };
+        int read_status = -1;
+        if (pc == 0xfffffff005b7b99cULL) {
+            read_status = cpu_memory_rw_debug(env_cpu(env), env->xregs[29] - 0x80,
+                                             (uint8_t *)hint, 36, 0);
+            for (unsigned i = 0; i < 36; i++) {
+                if (hint[i] && ((unsigned char)hint[i] < 32 || (unsigned char)hint[i] > 126)) {
+                    hint[i] = '.';
+                }
+            }
+        }
+        qemu_log("PODIUM7 GPT-PARTITION pc=%016" PRIx64 " result=%016" PRIx64
+                 " media=%016" PRIx64 " hint=%s hint_read=%d\n",
+                 pc, env->xregs[0], env->xregs[21], hint, read_status);
+    }
     if ((pc == 0xfffffff00777f958ULL || pc == 0xfffffff00777f8ecULL) &&
         irq_logged++ < 64) {
         uint8_t raw[8];
@@ -78,7 +96,8 @@ void HELPER(podium7_acc_trace)(CPUARMState *env, uint64_t pc)
         pc == 0xfffffff0077b9084ULL || pc == 0xfffffff0077b9108ULL ||
         pc == 0xfffffff0077b910cULL || pc == 0xfffffff005b898e4ULL ||
         pc == 0xfffffff00777f958ULL || pc == 0xfffffff00777f8ecULL ||
-        pc == 0xfffffff0068fcb94ULL || pc == 0xfffffff0068fcb98ULL) {
+        pc == 0xfffffff0068fcb94ULL || pc == 0xfffffff0068fcb98ULL ||
+        pc == 0xfffffff005b7b99cULL || pc == 0xfffffff005b7b02cULL) {
         gen_helper_podium7_acc_trace(tcg_env, tcg_constant_i64(pc));
     }''')
     # QEMU reserves fieldoffset=0 to mean no backing storage.

@@ -19,6 +19,8 @@ jobs:
         run: |
           python3 Tools/fetch_firmware.py --system-volume
           clang -Wall -Wextra -Werror Tools/create_apfs_snapshot.c -o .firmware/create-apfs-snapshot
+          codesign --force --sign - --entitlements Tools/snapshot-helper.entitlements.plist .firmware/create-apfs-snapshot
+          codesign --verify --strict .firmware/create-apfs-snapshot
       - uses: actions/download-artifact@v4
         with:
           name: ios-system-disk

@@ -1,3 +1,27 @@
+## System userland proceeds to mount-phase-1; installed volumes missing
+
+Run 38053476211 executes 10,497 EL0 returns and passes the real fsck quick
+check. launchd then starts mount-phase-1. Original mount reports a missing
+Data volume, missing role 256 (xART), and ENOENT for the Preboot firmware
+namespace before exit 66. launchd requests a userspace panic. This is the
+next concrete failure, rather than a filesystem-check hang.
+
+The isolated install-layout experiment creates role-tagged Data, Preboot
+and xART volumes using Apple diskutil, groups Data with the exact original
+System UUID, and seeds available original /private/var and firmware files.
+Mount paths are verified against the attached fixture before copying.
+The currently synthetic handoff selects an all-zero boot-manifest namespace;
+this is recorded explicitly. It does not establish authenticated boot, an
+installed root snapshot, display support, or a running SpringBoard.
+
+Run 38054266282 tests this layout with the original guest mount task. The
+source disk artifact is preserved; only its downloaded copy is changed.
+95 local tests pass, including rejecting host containers and wrong mounts.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38053476211
+
+---
+
 ## Real system launchd reached in explicit unsealed-root diagnostic
 
 Run 38051230231 executes original system launchd from the APFS System volume

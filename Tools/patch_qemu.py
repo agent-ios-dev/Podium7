@@ -1969,12 +1969,12 @@ static void podium7_irq_or_set(void *opaque, int input, int level)
     # Record the actual MSI-X payload before the normal DMA send. This changes
     # neither interrupt routing nor completion, and never invents an IRQ.
     replace_once(directory / "hw/pci/msix.c",
-        '    msg = msix_get_message(dev, vector);',
+        '    msg = msix_get_message(dev, vector);\n\n    msi_send_message(dev, msg);',
         '    msg = msix_get_message(dev, vector);\n'
         '    if (!strcmp(object_get_typename(OBJECT(dev)), "nvme")) {\n'
         '        qemu_log("PODIUM7 NVME-MSI vector=%u address=%016" PRIx64\n'
         '                 " data=%08x\\n", vector, msg.address, msg.data);\n'
-        '    }')
+        '    }\n\n    msi_send_message(dev, msg);')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")
 

@@ -15,10 +15,17 @@ static void podium7_storage_attach(VirtMachineState *vms, DeviceState *host)
     BlockBackend *disk = blk_by_name("podium7-storage");
     if (!disk) { return; }
     PCIHostState *pci = PCI_HOST_BRIDGE(host);
-    PCIDevice *port = pci_new(PCI_DEVFN(0, 0), "pcie-root-port");
-    qdev_prop_set_uint8(DEVICE(port), "port", 1);
-    qdev_prop_set_uint8(DEVICE(port), "chassis", 1);
-    pci_realize_and_unref(port, pci->bus, &error_fatal);
+    PCIDevice *port = NULL;
+    /* Original DeviceTree exposes four host ports. Empty root ports still
+     * have real PCI capabilities, but no endpoint or active link. */
+    for (unsigned i = 0; i < 4; i++) {
+        PCIDevice *root = pci_new(PCI_DEVFN(i, 0), "pcie-root-port");
+        qdev_prop_set_uint8(DEVICE(root), "port", i + 1);
+        qdev_prop_set_uint8(DEVICE(root), "chassis", 1);
+        qdev_prop_set_uint16(DEVICE(root), "slot", i + 1);
+        pci_realize_and_unref(root, pci->bus, &error_fatal);
+        if (i == 0) { port = root; }
+    }
     PCIDevice *nvme = pci_new(PCI_DEVFN(0, 0), "nvme");
     qdev_prop_set_string(DEVICE(nvme), "serial", "Podium7-Research");
     qdev_prop_set_drive(DEVICE(nvme), "drive", disk);

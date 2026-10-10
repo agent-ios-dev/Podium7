@@ -44,6 +44,34 @@ movz w1, #0x1b36
 movk w1, #0xc, lsl #16
 cmp w0, w1
 b.ne failure
+// Traverse the real PCI capability lists on all four DeviceTree root ports.
+mov x4, x21
+mov x5, #4
+root_caps:
+ldr w0, [x4]
+cmp w0, w1
+b.ne failure
+ldrb w6, [x4, #0x34]
+mov x7, #48
+cap_next:
+cbz w6, failure
+add x8, x4, x6
+ldrb w9, [x8]
+cmp w9, #0x10
+b.eq cap_found
+ldrb w6, [x8, #1]
+subs x7, x7, #1
+b.ne cap_next
+b failure
+cap_found:
+cmp x5, #4
+b.eq root_next
+ldrh w9, [x8, #0x12]
+tbnz w9, #13, failure
+root_next:
+add x4, x4, #8, lsl #12
+subs x5, x5, #1
+b.ne root_caps
 mov w0, #6
 strh w0, [x21, #4]
 movz w0, #0x100
@@ -290,6 +318,7 @@ def check(executable, report):
         report.write_text(json.dumps({"passed": passed, "disk_bytes": disk.stat().st_size,
             "persistent_write_verified": persisted, "returncode": result.returncode,
             "checks": ["real root port and class 010802 NVMe endpoint enumeration",
+                       "four original host-port capability lists; empty ports have no active link",
                        "admin queue DMA: identify controller and 16 GiB namespace",
                        "I/O queue creation, 512-byte write and independent read comparison",
                        "host-side exact persisted sector verification"],

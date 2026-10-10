@@ -1114,14 +1114,15 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
         /* Bounded research FIFO: original AP sends endpoint-start bursts.
          * Stage the low word independently; publish only on the high word.
          * Exact hardware depth is not yet established, so capacity 16 is explicit. */
-        if (bank->inbox_count < 16) {
+        if (address == 0x4010) {
+            /* Staging must survive a consumer freeing space between low/high writes. */
             bank->registers[address >> 2] = value;
-            if (address == 0x4014) {
-                unsigned tail = (bank->inbox_head + bank->inbox_count) % 16;
-                bank->inbox_fifo[tail] = ((uint64_t)value << 32) | bank->registers[0x4010 >> 2];
-                bank->inbox_count++;
-                bank->inbox_pending = true;
-            }
+        } else if (bank->inbox_count < 16) {
+            bank->registers[address >> 2] = value;
+            unsigned tail = (bank->inbox_head + bank->inbox_count) % 16;
+            bank->inbox_fifo[tail] = ((uint64_t)value << 32) | bank->registers[0x4010 >> 2];
+            bank->inbox_count++;
+            bank->inbox_pending = true;
         }
     } else if (address == 0x4010 || address == 0x4014) {""")
     sep = sep.replace("static void podium7_sep_mailbox_bank_create(",

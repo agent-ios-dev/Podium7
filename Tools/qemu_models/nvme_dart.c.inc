@@ -1,6 +1,7 @@
 /* Opt-in port0 DART research mapper, derived from original queue snapshots.
  * 4K two-level tables; PCI inbound address bit31 is excluded from table index.
- * Other streams, fault IRQs, DAPF and MSI delivery are not implemented. */
+ * Other streams, fault IRQs and DAPF are not implemented.
+ * A separate opt-in MSI aperture below has its own EL1 delivery test. */
 static uint64_t podium7_storage_ram_end;
 static unsigned podium7_storage_dma_logged;
 static unsigned podium7_storage_dma_fault_seen;

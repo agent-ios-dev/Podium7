@@ -24,6 +24,18 @@ jobs:
           key: qemu10-arm64-research-v1-${{ github.sha }}
           restore-keys: qemu10-arm64-research-v1-
       - run: python3 -m unittest discover -s Tools -p 'test_*.py'
+      - name: Compile all NVMe ARM64 guests before building the backend
+        run: |
+          python3 - <<'PY'
+          import pathlib, subprocess, sys, tempfile
+          sys.path.insert(0, 'Tools')
+          from check_nvme import assembly
+          with tempfile.TemporaryDirectory() as tmp:
+              for dart, msi in ((False, False), (True, False), (True, True)):
+                  source = pathlib.Path(tmp) / f'nvme-{dart}-{msi}.s'
+                  source.write_text(assembly(dart, msi))
+                  subprocess.run(['xcrun', 'clang', '-arch', 'arm64', '-c', str(source), '-o', str(source.with_suffix('.o'))], check=True)
+          PY
       - run: python3 Tools/fetch_firmware.py --restore-ramdisk
       - run: python3 Tools/analyze_firmware.py
       - name: Audit PMGR bootloader bridge settings

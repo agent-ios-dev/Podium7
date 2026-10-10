@@ -1,3 +1,28 @@
+## Real NVMe MSI-X delivery passes the ARM64 EL1 guest
+
+Run38042475924 passes the real DART+MSI guest. Every submitted admin/I/O
+command must both complete and enter an actual EL1 IRQ handler. The handler
+claims AIC event0x10120 (IRQ288); NVMe emits a real message to0xbffff000/data0.
+The guest still verifies persisted sector I/O and unchanged protected pages.
+This is an interrupt-delivery milestone, not evidence of a desktop boot.
+
+The independent original-kernel profile with MSI is now executing. The prior
+instrumented original driver sends exactly address0xbffff000/data0/vector0,
+matching original DeviceTree msi-address and msi-vector-offset288. The new
+port0 research aperture bypasses normal DART page-table translation for MSI,
+accepts only four-byte writes at offset0 with data0..7 and latches an AIC edge.
+Claim consumes the edge while retaining existing auto-mask and level behavior.
+Direct DMA, DART-only controls, other ports and unimplemented DART fault IRQs
+are not converted into this MSI path. Native IPA integration remains absent.
+
+The MSI assembly's nonencodable immediate and assumed BAR4 location were caught
+and corrected. A new early workflow step compiles all three guest variants
+before firmware fetch and backend compilation.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38042475924
+
+---
+
 ## Verified DART I/O and original Identify completion; MSI routing still missing
 
 Run38041269540 passes both actual ARM64 NVMe guests. The DART guest performs

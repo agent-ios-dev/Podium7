@@ -222,6 +222,7 @@ jobs:
           cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/nvme-msi-kernel-experiment/
           python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/nvme-msi-kernel-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --trust-cache .firmware/RestoreTrustCache.im4p --research-ramdisk-root --research-pmp-core --research-cfi-nvram --research-aes-root-fallback --research-nvme --research-nvme-dart --research-nvme-msi --seconds 180
           python3 Tools/inspect_boot_fault.py --directory .firmware/nvme-msi-kernel-experiment
+          python3 Tools/verify_nvme_kernel.py .firmware/nvme-msi-kernel-experiment
           python3 Tools/verify_restore_userland.py .firmware/nvme-msi-kernel-experiment
       - name: Save original NVMe MSI boot evidence
         uses: actions/upload-artifact@v4

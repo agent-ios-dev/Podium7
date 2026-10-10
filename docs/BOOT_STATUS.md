@@ -1,3 +1,28 @@
+## Original iOS publishes disk0 and reads sectors through DART and MSI
+
+Run38042475924 original MSI profile logs `Successfully initialized NVMe drive`,
+publishes IONVMeBlockStorageDevice and disk0, creates real CQ1/SQ1 and reads
+namespace1 LBAs0 and1. Identify, Set Features, queue creation, log page and
+namespace discovery complete without command timeout. Actual endpoint MSI
+writes reach AIC288. Restore launchd/early boot also pass with13531 EL0 returns.
+The overall run is still red because the independent fresh PMP repeat fails.
+
+A strict new storage gate requires original driver initialization, published
+disk0/block device, I/O queues, MSI and sector reads with no command timeout.
+It passes the downloaded real trace. 69 local Python tests pass using a
+workspace temporary-directory workaround for the Windows tempfile ACL issue.
+
+SpringBoard remains unconfirmed. The empty scratch disk has no system volume.
+Official IPSW OS member098-68748-067.dmg is4813157696 bytes, ZIP_STORED, CRC
+ba122ac6. Its checked UDIF trailer/resources describe14139459 sectors,
+GPT and Apple_APFS at sector34/count14139392. Chunk type0x80000007 is LZFSE;
+raw and zero chunks are also present. Small range reads inspected metadata;
+the full OS image has not yet been downloaded or prepared as a boot volume.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38042475924
+
+---
+
 ## Real NVMe MSI-X delivery passes the ARM64 EL1 guest
 
 Run38042475924 passes the real DART+MSI guest. Every submitted admin/I/O

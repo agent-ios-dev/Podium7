@@ -25,7 +25,7 @@ def inspect(stream):
     stream.seek(table_lba * 512); table = stream.read(count * entry_size)
     if zlib.crc32(table) != crc:
         raise ValueError('GPT table CRC invalid')
-    result = {'sectors': {'0': mbr.hex(), '1': header.hex(), '2': table[:512].hex()},
+    result = {'sectors': {'0': mbr.hex(), '1': header.hex(), '2': table.hex()},
               'partitions': [], 'booted_ios': False}
     for index in range(count):
         entry = table[index * entry_size:(index + 1) * entry_size]

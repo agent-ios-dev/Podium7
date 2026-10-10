@@ -421,6 +421,64 @@ ldr x2, [x0], #8
 cbnz x2, failure
 subs x1, x1, #8
 b.ne subpage_unchanged
+// Exercise the actual GPT-sized transfer through a four-page PRP list.
+// Full byte windows still have bit1 clear, like original data descriptors.
+mov x27, #0
+movz x0, #0x10c0
+movk x0, #0x4503, lsl #16
+movz x1, #0x8001
+movk x1, #0x4501, lsl #16
+movk x1, #0xfff0, lsl #32
+mov x2, #4
+bulk_leaf:
+str x1, [x0], #8
+add x1, x1, #0x1000
+subs x2, x2, #1
+b.ne bulk_leaf
+movz x0, #0xc000
+movk x0, #0x4501, lsl #16
+movz x1, #0x9000
+movk x1, #0x8001, lsl #16
+str x1, [x0]
+add x1, x1, #0x1000
+str x1, [x0, #8]
+add x1, x1, #0x1000
+str x1, [x0, #16]
+mov x20, #13
+movz w0, #2
+movk w0, #9, lsl #16
+str w0, [x23]
+mov w0, #1
+str w0, [x23, #4]
+movz x0, #0x8000
+movk x0, #0x8001, lsl #16
+str x0, [x23, #24]
+movz x0, #0xc000
+movk x0, #0x8001, lsl #16
+str x0, [x23, #32]
+mov x0, #0
+str x0, [x23, #40]
+mov w0, #31
+str w0, [x23, #48]
+bl submit_io
+movz x0, #0x8000
+movk x0, #0x4501, lsl #16
+mov x1, #0
+bulk_compare:
+ldrb w2, [x0, x1]
+mov w3, #0
+cmp x1, #0x1000
+b.lo bulk_expected
+mov x4, #0x1200
+cmp x1, x4
+b.hs bulk_expected
+and w3, w1, #255
+bulk_expected:
+cmp w2, w3
+b.ne failure
+add x1, x1, #1
+cmp x1, #0x4000
+b.ne bulk_compare
 '''
         source = source.replace("mov x20, #0\nb finish", negative + "mov x20, #0\nb finish")
     if msi:
@@ -574,6 +632,7 @@ def check(executable, report, dart=False, msi=False):
                        "host-side exact persisted sector verification"],
             "interrupt_delivery_tested": msi, "research_port0_dart_tested": dart,
             "dma_permission_and_invalid_leaf_checked": dart,
+            "gpt_sized_prp_read_verified": dart and passed,
             "mapper_fault_evidence_confirmed": fault_evidence if dart else None,
             "dart_hardware_fault_irq_tested": False,
             "stdout": result.stdout, "stderr": result.stderr,

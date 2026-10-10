@@ -1,3 +1,22 @@
+## PCIe channel reset removed; virtual root-port capability validation pending
+
+Run 38036292150 passes the channel reset guest: reg[1] +4 bit16 self-clears,
+without a DMA completion claim. Both normal and independent kernel probes
+advance and panic at AppleT801xPCIePort::enablePortHardware because
+_expressCapOffset is zero. The prior empty PCI config aperture supplied no
+root-port capabilities. No EL0 or userland is reached in these probes.
+
+fcbbc27 adds explicit virtual QEMU-identity PCIe root-port config on bus0
+and leaves downstream buses absent. Type1 headers, capability-list status,
+PCIe v2 root-port capability and zero link status are checked by an ARM64
+guest. This is research topology, not a claim of exact Apple port config.
+Compile, guest checks and original-kernel validation run in 38036534007.
+No launchd, SpringBoard or usable iOS IPA has been verified.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38036292150
+
+---
+
 ## Original user code progresses; PCIe common-control second phase added
 
 Run 38035660772 passes the first PCIe request check, confirms PMP startup and

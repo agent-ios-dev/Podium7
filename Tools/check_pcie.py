@@ -83,6 +83,13 @@ movz w5, #0x10
 movk w5, #0x42, lsl #16
 cmp w4, w5
 b.ne failure
+ldr w4, [x3, #0x8c]
+cmp w4, #0x11
+b.ne failure
+str wzr, [x3, #0x8c]
+ldr w4, [x3, #0x8c]
+cmp w4, #0x11
+b.ne failure
 ldr w4, [x3, #0x90]
 cbnz w4, failure
 add x3, x3, #0x100, lsl #12

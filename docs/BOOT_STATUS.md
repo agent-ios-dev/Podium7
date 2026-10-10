@@ -1,3 +1,31 @@
+## Real install roles under guest validation
+
+Run 38057428910 confirms native APFS expansion to the fixed 16-GiB disk:
+container capacity 17,179,832,320 bytes. GPT now exposes the actual final
+usable LBA; both header and entry-table checksums are checked before edits.
+The original System UUID is preserved and guest filesystem checking passes.
+
+The original DeviceTree fstab requires xART, System, Preboot, Data, Update
+and Hardware. Guest APFS aborts fstab enumeration on the missing xART role,
+so adding Preboot alone cannot complete mount-phase-1. Native macOS refuses
+both direct xART creation and assigning its iOS role to a new empty volume
+(run 38058108440, error -69599).
+
+The next isolated experiment creates genuine empty APFS filesystems with
+native diskutil, copies original Data/Preboot files, detaches the entire
+image, then formats only the four new volume role fields using Apple's
+published APFS schema. UUID, name, encryption state, object type, checksum
+and absence of an existing role/group must match before any write. System
+and Preboot metadata remain unchanged. Historical superblocks are checked
+and their checksums updated; original guest fsck and mounts must validate
+this experiment. All 101 local tests pass, including corruption rejection
+before writes and preservation of System and unrelated metadata.
+
+This does not establish an authenticated restore, System/Data grouping,
+a valid root snapshot, a display, or SpringBoard. These remain open gates.
+
+---
+
 ## Preboot allocation works; next guest mount task under test
 
 Run 38055238180 confirms the source APFS container permits 14 volumes and

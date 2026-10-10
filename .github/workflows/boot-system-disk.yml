@@ -11,7 +11,7 @@ on:
         type: boolean
         default: false
       prepare_install_layout:
-        description: Create Preboot and attempt grouped Data on isolated diagnostic disk
+        description: Prepare real install volumes and validate guest APFS on isolated 16-GiB disk
         type: boolean
         default: false
       root_device:

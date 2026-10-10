@@ -10,6 +10,7 @@ import subprocess
 import time
 import struct
 from prepare_os_disk import expose_full_disk_capacity
+from apfs_install_roles import format_roles
 
 SYSTEM_UUID = 'C16ECAF9-9EC3-42EB-9553-B3DA1A53090F'
 
@@ -95,40 +96,15 @@ def prepare(image):
         # Detach that mount before asking APFS to allocate new volumes.
         command(['diskutil', 'unmount', system['DeviceIdentifier']])
         for role, name in [('B', 'Preboot'), ('X', 'xART'), ('D', 'Data'), ('T', 'Update'), ('H', 'Hardware')]:
-            # macOS storagekit may reject creating reserved iOS roles directly.
-            # A regular volume followed by the documented changeVolumeRole
-            # operation still creates real APFS metadata, not a guest fstab skip.
-            direct = role in ('B', 'D')
+            # Create actual filesystems with the host; iOS-only role tags are
+            # formatted offline after unmounting every image volume.
             args = ['sudo', 'diskutil', 'apfs', 'addVolume', container['ContainerReference'], 'APFSX', name, '-nomount']
-            if direct: args += ['-role', role]
-            if role == 'D': args += ['-groupWith', system['DeviceIdentifier']]
-            try:
-                command(args)
-            except subprocess.CalledProcessError as error:
-                error.preparation_context = report
-                if role != 'D': raise
-                report['grouped_data_creation_error'] = error.output.decode(errors='replace')
-                observed = fixture_container(whole)
-                if any(v.get('Name') == name for v in observed.get('Volumes', [])):
-                    raise ValueError('Data allocation failed after a partial volume creation')
-                command(['sudo', 'diskutil', 'apfs', 'addVolume', container['ContainerReference'], 'APFSX', name, '-nomount'])
-                direct = False
-                report['data_grouped_with_system'] = False
-            if not direct:
-                observed = fixture_container(whole)
-                candidates = [v for v in observed.get('Volumes', []) if v.get('Name') == name
-                    and not v.get('Roles') and v.get('APFSVolumeUUID') != SYSTEM_UUID]
-                if len(candidates) != 1: raise ValueError('new untagged fixture volume not unique: ' + name)
-                command(['sudo', 'diskutil', 'apfs', 'changeVolumeRole', candidates[0]['DeviceIdentifier'], role])
-            observed = fixture_container(whole)
-            expected = 'XART' if role == 'X' else name
-            if len([v for v in observed.get('Volumes', []) if
-                    [r.lower() for r in v.get('Roles', [])] == [expected.lower()]]) != 1:
-                raise ValueError('native role change not confirmed: ' + name)
+            if role == 'B': args += ['-role', role]
+            command(args)
         updated = fixture_container(whole)
         mounted = {}
         for role, label in [('Data', 'data'), ('Preboot', 'preboot')]:
-            volumes = [v for v in updated['Volumes'] if v.get('Roles') == [role]]
+            volumes = [v for v in updated['Volumes'] if v.get('Name') == role and v.get('APFSVolumeUUID') != SYSTEM_UUID]
             if not volumes and role == 'Data': continue
             if len(volumes) != 1: raise ValueError('created role not uniquely present: ' + role)
             mounted[role] = mount_volume(volumes[0], root / ('install-' + label))
@@ -146,9 +122,15 @@ def prepare(image):
                       data_volume_prepared='Data' in mounted, xart_volume_prepared=True,
                       authenticated_boot_confirmed=False, springboard_confirmed=False,
                       firmware_files=sum(1 for f in firmware.rglob('*') if f.is_file()))
-        return report
+        targets = [v for v in updated['Volumes'] if v.get('Name') in ('Data', 'xART', 'Update', 'Hardware')]
     finally:
         command(['hdiutil', 'detach', whole])
+    with image.open('r+b') as stream:
+        report['offline_role_formatting'] = format_roles(stream, targets)
+    for volume in report['volumes']:
+        if volume.get('Name') in ('Data', 'xART', 'Update', 'Hardware'):
+            volume['Roles'] = [volume['Name']]
+    return report
 
 
 if __name__ == '__main__':

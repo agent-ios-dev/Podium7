@@ -48,7 +48,7 @@ jobs:
         run: python3 Tools/check_wdt.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify T8010 GPIO MMIO model
         run: python3 Tools/check_gpio.py --qemu .qemu/build/qemu-system-aarch64
-      - name: Verify T8010 AES register windows
+      - name: Verify AES ECB/CBC NIST vectors and hardware-key rejection
         run: python3 Tools/check_aes.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify T8010 SoCHot and temperature sensor register windows
         run: python3 Tools/check_sochot.py --qemu .qemu/build/qemu-system-aarch64

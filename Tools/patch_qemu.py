@@ -687,63 +687,7 @@ static void podium7_gpio_create(MachineState *machine, MemoryRegion *memory,
     gpio = gpio.replace("    unsigned logged_accesses;", "    unsigned logged_accesses;\n    unsigned bus_logged;")
     gpio = gpio.replace("if (gpio->logged_accesses < 256)",
         "if (gpio->logged_accesses < 256 || (podium7_gpio_i2c_pin(gpio, address) && gpio->bus_logged++ < 512))")
-    aes = '''
-/* Minimal T8010 AES register windows for kernel bootstrap.
- * AppleS8000AES maps both ranges as 0x4000-byte windows. This backing store
- * only prevents unimplemented-MMIO aborts; it does not perform AES operations,
- * model DMA, key slots, interrupts, or secure-enclave behavior.
- */
-typedef struct Podium7AES {
-    MemoryRegion io;
-    uint64_t base;
-    uint32_t registers[0x1000];
-    unsigned logged_accesses;
-} Podium7AES;
-
-static uint64_t podium7_aes_read(void *opaque, hwaddr address, unsigned size)
-{
-    Podium7AES *aes = opaque;
-    uint32_t value = aes->registers[address >> 2];
-    if (aes->logged_accesses < 256) {
-        qemu_log("PODIUM7 AES base=%016" PRIx64 " read offset=%04" PRIx64
-                 " value=%08" PRIx32 "\\n",
-                 aes->base, (uint64_t)address, value);
-        aes->logged_accesses++;
-    }
-    return value;
-}
-
-static void podium7_aes_write(void *opaque, hwaddr address, uint64_t data,
-                              unsigned size)
-{
-    Podium7AES *aes = opaque;
-    uint32_t value = (uint32_t)data;
-    aes->registers[address >> 2] = value;
-    if (aes->logged_accesses < 256) {
-        qemu_log("PODIUM7 AES base=%016" PRIx64 " write offset=%04" PRIx64
-                 " value=%08" PRIx32 "\\n",
-                 aes->base, (uint64_t)address, value);
-        aes->logged_accesses++;
-    }
-}
-
-static const MemoryRegionOps podium7_aes_ops = {
-    .read = podium7_aes_read, .write = podium7_aes_write,
-    .endianness = DEVICE_LITTLE_ENDIAN,
-    .valid = { .min_access_size = 4, .max_access_size = 4 },
-};
-
-static void podium7_aes_create(MachineState *machine, MemoryRegion *memory,
-                               hwaddr base, const char *name)
-{
-    Podium7AES *aes = g_new0(Podium7AES, 1);
-    aes->base = base;
-    memory_region_init_io(&aes->io, OBJECT(machine), &podium7_aes_ops, aes,
-                          name, 0x4000);
-    memory_region_add_subregion(memory, base, &aes->io);
-}
-
-'''
+    aes = (pathlib.Path(__file__).parent / 'qemu_models' / 'aes.c.inc').read_text(encoding='utf-8')
     thermal = '''
 /* Minimal T8010 thermal register windows for XNU bring-up.
  * sochot1 and tempsensor3-5 share 0x202f30000; tempsensor0-2 share 0x20e0bc000.

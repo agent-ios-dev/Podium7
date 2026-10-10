@@ -151,7 +151,20 @@ ldr w6, [x3, x4]
 tbz w6, #16, failure
 mov x5, #0xdead
 str x5, [x3, #0x4010]
-mov x13, #1
+// Stage low word while full; a consume between word writes must not borrow
+// the last message's low word when the new high word is finally published.
+mov x4, #0x4010
+mov w5, #17
+str w5, [x3, x4]
+ldr x6, [x3, #0xb98]
+mov x5, #1
+movk x5, #0x77, lsl #48
+cmp x5, x6
+b.ne failure
+mov x4, #0x4014
+mov w5, #0x770000
+str w5, [x3, x4]
+mov x13, #2
 drain_fifo:
 ldr x6, [x3, #0xb98]
 mov x5, x13
@@ -159,8 +172,9 @@ movk x5, #0x77, lsl #48
 cmp x5, x6
 b.ne failure
 add x13, x13, #1
-cmp x13, #17
+cmp x13, #18
 b.ne drain_fifo
+mov x4, #0x4008
 ldr w6, [x3, x4]
 tbz w6, #17, failure
 // PMP transmit -> AP receive; low word alone must not publish a message.
@@ -307,7 +321,7 @@ banks:
         passed = all(r["returncode"] == 0 for r in results)
         report.write_text(json.dumps({"passed": passed, "iop_firmware_execution": False,
             "checks": ["observed IOP boot-parameter and IRQ-mask writes", "empty modern and legacy ARM32 receive views",
-                       "64-bit send occupies one slot without overwrite", "queue status cannot be forged", "PMP bidirectional peer views, atomic publication, consume and refill", "PMP 16-message FIFO burst, ordered drain, and full-slot overflow protection", "PMP original AP receive AIC event and deassertion", "private IOP receive-event word respects enable and queue consumption", "each bank starts empty after filling the other",
+                       "64-bit send occupies one slot without overwrite", "queue status cannot be forged", "PMP bidirectional peer views, atomic publication, consume and refill", "PMP 16-message FIFO burst, ordered drain, and full-slot overflow protection", "partial low/high publication across a consumer pop while full", "PMP original AP receive AIC event and deassertion", "private IOP receive-event word respects enable and queue consumption", "each bank starts empty after filling the other",
                        "PMP SRAM firmware word, byte order and final 64-bit boundary; separate system bank"],
             "results": results}, indent=2))
         if not passed:

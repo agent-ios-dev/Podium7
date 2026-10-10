@@ -1439,9 +1439,10 @@ static void podium7_pcie_create(MachineState *machine, MemoryRegion *memory)
     MemoryRegion *config = g_new0(MemoryRegion, 1);
     memory_region_init_io(config, OBJECT(machine), &podium7_pcie_config_ops,
         NULL, "podium7-t8010-pcie-empty-config", 0x1000000);
-    memory_region_add_subregion(memory, 0x610000000ULL, config);
+    if (!blk_by_name("podium7-storage")) { memory_region_add_subregion(memory, 0x610000000ULL, config); }
 }
 '''
+    pcie += (pathlib.Path(__file__).parent / 'qemu_models' / 'nvme.c.inc').read_text(encoding='utf-8')
     aop_system = mipi.replace("MIPI-DSIM", "AOP-SYSTEM").replace("mipi_dsim", "aop_system")
     aop_system = aop_system.replace("Podium7MIPIDSIMBank", "Podium7AOPSystemBank")
     aop_system = "\n/* Original AOP reg[2] system controls; no firmware execution. */\n" + aop_system[aop_system.index("typedef struct "):]
@@ -1937,6 +1938,19 @@ static void podium7_irq_or_set(void *opaque, int input, int level)
         pmp->registers[0x38 >> 2] = 1;
         podium7_pmp_system_create(machine, sysmem);
     }''')
+    replace_once(directory / "hw/arm/virt.c", '#include "hw/pci-host/gpex.h"',
+        '#include "hw/pci-host/gpex.h"\n#include "hw/pci/pci_bridge.h"\n#include "hw/qdev-properties-system.h"\n'
+        'static void podium7_storage_attach(VirtMachineState *, DeviceState *);')
+    replace_once(directory / "hw/arm/virt.c", '    vms->bus = pci->bus;',
+        '    vms->bus = pci->bus;\n    podium7_storage_attach(vms, dev);')
+    # Reserve slot0 for a real root port only when this explicit backend exists.
+    replace_once(directory / "hw/pci-host/gpex.c", '#include "hw/pci/pci_bus.h"',
+        '#include "hw/pci/pci_bus.h"\n#include "sysemu/block-backend.h"')
+    replace_once(directory / "hw/pci-host/gpex.c",
+        '    qdev_realize(DEVICE(&s->gpex_root), BUS(pci->bus), &error_fatal);',
+        '    if (blk_by_name("podium7-storage")) {\n'
+        '        qdev_prop_set_int32(DEVICE(&s->gpex_root), "addr", PCI_DEVFN(31, 0));\n'
+        '    }\n    qdev_realize(DEVICE(&s->gpex_root), BUS(pci->bus), &error_fatal);')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")
 

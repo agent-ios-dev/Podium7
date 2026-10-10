@@ -1,0 +1,289 @@
+"""Real PCI enumeration, NVMe queue DMA and persistent 16 GiB disk I/O.
+
+Polling completion test; deliberately does not claim Apple DART/MSI support.
+The scratch disk is fresh and isolated from any user's virtual iPod.
+"""
+import argparse
+import json
+import pathlib
+import subprocess
+import tempfile
+
+from check_qemu_registers import text_section
+from qemu_probe import elf_image
+
+DISK_BYTES = 16 << 30
+
+
+def assembly():
+    return '''.text
+mov x20, #1
+movz x21, #0
+movk x21, #0x1000, lsl #16
+movk x21, #6, lsl #32
+ldr w0, [x21]
+movz w1, #0x1b36
+movk w1, #0xc, lsl #16
+cmp w0, w1
+b.ne failure
+mov w0, #6
+strh w0, [x21, #4]
+movz w0, #0x100
+movk w0, #1, lsl #16
+str w0, [x21, #0x18]
+movz w0, #0x2001
+movk w0, #0x2001, lsl #16
+str w0, [x21, #0x24]
+mov w0, #6
+str w0, [x21, #0x28]
+str w0, [x21, #0x2c]
+mov x20, #2
+mov x0, #0x100000
+add x21, x21, x0
+ldr w0, [x21, #8]
+lsr w0, w0, #8
+movz w1, #0x802
+movk w1, #1, lsl #16
+cmp w0, w1
+b.ne failure
+movz w0, #4
+movk w0, #0x2000, lsl #16
+str w0, [x21, #0x10]
+mov w0, #6
+str w0, [x21, #0x14]
+strh w0, [x21, #4]
+movz x22, #0
+movk x22, #0x2000, lsl #16
+movk x22, #6, lsl #32
+mov x20, #3
+ldr w0, [x22, #8]
+cbz w0, failure
+// Clear queues and buffers (fresh memory only).
+movz x0, #0
+movk x0, #0x4501, lsl #16
+mov x1, #0x20000
+zero:
+str xzr, [x0], #8
+subs x1, x1, #8
+b.ne zero
+movz w0, #0xf
+movk w0, #0xf, lsl #16
+str w0, [x22, #0x24]
+movz x0, #0
+movk x0, #0x4501, lsl #16
+str x0, [x22, #0x28]
+movz x0, #0x4000
+movk x0, #0x4501, lsl #16
+str x0, [x22, #0x30]
+movz w0, #1
+movk w0, #0x46, lsl #16
+str w0, [x22, #0x14]
+mov x1, #0x100000
+ready:
+ldr w0, [x22, #0x1c]
+tbnz w0, #1, failure
+tbnz w0, #0, initialized
+subs x1, x1, #1
+b.ne ready
+b failure
+initialized:
+// Each command has a distinct CID and completion entry.
+movz x23, #0
+movk x23, #0x4501, lsl #16
+movz x24, #0x4000
+movk x24, #0x4501, lsl #16
+mov x25, #0
+mov x20, #4
+mov w0, #6
+str w0, [x23]
+movz x0, #0x8000
+movk x0, #0x4501, lsl #16
+str x0, [x23, #24]
+mov w0, #1
+str w0, [x23, #40]
+bl submit_admin
+// Controller reports exactly one namespace.
+movz x0, #0x8000
+movk x0, #0x4501, lsl #16
+ldr w1, [x0, #516]
+cmp w1, #1
+b.ne failure
+mov x20, #5
+movz w0, #6
+movk w0, #1, lsl #16
+str w0, [x23]
+mov w0, #1
+str w0, [x23, #4]
+movz x0, #0xc000
+movk x0, #0x4501, lsl #16
+str x0, [x23, #24]
+bl submit_admin
+movz x0, #0xc000
+movk x0, #0x4501, lsl #16
+ldr x1, [x0]
+movz x2, #0
+movk x2, #0x200, lsl #16
+cmp x1, x2
+b.ne failure
+ldrb w1, [x0, #130]
+cmp w1, #9
+b.ne failure
+mov x20, #6
+movz w0, #5
+movk w0, #2, lsl #16
+str w0, [x23]
+movz x0, #0
+movk x0, #0x4502, lsl #16
+str x0, [x23, #24]
+movz w0, #1
+movk w0, #0xf, lsl #16
+str w0, [x23, #40]
+mov w0, #1
+str w0, [x23, #44]
+bl submit_admin
+mov x20, #7
+movz w0, #1
+movk w0, #3, lsl #16
+str w0, [x23]
+movz x0, #0x4000
+movk x0, #0x4502, lsl #16
+str x0, [x23, #24]
+movz w0, #1
+movk w0, #0xf, lsl #16
+str w0, [x23, #40]
+movz w0, #1
+movk w0, #1, lsl #16
+str w0, [x23, #44]
+bl submit_admin
+movz x0, #0x8000
+movk x0, #0x4502, lsl #16
+mov x1, #0
+pattern:
+strb w1, [x0, x1]
+add x1, x1, #1
+cmp x1, #512
+b.ne pattern
+movz x23, #0x4000
+movk x23, #0x4502, lsl #16
+movz x24, #0
+movk x24, #0x4502, lsl #16
+mov x25, #0
+mov x20, #8
+movz w0, #1
+movk w0, #4, lsl #16
+str w0, [x23]
+mov w0, #1
+str w0, [x23, #4]
+movz x0, #0x8000
+movk x0, #0x4502, lsl #16
+str x0, [x23, #24]
+mov x0, #8
+str x0, [x23, #40]
+bl submit_io
+mov x20, #9
+movz w0, #2
+movk w0, #5, lsl #16
+str w0, [x23]
+mov w0, #1
+str w0, [x23, #4]
+movz x0, #0xc000
+movk x0, #0x4502, lsl #16
+str x0, [x23, #24]
+mov x0, #8
+str x0, [x23, #40]
+bl submit_io
+movz x0, #0xc000
+movk x0, #0x4502, lsl #16
+mov x1, #0
+compare:
+ldrb w2, [x0, x1]
+and w3, w1, #255
+cmp w2, w3
+b.ne failure
+add x1, x1, #1
+cmp x1, #512
+b.ne compare
+mov x20, #0
+b finish
+submit_admin:
+mov x26, #0x1000
+b submit
+submit_io:
+mov x26, #0x1008
+submit:
+add x25, x25, #1
+dsb sy
+str w25, [x22, x26]
+mov x1, #0x1000000
+completion:
+ldrh w0, [x24, #14]
+tbnz w0, #0, completed
+subs x1, x1, #1
+b.ne completion
+b failure
+completed:
+lsr w0, w0, #1
+cbnz w0, failure
+// Verify this completion belongs to the submitted command.
+ldrh w0, [x24, #12]
+ldrh w1, [x23, #2]
+cmp w0, w1
+b.ne failure
+add x26, x26, #4
+str w25, [x22, x26]
+add x23, x23, #64
+add x24, x24, #16
+ret
+failure:
+finish:
+adr x1, exit_block
+str x20, [x1, #8]
+mov x0, #0x20
+hlt #0xf000
+b .
+.p2align 3
+exit_block:
+.quad 0x20026, 0
+'''
+
+
+def check(executable, report):
+    report.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory() as temporary:
+        root = pathlib.Path(temporary)
+        disk = root / "scratch-16g.raw"
+        with disk.open("xb") as stream:
+            stream.truncate(DISK_BYTES)
+        (root / "test.s").write_text(assembly())
+        subprocess.run(["xcrun", "clang", "-arch", "arm64", "-c", str(root / "test.s"),
+                        "-o", str(root / "test.o")], check=True)
+        code = text_section((root / "test.o").read_bytes())
+        image = root / "test.elf"
+        image.write_bytes(elf_image(0x45000000, [(0x45000000, len(code), code)]))
+        result = subprocess.run([executable, "-machine", "virt,secure=off,virtualization=off",
+            "-cpu", "podium7-research", "-m", "128", "-display", "none", "-monitor", "none",
+            "-serial", "none", "-semihosting-config", "enable=on,target=native",
+            "-drive", f"if=none,id=podium7-storage,format=raw,file={disk}",
+            "-device", f"loader,file={image},cpu-num=0"], capture_output=True, text=True, timeout=25)
+        with disk.open("rb") as stream:
+            stream.seek(8 * 512)
+            persisted = stream.read(512) == bytes(range(256)) * 2
+        passed = result.returncode == 0 and persisted and disk.stat().st_size == DISK_BYTES
+        report.write_text(json.dumps({"passed": passed, "disk_bytes": disk.stat().st_size,
+            "persistent_write_verified": persisted, "returncode": result.returncode,
+            "checks": ["real root port and class 010802 NVMe endpoint enumeration",
+                       "admin queue DMA: identify controller and 16 GiB namespace",
+                       "I/O queue creation, 512-byte write and independent read comparison",
+                       "host-side exact persisted sector verification"],
+            "interrupt_delivery_tested": False, "apple_dart_tested": False,
+            "stdout": result.stdout, "stderr": result.stderr}, indent=2))
+        if not passed:
+            raise RuntimeError(f"Real NVMe DMA checks failed at stage {result.returncode}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--qemu", required=True)
+    parser.add_argument("--report", type=pathlib.Path, default=pathlib.Path(".firmware/nvme-checks.json"))
+    args = parser.parse_args()
+    check(args.qemu, args.report)

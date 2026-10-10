@@ -1,3 +1,31 @@
+## Verified shared-memory PMP execution and bidirectional mailbox queues
+
+Run 38028359295 verifies the original ARM32 firmware executing alongside ARM64
+XNU in the same QEMU process. XNU copies firmware into its original SRAM window
+and writes release +0x38; the generic Cortex-A7 research core then enters the
+unaltered reset body through a private low SRAM alias. A second TCG context is
+reserved without creating a second AP. PMP sends its original version-12 hello
+at +0xbb0/+0xbb4. This is actual firmware execution, not an emulated RTKit reply.
+
+Run 38028112335 also passes guest tests for both data directions, publication
+only after the high word, occupied-slot protection, read consumption/refill,
+and AIC receive assertion/deassertion. Receive registers +0xb98/+0xb9c and send
+registers +0xbb0/+0xbb4 come from executed original firmware instructions.
+
+Full handshake is not yet confirmed: run 38028359295 leaves the hello queued
+and XNU still panics with RTBuddy(PMP) status 4 after 20 seconds. The trace shows
+source 167 masked and original XNU enabling source 170 (DTS interrupt index 2).
+The receive IRQ has now been corrected to 170; its follow-up is pending.
+QMP snapshots were also corrected to select the peer through cpu-index on the
+individual request, since a separate HMP cpu command did not persist selection.
+
+59 Python tests pass locally. Launchd/EL0, SpringBoard, normal root storage,
+and a usable iOS IPA remain unconfirmed. Fixed native 16-GiB backing is unchanged.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38028359295
+
+---
+
 ## Verified PMP milestone: original firmware reaches scheduler WFI
 
 Run 37988746111 executes 1516 distinct authentic ARM32 blocks. The corrected

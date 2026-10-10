@@ -98,6 +98,15 @@ jobs:
           python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/pmp-integrated-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --trust-cache .firmware/RestoreTrustCache.im4p --research-ramdisk-root --research-pmp-core --seconds 120
           python3 Tools/inspect_boot_fault.py --directory .firmware/pmp-integrated-experiment
           python3 Tools/verify_pmp_integration.py .firmware/pmp-integrated-experiment
+      - name: Save integrated PMP evidence before baseline controls
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pmp-integration-evidence
+          path: |
+            .firmware/pmp-integrated-experiment/*.json
+            .firmware/pmp-integrated-experiment/*.txt
+          if-no-files-found: warn
       - name: Execute original kernel and retain the next failure
         run: python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research
       - name: Probe synthetic bridge handoff separately from original metadata

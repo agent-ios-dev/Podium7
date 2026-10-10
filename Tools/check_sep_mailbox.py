@@ -100,6 +100,14 @@ b.ne next_bank
 movz x3, #0
 movk x3, #0xe30, lsl #16
 movk x3, #2, lsl #32
+ldr w6, [x3, #0x81c]
+cbnz w6, failure
+mov w5, #1
+str w5, [x3, #0xb88]
+ldr w6, [x3, #0x81c]
+mov w5, #0x40000
+cmp w6, w5
+b.ne failure
 ldr w6, [x3, #0xb88]
 tbz w6, #16, failure
 ldr w6, [x3, #0xb98]
@@ -112,6 +120,8 @@ ldr w6, [x3, #0xb9c]
 mov w5, #0xabcd0000
 cmp w6, w5
 b.ne failure
+ldr w6, [x3, #0x81c]
+cbnz w6, failure
 ldr w6, [x3, #0xb88]
 tbz w6, #17, failure
 ldr w6, [x3, #0xb98]
@@ -265,7 +275,7 @@ banks:
         passed = all(r["returncode"] == 0 for r in results)
         report.write_text(json.dumps({"passed": passed, "iop_firmware_execution": False,
             "checks": ["observed IOP boot-parameter and IRQ-mask writes", "empty modern and legacy ARM32 receive views",
-                       "64-bit send occupies one slot without overwrite", "queue status cannot be forged", "PMP bidirectional peer views, atomic publication, consume and refill", "PMP original AP receive AIC event and deassertion", "each bank starts empty after filling the other",
+                       "64-bit send occupies one slot without overwrite", "queue status cannot be forged", "PMP bidirectional peer views, atomic publication, consume and refill", "PMP original AP receive AIC event and deassertion", "private IOP receive-event word respects enable and queue consumption", "each bank starts empty after filling the other",
                        "PMP SRAM firmware word, byte order and final 64-bit boundary; separate system bank"],
             "results": results}, indent=2))
         if not passed:

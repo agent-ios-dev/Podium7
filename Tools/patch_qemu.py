@@ -1036,6 +1036,12 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
         "        value = (value & 1U) | (bank->outbox_pending ? (1U << 16) : (1U << 17));")
     sep = sep.replace("        value |= 1U << 17; /* Observed ARM32 receive-control offset +8. */",
         "        value = (value & 0xffffU) | ((bank->base == 0x20e300000ULL && bank->inbox_pending) ? (1U << 16) : (1U << 17));")
+    sep = sep.replace("    return value;", """    if (bank->base == 0x20e300000ULL && address == 0x81c) {
+        /* Original IOP interrupt dispatch at 0x0100bf94 reads this event word.
+         * Type 4/source 0 selects its mailbox-receive handler (0x0100c1fc). */
+        value = bank->inbox_pending && (bank->registers[0xb88 >> 2] & 1) ? 0x40000 : 0;
+    }
+    return value;""")
     read_end = "    if (bank->logged_accesses < 256) {"
     read_peer = """    if (bank->base == 0x20e300000ULL) {
         if (address == 0xba0) {
@@ -1060,6 +1066,7 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
         "            else { bank->outbox_high = value; bank->outbox_pending = true; }\n"
         "        }\n"
         "    } else if (address == 0x4008) {\n        /* Queue status is read-only. */")
+    sep = sep.replace("    bool inbox_pending;", "    qemu_irq pmp_receive_irq;\n    bool inbox_pending;")
     sep = sep.replace("typedef struct Podium7SEPMailboxBank {",
         "static ARMCPU *podium7_pmp_cpu;\n"
         "static void podium7_pmp_start(void);\n"
@@ -1080,11 +1087,17 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
 """ + sep[last:]
     sep = sep.replace("    return value;", """    if (bank->base == 0x20e300000ULL) {
         podium7_aic_set_external(170, bank->outbox_pending && (bank->registers[0x4020 >> 2] & 1));
+        if (bank->pmp_receive_irq) {
+            qemu_set_irq(bank->pmp_receive_irq, bank->inbox_pending && (bank->registers[0xb88 >> 2] & 1));
+        }
     }
     return value;""")
     last = sep.rindex("    if (bank->logged_accesses < 256) {")
     sep = sep[:last] + """    if (bank->base == 0x20e300000ULL) {
         podium7_aic_set_external(170, bank->outbox_pending && (bank->registers[0x4020 >> 2] & 1));
+        if (bank->pmp_receive_irq) {
+            qemu_set_irq(bank->pmp_receive_irq, bank->inbox_pending && (bank->registers[0xb88 >> 2] & 1));
+        }
     }
 """ + sep[last:]
     sep = sep.replace("static void podium7_sep_mailbox_bank_create(",
@@ -1140,7 +1153,10 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
         podium7_pmp_cpu = ARM_CPU(core);
         /* Local interrupt-controller state must not overwrite AP IRQ masks. */
         Podium7AIC *local_aic = g_new0(Podium7AIC, 1);
-        local_aic->output = qdev_get_gpio_in(DEVICE(core), ARM_CPU_IRQ);
+        Podium7IRQOr *route = g_new0(Podium7IRQOr, 1);
+        route->output = qdev_get_gpio_in(DEVICE(core), ARM_CPU_IRQ);
+        local_aic->output = qemu_allocate_irq(podium7_irq_or_set, route, 0);
+        pmp_bank->pmp_receive_irq = qemu_allocate_irq(podium7_irq_or_set, route, 1);
         memset(local_aic->irq_mask, 0xff, sizeof(local_aic->irq_mask));
         local_aic->ipi_mask = 0x80000001U;
         memory_region_init_io(&local_aic->io, OBJECT(machine), &podium7_aic_ops,

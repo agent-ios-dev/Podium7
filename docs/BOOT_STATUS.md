@@ -20,6 +20,20 @@ the launch stall. Both retain 22 xpcproxy processes parented by launchd. The
 next diagnostic records bounded effective UID metadata and original launch
 service users to investigate where these proxies wait before exec.
 
+Run 38086369069 confirms that UID collection works in the original guest:
+59 processes, 100,232 EL0 returns in 300 seconds, no panic. Mobile launchd and
+many original services run as UID 501. Of the 22 remaining xpcproxy processes,
+13 have UID 501, eight have UID 0, and one has UID 25. All have parent PID 1.
+Thus a general failure to resolve/switch to mobile credentials is ruled out.
+The snapshot still has no SpringBoard/backboardd. Proxy target identities and
+their exact wait conditions have not yet been established; do not infer them
+from PID order. 128 tests pass locally and in the macOS workflow.
+
+UID offsets were recovered from original _proc_ucred 0xfffffff0075dbca8
+(proc +0x20 -> proc_ro, validates proc_ro +0 back-reference, credential +0x20)
+and _kauth_cred_getuid 0xfffffff0075abadc (credential +0x18). Reads retain only
+UID/PID/PPID/name and remain gated by the original kernel SHA-256.
+
 The analysis script also fixes an observed macOS APFS publication race with
 bounded retries and strict System UUID checks. 127 local tests pass. The macOS
 probe test now resolves /var versus /private/var before mocking fixture size.

@@ -1,3 +1,34 @@
+## Genuine PCIe PHY register FAR reveals a preexisting aperture typo
+
+Run 38037265062 passes the lane-state guest and original driver exits its
+PHY wait. Both kernel probes then data-abort at PC 0xfffffff00694d73c reading
+PHY +0x180. QMP translates the actual FAR to 0x60a000180. Original DeviceTree
+reg[11] declares base 0x60a000000 length0x4000, whereas the earlier bank table
+mistyped it as 0x6000a0000. The model and guest aperture table now use the exact
+original physical range. No kernel panic instruction is patched. Compile and
+kernel validation follow; full iOS startup remains unconfirmed.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38037265062
+
+---
+
+## PCIe speed panic cleared; research PHY lane request state added
+
+Run 38036919703 passes PCIe-v2 speed-vector checks and no longer hits either
+capability or speed panic. Its stopped stack reaches 0xfffffff00694eff8,
+waiting for PHY lane status at 0x60000800c after enabling port0 +0x124=0x31.
+Original lane-cfg=0 handling requests two lanes for port0; DeviceTree exposes
+bridge0 storage and bridge3 WLAN. The research model now derives ready bits
+from port enable requests (port0 mask3, other ports one lane) and removes them
+on disable. This is explicit virtual PHY state, not analog calibration or
+PCI link-up. An ARM64 guest verifies enable/disable and status independence.
+Original kernel validation is pending. This run's PMP startup evidence is
+incomplete and md0 mount fails, so it is not successful userland progression.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38036919703
+
+---
+
 ## Original PCIe v2 speed-vector dependency identified
 
 Run 38036762119 still panics at limitedSpeed > 0 despite valid Gen1

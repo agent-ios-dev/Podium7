@@ -153,7 +153,7 @@ banks:
 .quad 0x603000000, 0x4000, 0x603004000, 0x4000
 .quad 0x604000000, 0x4000, 0x604004000, 0x4000
 .quad 0x600000000, 0x8000, 0x600008000, 0x4000
-.quad 0x6000a0000, 0x4000
+.quad 0x60a000000, 0x4000
 '''
     with tempfile.TemporaryDirectory() as temporary:
         root = pathlib.Path(temporary)

@@ -1418,7 +1418,7 @@ static void podium7_pcie_create(MachineState *machine, MemoryRegion *memory)
         { 0x603000000ULL, 0x4000 }, { 0x603004000ULL, 0x4000 },
         { 0x604000000ULL, 0x4000 }, { 0x604004000ULL, 0x4000 },
         { 0x600000000ULL, 0x8000 }, { 0x600008000ULL, 0x4000 },
-        { 0x6000a0000ULL, 0x4000 },
+        { 0x60a000000ULL, 0x4000 },
     };
     for (unsigned i = 0; i < ARRAY_SIZE(banks); i++) {
         podium7_pcie_bank_create(machine, memory, banks[i].base, banks[i].size,

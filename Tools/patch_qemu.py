@@ -1734,7 +1734,7 @@ static void podium7_pmgr_raw_write(void *opaque, hwaddr address,
          * Busy (bit 31) clears immediately in this fixed-clock TCG model. */
         uint32_t actual = s->registers[address >> 2] & 0xf;
         uint32_t desired = value & 0xf;
-        if ((value & (1U << 25)) && desired >= 2) {
+        if ((value & (1U << 25)) && desired >= 2 && desired <= 8) {
             actual = desired;
         }
         value = (value & ~0x8000000fULL) | actual;
@@ -1774,10 +1774,12 @@ static void podium7_pmgr_raw_create(MachineState *machine, MemoryRegion *memory)
             s->registers[0x20 / 4] = 2; /* first valid virtual CPU state */
         }
         if (s->base == 0x202f80000ULL) {
-            /* XNU reads state records at encoded index * 0x20. Bit 23
-             * distinguishes P-core records. States 0/1 are E, 2/3 are P. */
-            s->registers[0x80 / 4] = 1U << 23;
-            s->registers[0xa0 / 4] = 1U << 23;
+            /* XNU reads records at (perf index + 2) * 0x20. The complete
+             * native VFC layout has E states 0..2, then P states 3..6.
+             * Intermediate P states are required by the UVLO selector. */
+            for (unsigned encoded = 5; encoded <= 8; encoded++) {
+                s->registers[encoded * 0x20 / 4] = 1U << 23;
+            }
         }
         memory_region_init_io(&s->io, OBJECT(machine), &podium7_pmgr_raw_ops,
                               s, "podium7-t8010-pmgr-raw", banks[i].size);

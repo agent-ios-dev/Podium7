@@ -1,3 +1,22 @@
+## Original early boot completes; CPU UVLO transition blocks full boot
+
+Run 38065904495 confirms the original keybag diagnostic path and all 22
+original launchd early-boot tasks. The serial log reports `Early boot complete.
+Continuing system boot.` with 26,608 EL0 returns. SpringBoard is not confirmed.
+The next genuine kernel panic is AppleT8010PMGR setPerfStateCPU line 742:
+`_uvloMidPCPUPerfState != state`. SEP protection remains unimplemented;
+ephemeral storage is disabled and the disk remains fixed at 16 GiB.
+
+Static analysis shows the old four-state virtual table omitted the original
+1056-MHz intermediate P state selected by the UVLO search. The handoff now
+preserves all three E and four P frequencies from the original DeviceTree.
+The virtual PMGR classifies the corresponding seven hardware records and
+rejects requests outside that table. Guest MMIO checks cover highest and
+intermediate transitions before the next full-system boot. The kernel assert
+is unchanged. Runtime validation of this correction is pending.
+
+---
+
 ## Keybag diagnostic handoff experiment (not yet boot-confirmed)
 
 Read-only inspection 38065058205 confirms both diagnostic and ephemeral skip

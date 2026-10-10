@@ -187,17 +187,25 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
                     raise ValueError("synthetic CPU domain requires E/P static VFC tables")
                 efficiency = [record[0] >> 16 for record in struct.iter_unpack("<II", ecore)]
                 performance = [record[0] >> 16 for record in struct.iter_unpack("<II", pcore)]
-                frequencies = [efficiency[0], efficiency[-1], performance[0], frequency_mhz]
-                if not (0 < frequencies[0] < frequencies[1] and
-                        0 < frequencies[2] < frequencies[1] and frequencies[2] < frequencies[3]):
+                # Keep the intermediate native VFC frequencies. The original
+                # T8010 UVLO selector needs a P state above 756 and <=1355 MHz;
+                # endpoints alone leave its search at nonexistent state 14.
+                frequencies = efficiency + performance
+                if (len(efficiency) != 3 or len(performance) != 4 or
+                        any(a >= b for group in (efficiency, performance) for a, b in zip(group, group[1:])) or
+                        efficiency[0] <= 0 or performance[0] <= 0 or
+                        performance[0] >= efficiency[-1] or performance[-1] != frequency_mhz):
                     raise ValueError("virtual CPU groups must expose the XNU E/P frequency drop")
+                if not any(756 < frequency <= 1355 for frequency in performance):
+                    raise ValueError('virtual CPU domain lacks a valid UVLO intermediate P state')
                 periods = [(1000 << 16) // frequency for frequency in frequencies]
                 if any((1000 << 16) // encoded != frequency for encoded, frequency in zip(periods, frequencies)):
                     raise ValueError("CPU frequency is not exactly representable")
                 # Generic PMGR detects the first decreasing frequency as P-core
                 # boundary, at 0x0066e0018. Nominal voltage is virtual metadata,
                 # not a physical rail: nonzero permits its V^2 power calculation.
-                value = b"".join(struct.pack("<II", encoded, 900) for encoded in periods) + bytes(96)
+                value = b"".join(struct.pack("<II", encoded, 900) for encoded in periods)
+                value += bytes(128 - len(value))
                 position = next(i for i, (key, _) in enumerate(properties)
                                 if key.split(b"\0")[0] == b"voltage-states1")
                 properties[position] = (properties[position][0], value)

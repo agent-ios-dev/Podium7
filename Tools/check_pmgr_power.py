@@ -123,7 +123,31 @@ ldr w4, [x3]
 and w4, w4, #15
 cmp w4, #3
 b.ne failure
-// Two virtual records are E-core, followed by two P-core records.
+// Highest P state and the UVLO intermediate P state must both complete.
+mov w5, #8
+movk w5, #0x8200, lsl #16
+str w5, [x3]
+ldr w4, [x3]
+mov w6, #8
+movk w6, #0x0200, lsl #16
+cmp w4, w6
+b.ne failure
+mov w5, #6
+movk w5, #0x8200, lsl #16
+str w5, [x3]
+ldr w4, [x3]
+mov w6, #6
+movk w6, #0x0200, lsl #16
+cmp w4, w6
+b.ne failure
+// Out-of-table requests cannot fabricate a new actual state.
+mov w5, #15
+movk w5, #0x8200, lsl #16
+str w5, [x3]
+ldr w4, [x3]
+cmp w4, w6
+b.ne failure
+// Three virtual records are E-core, followed by four P-core records.
 movz x3, #0x40
 movk x3, #0x02f8, lsl #16
 movk x3, #2, lsl #32
@@ -132,9 +156,22 @@ cbnz x4, failure
 ldr x4, [x3, #0x20]
 cbnz x4, failure
 ldr x4, [x3, #0x40]
+cbnz x4, failure
 mov x5, #0x800000
+ldr x4, [x3, #0x60]
 cmp x4, x5
 b.ne failure
+ldr x4, [x3, #0x80]
+cmp x4, x5
+b.ne failure
+ldr x4, [x3, #0xa0]
+cmp x4, x5
+b.ne failure
+ldr x4, [x3, #0xc0]
+cmp x4, x5
+b.ne failure
+ldr x4, [x3, #0xe0]
+cbnz x4, failure
 // XNU performs 64-bit accesses in PMGR aperture 6.
 movz x3, #0x40
 movk x3, #0x02f8, lsl #16
@@ -210,8 +247,9 @@ failure_exit:
                        "AP and AOP aperture storage are independent",
                        "64-bit aperture 6 round-trip and little-endian halves",
                        "CPU state starts at encoded 2 and survives initialization",
-                       "CPU request completes, clears BUSY and rejects invalid zero",
-                       "E/P CPU record classification matches four nominal states",
+                       "CPU requests complete, clear BUSY and reject zero/out-of-table states",
+                       "E/P CPU record classification matches all seven nominal states",
+                       "highest and intermediate UVLO P-state transitions complete",
                        "observed ACC control page 0x202f38008 accepts 64-bit kernel store"],
             "returncode": result.returncode, "stdout": result.stdout,
             "stderr": result.stderr}, indent=2))

@@ -70,6 +70,8 @@ jobs:
           cd .qemu/build
           ../configure --python="$(python -c 'import sys; print(sys.executable)')" --cc="ccache clang" --cxx="ccache clang++" --target-list=aarch64-softmmu --disable-docs --disable-tools --disable-guest-agent --disable-slirp --disable-hvf --disable-cocoa --disable-vnc --disable-sdl --disable-gtk --disable-curses
           ninja qemu-system-aarch64
+      - name: Require guest PMGR state transitions before system boot
+        run: python3 Tools/check_pmgr_power.py --qemu .qemu/build/qemu-system-aarch64
       - name: Require real scratch NVMe DMA and EL1 IRQ delivery before system boot
         run: python3 Tools/check_nvme.py --qemu .qemu/build/qemu-system-aarch64 --dart --msi
       - name: Wait for the specified official disk preparation to finish
@@ -124,5 +126,6 @@ jobs:
             .firmware/system-boot/*.json
             .firmware/system-boot/*.txt
             .firmware/nvme-checks.json
+            .firmware/pmgr-power-checks.json
             .firmware/install-layout.json
           if-no-files-found: ignore

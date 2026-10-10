@@ -2,7 +2,7 @@ import io
 import struct
 import unittest
 import zlib
-from prepare_os_disk import relocate_gpt
+from prepare_os_disk import relocate_gpt, expose_full_disk_capacity
 from inspect_system_disk import inspect as inspect_disk
 from inspect_system_disk import compare_readback
 from fetch_firmware import RemoteZIP
@@ -50,6 +50,21 @@ class OSDiskTests(unittest.TestCase):
             crc = struct.unpack_from('<I', h, 16)[0];struct.pack_into('<I', h, 16, 0)
             self.assertEqual(zlib.crc32(h[:92]), crc)
         disk.seek(1024);self.assertEqual(disk.read(16384), table)
+
+    def test_expanded_free_space_updates_both_headers_without_partition_changes(self):
+        disk, table = self.disk();relocate_gpt(disk, 8192 * 512)
+        expose_full_disk_capacity(disk, 8192 * 512)
+        for sector in (1, 8191):
+            disk.seek(sector * 512);h = bytearray(disk.read(512))
+            self.assertEqual(struct.unpack_from('<Q', h, 48)[0], 8158)
+            crc = struct.unpack_from('<I', h, 16)[0];struct.pack_into('<I', h, 16, 0)
+            self.assertEqual(crc, zlib.crc32(h[:92]))
+        disk.seek(1024);self.assertEqual(disk.read(16384), table)
+        disk.seek(8191 * 512 + 24);disk.write(b'x')
+        before = disk.getvalue()
+        with self.assertRaisesRegex(ValueError, 'CRC'):
+            expose_full_disk_capacity(disk, 8192 * 512)
+        self.assertEqual(disk.getvalue(), before)
 
     def test_corrupt_primary_crc_rejected_before_writing(self):
         disk, _ = self.disk();disk.seek(512 + 24);disk.write(b'\x03')

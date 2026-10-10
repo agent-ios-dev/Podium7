@@ -68,6 +68,43 @@ def relocate_gpt(stream, disk_bytes=DISK_BYTES):
             'partition_extents_unchanged': True, 'disk_bytes': disk_bytes}
 
 
+def expose_full_disk_capacity(stream, disk_bytes=DISK_BYTES):
+    """Expose expanded GPT free space; native APFS tools resize its partition.
+
+    Both headers and tables must validate before any write. Partition extents
+    are preserved here, and only the isolated fixture caller may later resize.
+    """
+    last = disk_bytes // 512 - 1
+    headers = []
+    tables = []
+    for own, other, table_lba in ((1, last, 2), (last, 1, last - 32)):
+        stream.seek(own * 512);h = bytearray(stream.read(512))
+        if h[:8] != b'EFI PART': raise ValueError('GPT header missing')
+        size, crc = struct.unpack_from('<II', h, 12)
+        if size != 92: raise ValueError('unsupported GPT header size')
+        checked = bytearray(h[:size]);struct.pack_into('<I', checked, 16, 0)
+        if zlib.crc32(checked) != crc: raise ValueError('GPT header CRC mismatch')
+        if struct.unpack_from('<QQQ', h, 24) != (own, other, 34):
+            raise ValueError('GPT geometry does not match isolated expanded disk')
+        lba, count, entry_size, table_crc = struct.unpack_from('<QIII', h, 72)
+        if (lba, count, entry_size) != (table_lba, 128, 128):
+            raise ValueError('unexpected GPT table layout')
+        stream.seek(table_lba * 512);table = stream.read(16384)
+        if zlib.crc32(table) != table_crc: raise ValueError('GPT table CRC mismatch')
+        headers.append(h);tables.append(table)
+    if tables[0] != tables[1]: raise ValueError('GPT tables disagree')
+    old = [struct.unpack_from('<Q', h, 48)[0] for h in headers]
+    if old[0] != old[1] or not 34 <= old[0] <= last - 33:
+        raise ValueError('GPT usable ranges disagree')
+    for h, sector in zip(headers, (1, last)):
+        struct.pack_into('<Q', h, 48, last - 33)
+        struct.pack_into('<I', h, 16, 0)
+        struct.pack_into('<I', h, 16, zlib.crc32(h[:92]))
+        stream.seek(sector * 512);stream.write(h)
+    return {'old_last_usable_lba': old[0], 'last_usable_lba': last - 33,
+            'partition_extents_unchanged': True}
+
+
 def prepare(output):
     if sys.platform != 'darwin':
         raise RuntimeError('official LZFSE DMG conversion currently requires macOS hdiutil')

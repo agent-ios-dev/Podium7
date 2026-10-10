@@ -9,6 +9,7 @@ import plistlib
 import subprocess
 import time
 import struct
+from prepare_os_disk import expose_full_disk_capacity
 
 SYSTEM_UUID = 'C16ECAF9-9EC3-42EB-9553-B3DA1A53090F'
 
@@ -44,6 +45,8 @@ def prepare(image):
         raise ValueError('only isolated downloaded system-disk fixture is permitted')
     if image.stat().st_size != 16 << 30:
         raise ValueError('fixture must be exactly 16 GiB')
+    with image.open('r+b') as stream:
+        geometry = expose_full_disk_capacity(stream)
     with image.open('rb') as stream:
         stream.seek(34 * 512)
         nx = stream.read(4096)
@@ -71,6 +74,12 @@ def prepare(image):
         if len(systems) != 1 or len(container['Volumes']) != 1:
             raise ValueError('expected unchanged official single System-volume fixture')
         system = systems[0]
+        command(['sudo', 'diskutil', 'apfs', 'resizeContainer', container['ContainerReference'], '0'])
+        container = fixture_container(whole)
+        resized_systems = [v for v in container.get('Volumes', []) if v.get('Roles') == ['System']
+                           and v.get('APFSVolumeUUID') == SYSTEM_UUID]
+        if len(resized_systems) != 1: raise ValueError('System UUID changed after resize')
+        system = resized_systems[0]
         source = mount_volume(system, root / 'install-system', readonly=True)
         for relative in ('private/var', 'private/etc/fstab', 'usr/standalone/firmware'):
             if not (source/relative).resolve().is_relative_to(source):
@@ -80,6 +89,7 @@ def prepare(image):
                   'source_firmware_present': (source/'usr/standalone/firmware').is_dir()}
         report['container_before'] = container
         report['nx_superblock'] = nx_diagnostic
+        report['gpt_free_space_exposed'] = geometry
         print(json.dumps(report), flush=True)
         # A lone read-only mounted volume can keep its container read-only.
         # Detach that mount before asking APFS to allocate new volumes.

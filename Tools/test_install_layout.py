@@ -52,18 +52,19 @@ class InstallLayoutTests(unittest.TestCase):
                                  'APFSVolumeUUID': 'C16ECAF9-9EC3-42EB-9553-B3DA1A53090F'}]}
                 error = subprocess.CalledProcessError(1, ['sudo', 'diskutil'], output=b'rejected')
                 responses = [plistlib.dumps({'system-entities': [{'dev-entry': '/dev/disk12'}]}),
-                    plistlib.dumps({'Containers': [container]}), b'',
+                    plistlib.dumps({'Containers': [container]}), b'', plistlib.dumps({'Containers': [container]}), b'',
                     plistlib.dumps({'DeviceIdentifier': 'disk13s1', 'MountPoint': str(source)}),
                     b'', error, b'']
                 original_stat = pathlib.Path.stat
                 def stat(path, *args, **kwargs):
                     return SimpleNamespace(st_size=16 << 30) if path == image else original_stat(path, *args, **kwargs)
                 with patch('prepare_install_layout.pathlib.Path.stat', stat), patch(
-                        'prepare_install_layout.command', side_effect=responses) as command:
+                        'prepare_install_layout.command', side_effect=responses) as command, patch(
+                        'prepare_install_layout.expose_full_disk_capacity', return_value={}):
                     with self.assertRaises(subprocess.CalledProcessError): prepare(image)
                     calls = [c.args[0] for c in command.call_args_list]
-                    self.assertEqual(calls[4], ['diskutil', 'unmount', 'disk13s1'])
-                    self.assertEqual(calls[5][:5], ['sudo', 'diskutil', 'apfs', 'addVolume', 'disk13'])
+                    self.assertEqual(calls[6], ['diskutil', 'unmount', 'disk13s1'])
+                    self.assertEqual(calls[7][:5], ['sudo', 'diskutil', 'apfs', 'addVolume', 'disk13'])
                     self.assertEqual(calls[-1], ['hdiutil', 'detach', '/dev/disk12'])
             finally:
                 os.chdir(previous)

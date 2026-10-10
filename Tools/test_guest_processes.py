@@ -12,6 +12,10 @@ class GuestProcessesTests(unittest.TestCase):
         for i, (node, name) in enumerate(zip(nodes, names)):
             memory[node + 0x68] = struct.pack("<I", i + 1)
             memory[node + 0x28] = struct.pack("<I", i)
+            memory[node + 0x20] = struct.pack("<Q", node + 0x500)
+            memory[node + 0x500] = struct.pack("<Q", node)
+            memory[node + 0x520] = struct.pack("<Q", node + 0x600)
+            memory[node + 0x618] = struct.pack("<I", 0 if i == 0 else 501)
             memory[node + 0x370] = name.encode().ljust(32, b"\0")
             memory[node + 0xa8] = struct.pack("<Q", nodes[i+1] if i+1 < len(nodes) else 0)
         return memory, nodes
@@ -19,8 +23,8 @@ class GuestProcessesTests(unittest.TestCase):
     def test_names_are_evidence_of_processes_not_visible_desktop(self):
         memory, _ = self.fixture()
         result = inspect(lambda address, size: memory[address])
-        self.assertEqual(result["processes"], [{"pid": 1, "ppid": 0, "name": "launchd"},
-                                               {"pid": 2, "ppid": 1, "name": "SpringBoard"}])
+        self.assertEqual(result["processes"], [{"pid": 1, "ppid": 0, "uid": 0, "name": "launchd"},
+                                               {"pid": 2, "ppid": 1, "uid": 501, "name": "SpringBoard"}])
         self.assertTrue(result["springboard_process_seen"])
         self.assertFalse(result["visible_springboard_confirmed"])
 
@@ -28,6 +32,16 @@ class GuestProcessesTests(unittest.TestCase):
         memory, nodes = self.fixture()
         memory[nodes[-1] + 0xa8] = struct.pack("<Q", nodes[0])
         with self.assertRaisesRegex(ValueError, "cyclic"):
+            inspect(lambda address, size: memory[address])
+
+    def test_credential_requires_kernel_pointer_and_matching_process(self):
+        memory, nodes = self.fixture()
+        memory[nodes[0] + 0x500] = struct.pack('<Q', nodes[1])
+        with self.assertRaisesRegex(ValueError, 'back-reference'):
+            inspect(lambda address, size: memory[address])
+        memory[nodes[0] + 0x500] = struct.pack('<Q', nodes[0])
+        memory[nodes[0] + 0x520] = struct.pack('<Q', 0x1000)
+        with self.assertRaisesRegex(ValueError, 'bounded kernel'):
             inspect(lambda address, size: memory[address])
 
     def test_user_pointer_rejected_before_read(self):

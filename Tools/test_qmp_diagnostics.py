@@ -101,7 +101,10 @@ class QMPTests(unittest.TestCase):
             {"id": "human-monitor-command", "return": "PC=fffffff0071904e8"}]
         for address, values in [(0xfffffff007137440, [0xffffffe100000000]),
             (0xfffffff007137448, [0]), (0xffffffe100000000, [node]),
-            (node + 0x68, [23]), (node + 0x28, [1]), (node + 0x370, name_words), (node + 0xa8, [0])]:
+            (node + 0x68, [23]), (node + 0x28, [1]),
+            (node + 0x20, [node + 0x500]), (node + 0x500, [node]),
+            (node + 0x520, [node + 0x600]), (node + 0x618, [501]),
+            (node + 0x370, name_words), (node + 0xa8, [0])]:
             replies.append({"id": "human-monitor-command", "return": memory(address, values)})
         stream = Stream(replies)
         connection = MagicMock()
@@ -110,9 +113,9 @@ class QMPTests(unittest.TestCase):
         with patch("qmp_diagnostics.socket.AF_UNIX", 1, create=True), patch("qmp_diagnostics.socket.socket", return_value=connection):
             result = capture("local.sock", kernel_process_metadata=True)
         metadata = result["guest_process_metadata"]
-        self.assertEqual(metadata["processes"], [{"pid": 23, "ppid": 1, "name": "SpringBoard"}])
+        self.assertEqual(metadata["processes"], [{"pid": 23, "ppid": 1, "uid": 501, "name": "SpringBoard"}])
         self.assertTrue(metadata["springboard_process_seen"])
         self.assertFalse(metadata["visible_springboard_confirmed"])
         self.assertNotIn("backend_result", metadata)
-        self.assertEqual(stream.sent[-4]["arguments"], {
+        self.assertEqual(stream.sent[-8]["arguments"], {
             "command-line": f"x/1gx {hex(node + 0x68)}", "cpu-index": 0})

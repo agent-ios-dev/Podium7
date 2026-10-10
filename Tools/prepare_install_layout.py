@@ -101,6 +101,8 @@ def prepare(image):
                 report['original_boot_tools'].append({'name': name, 'bytes': len(data),
                     'sha256': hashlib.sha256(data).hexdigest(), 'modified': False})
         report['container_before'] = container
+        from inspect_launch_services import collect
+        report['original_launch_metadata'] = collect(source)
         report['nx_superblock'] = nx_diagnostic
         report['gpt_free_space_exposed'] = geometry
         print(json.dumps(report), flush=True)

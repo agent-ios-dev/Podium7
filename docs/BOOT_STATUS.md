@@ -12,7 +12,13 @@ Apple's public bsd/kern/kern_mib.c confirms hw.osenvironment returns EINVAL
 without a supplied value. The next experiment supplies normal only when that
 handoff is absent/zero, independently of product/boot-ios-diagnostics; original
 nonempty values and launch plists remain unchanged. SEP/authenticated boot and
-SpringBoard remain unconfirmed. The change is not yet validated in real boot.
+SpringBoard remain unconfirmed. Run 38084762951 validates the handoff for 600
+seconds without panic, but still has 59 processes and no SpringBoard/backboardd
+(104,612 EL0 returns). Control run 38084396370 also has 59 processes and no
+desktop after 600 seconds (103,651 returns). Normal environment did not resolve
+the launch stall. Both retain 22 xpcproxy processes parented by launchd. The
+next diagnostic records bounded effective UID metadata and original launch
+service users to investigate where these proxies wait before exec.
 
 The analysis script also fixes an observed macOS APFS publication race with
 bounded retries and strict System UUID checks. 127 local tests pass. The macOS

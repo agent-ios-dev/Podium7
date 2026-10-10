@@ -43,11 +43,19 @@ def inspect(read):
             pid = struct.unpack("<I", data(current + 0x68, 4))[0]
             # Original _proc_ppid at 0xfffffff0075db0dc returns proc +0x28.
             ppid = struct.unpack("<I", data(current + 0x28, 4))[0]
+            # Original _proc_ucred 0xfffffff0075dbca8 validates proc_ro's
+            # back-reference then reads its credential pointer at +0x20.
+            readonly = word(current + 0x20)
+            if word(readonly) != current:
+                raise ValueError("invalid process read-only back-reference")
+            credential = word(readonly + 0x20)
+            # Original _kauth_cred_getuid 0xfffffff0075abadc returns +0x18.
+            uid = struct.unpack("<I", data(credential + 0x18, 4))[0]
             name_bytes = data(current + 0x370, 32).split(b"\0", 1)[0]
             if max(pid, ppid) > 1000000 or any(byte < 32 or byte > 126 for byte in name_bytes):
                 raise ValueError("invalid process identity metadata")
             name = name_bytes.decode("ascii")
-            processes.append({"pid": pid, "ppid": ppid, "name": name})
+            processes.append({"pid": pid, "ppid": ppid, "uid": uid, "name": name})
             current = word(current + 0xa8)
     return {"source": "stopped original kernel process hash", "read_only": True,
             "processes": sorted(processes, key=lambda item: item["pid"]),

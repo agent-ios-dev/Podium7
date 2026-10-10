@@ -36,7 +36,7 @@ def bounded(value, depth=0):
 
 def collect(source):
     source = pathlib.Path(source).resolve()
-    files, count = [], 0
+    files, count, identities = [], 0, []
     for directory in ('System/Library/LaunchDaemons', 'System/Library/LaunchAgents'):
         folder = source / directory
         if not folder.resolve().is_relative_to(source):
@@ -52,13 +52,17 @@ def collect(source):
             data = plistlib.loads(candidate.read_bytes())
             if not isinstance(data, dict):
                 raise ValueError('launch plist is not a dictionary')
+            identities.append({'label': bounded(data.get('Label')),
+                               'user': bounded(data.get('UserName')),
+                               'run_at_load': bounded(data.get('RunAtLoad'))})
             identity = ' '.join(str(data.get(key, '')) for key in
                                 ('Label', 'Program', 'ProgramArguments')) + ' ' + candidate.name
             if any(target in identity.lower() for target in TARGETS):
                 files.append({'path': candidate.relative_to(source).as_posix(),
                               'configuration_keys': sorted(data),
                               'configuration': {key: bounded(data[key]) for key in FIELDS if key in data}})
-    return {'read_only': True, 'binary_exported': False, 'plists_scanned': count, 'services': files}
+    return {'read_only': True, 'binary_exported': False, 'plists_scanned': count,
+            'services': files, 'service_identities': identities}
 
 
 def inspect(image):

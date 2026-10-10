@@ -1,3 +1,4 @@
+import struct
 import os
 import subprocess
 from types import SimpleNamespace
@@ -40,7 +41,10 @@ class InstallLayoutTests(unittest.TestCase):
             try:
                 root = pathlib.Path.cwd() / '.firmware'
                 image = root / 'system-disk/storage-16g.raw'
-                image.parent.mkdir(parents=True);image.write_bytes(b'fixture')
+                image.parent.mkdir(parents=True)
+                raw = bytearray(34 * 512 + 4096);raw[34 * 512 + 32:34 * 512 + 36] = b'NXSB'
+                struct.pack_into('<I', raw, 34 * 512 + 180, 1)
+                image.write_bytes(raw)
                 source = root / 'install-system'
                 container = {'ContainerReference': 'disk13',
                     'PhysicalStores': [{'DeviceIdentifier': 'disk12s1'}],

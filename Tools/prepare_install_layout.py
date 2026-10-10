@@ -8,6 +8,7 @@ import pathlib
 import plistlib
 import subprocess
 import time
+import struct
 
 SYSTEM_UUID = 'C16ECAF9-9EC3-42EB-9553-B3DA1A53090F'
 
@@ -43,6 +44,13 @@ def prepare(image):
         raise ValueError('only isolated downloaded system-disk fixture is permitted')
     if image.stat().st_size != 16 << 30:
         raise ValueError('fixture must be exactly 16 GiB')
+    with image.open('rb') as stream:
+        stream.seek(34 * 512)
+        nx = stream.read(4096)
+    if nx[32:36] != b'NXSB': raise ValueError('expected official APFS partition superblock')
+    nx_diagnostic = {'max_file_systems': struct.unpack_from('<I', nx, 180)[0],
+                     'flags': hex(struct.unpack_from('<Q', nx, 1264)[0]),
+                     'block_count': struct.unpack_from('<Q', nx, 40)[0]}
     attached = plistlib.loads(command(['hdiutil', 'attach', '-readwrite', '-nomount',
         '-plist', '-imagekey', 'diskimage-class=CRawDiskImage', str(image)]))
     devices = [e['dev-entry'] for e in attached.get('system-entities', []) if e.get('dev-entry')]
@@ -71,14 +79,19 @@ def prepare(image):
                   'source_var_present': (source/'private/var').is_dir(),
                   'source_firmware_present': (source/'usr/standalone/firmware').is_dir()}
         report['container_before'] = container
+        report['nx_superblock'] = nx_diagnostic
         print(json.dumps(report), flush=True)
         # A lone read-only mounted volume can keep its container read-only.
         # Detach that mount before asking APFS to allocate new volumes.
         command(['diskutil', 'unmount', system['DeviceIdentifier']])
-        for role, name in [('D', 'Data'), ('B', 'Preboot'), ('X', 'xART')]:
+        for role, name in [('B', 'Preboot'), ('X', 'xART'), ('D', 'Data')]:
             args = ['sudo', 'diskutil', 'apfs', 'addVolume', container['ContainerReference'], 'APFSX', name, '-role', role, '-nomount']
             if role == 'D': args += ['-groupWith', system['DeviceIdentifier']]
-            command(args)
+            try:
+                command(args)
+            except subprocess.CalledProcessError as error:
+                error.preparation_context = report
+                raise
         updated = fixture_container(whole)
         mounted = {}
         for role, label in [('Data', 'data'), ('Preboot', 'preboot')]:
@@ -114,6 +127,7 @@ if __name__ == '__main__':
         report = {'preparation_error': str(error)}
         if isinstance(error, subprocess.CalledProcessError):
             report['command_output'] = error.output.decode(errors='replace')
+            report['context'] = getattr(error, 'preparation_context', None)
     args.output.write_text(json.dumps(report, indent=2, default=str), encoding='utf-8')
     print(json.dumps(report, indent=2, default=str))
     if 'preparation_error' in report: raise SystemExit(1)

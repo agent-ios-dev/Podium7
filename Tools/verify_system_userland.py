@@ -24,6 +24,10 @@ def verify(directory):
     directory = pathlib.Path(directory)
     result = evidence((directory/'qemu-serial.txt').read_text(errors='replace'),
                       (directory/'qemu-trace.txt').read_text(errors='replace'))
+    patches = json.loads((directory/'guest-patches.json').read_text()) if (directory/'guest-patches.json').exists() else []
+    result['unsealed_root_diagnostic'] = any(edit.get('name') == 'research unsealed system root diagnostic'
+        for patch in patches for edit in patch.get('additional_edits', []))
+    result['authenticated_boot_confirmed'] = False
     (directory/'system-userland-checks.json').write_text(json.dumps(result, indent=2))
     print(json.dumps(result, indent=2))
     if not result['system_userland_confirmed']:

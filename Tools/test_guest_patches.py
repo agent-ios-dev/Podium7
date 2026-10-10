@@ -5,6 +5,27 @@ import guest_patches as gp
 
 
 class GuestPatchTests(unittest.TestCase):
+    def test_unsealed_diagnostic_is_exact_opt_in_and_never_reports_authenticated_root(self):
+        original, segments = self.fixture()
+        offset = len(original)
+        original += gp.SYSTEM_ROOT_AUTH_SIGNATURE + b'TAIL'
+        segments += [{'address': hex(gp.SYSTEM_ROOT_AUTH_BRANCH-8),
+                      'file_size': 16, 'offset': offset}]
+        with patch.object(gp, 'REFERENCE_SHA256', hashlib.sha256(original).hexdigest()):
+            control, report = gp.skip_restore_secure_root(original, segments)
+            changed, report = gp.skip_restore_secure_root(original, segments, unsealed_system_root=True)
+        self.assertEqual(changed[:offset+8], control[:offset+8])
+        self.assertEqual(changed[offset+8:offset+12], bytes.fromhex('1f2003d5'))
+        self.assertEqual(changed[offset+12:], control[offset+12:])
+        self.assertFalse(report['additional_edits'][0]['guest_root_authenticated'])
+        with patch.object(gp, 'REFERENCE_SHA256', hashlib.sha256(original).hexdigest()):
+            with self.assertRaisesRegex(ValueError, 'not file-backed'):
+                gp.skip_restore_secure_root(original, segments[:1], unsealed_system_root=True)
+        wrong = original[:offset+8] + bytes(4) + original[offset+12:]
+        with patch.object(gp, 'REFERENCE_SHA256', hashlib.sha256(wrong).hexdigest()):
+            with self.assertRaisesRegex(ValueError, 'signature mismatch'):
+                gp.skip_restore_secure_root(wrong, segments, unsealed_system_root=True)
+
     def fixture(self):
         original = b"PREFIX!!" + gp.ENTRY_SIGNATURE + b"SUFFIX!!"
         segment = {"address": hex(gp.SECURE_ROOT_ENTRY), "file_size": len(gp.ENTRY_SIGNATURE), "offset": 8}

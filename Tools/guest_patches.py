@@ -13,9 +13,11 @@ RETURN = bytes.fromhex("c0035fd6")
 AES_SECURE_ROOT_CALL = 0xfffffff005b6d664
 AES_CALL_SIGNATURE = bytes.fromhex("060080d200013fd6")
 AES_UNSUPPORTED = bytes.fromhex("e05880520000bc72")
+SYSTEM_ROOT_AUTH_BRANCH = 0xfffffff00759fea8
+SYSTEM_ROOT_AUTH_SIGNATURE = bytes.fromhex("e0c3029100013fd6801100353c410394")
 
 
-def skip_restore_secure_root(kernel, segments, *, aes_root_fallback=False):
+def skip_restore_secure_root(kernel, segments, *, aes_root_fallback=False, unsealed_system_root=False):
     original_digest = hashlib.sha256(kernel).hexdigest()
     if original_digest != REFERENCE_SHA256:
         raise ValueError("restore root experiment requires the exact original 19H422 kernel")
@@ -28,6 +30,20 @@ def skip_restore_secure_root(kernel, segments, *, aes_root_fallback=False):
             changed = bytearray(kernel)
             changed[offset:offset+4] = RETURN
             additional_edits = []
+            if unsealed_system_root:
+                auth_segment = next((s for s in segments if int(s['address'], 16) <= SYSTEM_ROOT_AUTH_BRANCH - 8 and
+                    SYSTEM_ROOT_AUTH_BRANCH + 8 <= int(s['address'], 16) + s['file_size']), None)
+                if auth_segment is None:
+                    raise ValueError('system root-auth diagnostic branch is not file-backed')
+                auth_offset = auth_segment['offset'] + SYSTEM_ROOT_AUTH_BRANCH - int(auth_segment['address'], 16)
+                if kernel[auth_offset-8:auth_offset+8] != SYSTEM_ROOT_AUTH_SIGNATURE:
+                    raise ValueError('system root-auth diagnostic signature mismatch')
+                changed[auth_offset:auth_offset+4] = bytes.fromhex('1f2003d5')
+                additional_edits.append({'name': 'research unsealed system root diagnostic',
+                    'virtual_address': hex(SYSTEM_ROOT_AUTH_BRANCH), 'file_offset': auth_offset,
+                    'original_bytes': kernel[auth_offset:auth_offset+4].hex(), 'replacement_bytes': '1f2003d5',
+                    'guest_root_authenticated': False,
+                    'reason': 'isolate genuine system launchd startup from missing installed root snapshot; not authenticated boot'})
             if aes_root_fallback:
                 aes_segment = next((s for s in segments if int(s["address"], 16) <= AES_SECURE_ROOT_CALL and
                     AES_SECURE_ROOT_CALL + len(AES_CALL_SIGNATURE) <= int(s["address"], 16) + s["file_size"]), None)

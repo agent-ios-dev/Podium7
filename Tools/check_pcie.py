@@ -19,7 +19,7 @@ def check(executable, report, tree):
     if len(apertures) != 12 or apertures[0] != (0x610000000, 0x1000000):
         raise ValueError("original T8010 PCIe aperture schema changed")
     banks = apertures[1:]
-    if any(size < 0x1000 or size > 0x8000 for base, size in banks):
+    if any(size < 0x1000 or size > 0x40000 for base, size in banks):
         raise ValueError("unexpected PCIe control aperture size")
     assembly = '''.text
 adr x7, banks
@@ -179,7 +179,7 @@ banks:
 .quad 0x603000000, 0x4000, 0x603004000, 0x4000
 .quad 0x604000000, 0x4000, 0x604004000, 0x4000
 .quad 0x600000000, 0x8000, 0x600008000, 0x4000
-.quad 0x60a000000, 0x4000
+.quad 0x60a000000, 0x40000
 '''
     bank_start = assembly.index("banks:\n")
     assembly = assembly[:bank_start] + "banks:\n" + "".join(

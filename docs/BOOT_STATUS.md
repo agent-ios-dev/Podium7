@@ -1,3 +1,17 @@
+## Original DeviceTree validation catches exact PHY span mismatch
+
+Run 38037480360 rejects the new DeviceTree aperture check before boot: the
+original final PHY range is base0x60a000000, size0x40000, not0x4000. This single
+original span includes all four lane strides0x10000. The model now uses that
+exact span and removes the speculative separate lane banks. The guest derives
+all bank addresses and bounds from original DeviceTree and separately probes
+lane controls. No prepared DeviceTree range is enlarged. Compile and kernel
+validation follow. iOS desktop boot remains unverified.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38037480360
+
+---
+
 ## Exact PHY base fixed; original driver requires per-lane stride apertures
 
 Run 38037441527 reads and programs PHY lane0 at exact 0x60a000000, then

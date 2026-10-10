@@ -1,0 +1,33 @@
+name: Inspect original graphics launch conditions read-only
+on:
+  workflow_dispatch:
+    inputs:
+      disk_run_id:
+        description: Official System disk preparation run
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s Tools -p 'test_launch_inspection.py'
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-system-disk
+          path: .firmware/system-disk
+          run-id: ${{ inputs.disk_run_id }}
+          github-token: ${{ github.token }}
+      - name: Read selected launch conditions without modifying the original disk
+        run: python Tools/inspect_launch_services.py --disk .firmware/system-disk/storage-16g.raw --output .firmware/launch-inspection.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launch-inspection
+          path: .firmware/launch-inspection.json

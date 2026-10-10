@@ -10,7 +10,12 @@ Commit 0667361 removes the shadowing import. A deadline integration test now
 exercises the complete host snapshot-and-termination path and verifies the
 kernel layout hash check. QMP tests also verify rounded PID reads and ensure
 raw memory words are not retained. 122 local tests pass. Run 38081478064 is the
-real guest validation of that correction; its outcome is pending.
+real guest validation of that correction and completed successfully. Its bounded
+snapshot contains 59 processes, including runningboardd, mediaserverd, configd
+and keybagd, but neither SpringBoard nor backboardd. There were 100,747 EL0
+returns and no panic during 300 seconds. This confirms system services, not
+the desktop. Next investigation reads original graphics service launch conditions
+from the immutable System fixture; no launch configuration is fabricated.
 
 The read-only process layout was independently resolved in the original kernel:
 _proc_find 0xfffffff0075d9f18 uses hash pointer 0xfffffff007137440 and mask

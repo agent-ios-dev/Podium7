@@ -4,6 +4,52 @@ from qemu_probe import boot_args, elf_image, PHYSICAL_BASE, RAM_SIZE, virtual_ba
 
 
 class QEMUProbeTests(unittest.TestCase):
+    def test_system_probe_deadline_saves_snapshot_and_terminates_backend(self):
+        import contextlib
+        import io
+        import json
+        import pathlib
+        import tempfile
+        from types import SimpleNamespace
+        from unittest.mock import patch, MagicMock
+        from qemu_probe import run_probe
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            disk = root / "disk.raw"
+            disk.touch()
+            (root / "KernelCache.macho").write_bytes(b"verified fixture")
+            (root / "PreparedDeviceTree.bin").write_bytes(b"fixture tree")
+            backend = MagicMock()
+            backend.poll.return_value = None
+            backend.returncode = 0
+            def launch(*args, **kwargs):
+                (root / "qemu-trace.txt").write_text("0x0000000042001000: nop\n")
+                return backend
+            original_stat = pathlib.Path.stat
+            def stat(path, *args, **kwargs):
+                if path == disk:
+                    original = original_stat(path, *args, **kwargs)
+                    return SimpleNamespace(st_size=16 << 30, st_mode=original.st_mode)
+                return original_stat(path, *args, **kwargs)
+            with contextlib.ExitStack() as stack:
+                stack.enter_context(patch("qemu_probe.make_probe", return_value=(root / "fixture.elf", 0x42001000, (0, 0))))
+                stack.enter_context(patch("qemu_probe.subprocess.check_output", return_value="QEMU fixture\n"))
+                stack.enter_context(patch("qemu_probe.subprocess.Popen", side_effect=launch))
+                stack.enter_context(patch("qemu_probe.time.monotonic", side_effect=[0, 301, 301]))
+                stack.enter_context(patch("pathlib.Path.stat", stat))
+                snapshot = stack.enter_context(patch("qemu_probe.capture_cpu", return_value={"registers": "PC=fixture", "stack": ""}))
+                stack.enter_context(patch("inspect_pmgr_handoff.inspect_tree", return_value={}))
+                stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+                run_probe(root, cpu="podium7-research", research_system_root="disk0s1s1",
+                          research_nvme=True, research_nvme_dart=True, research_nvme_msi=True,
+                          research_nvme_image=disk, seconds=300)
+            backend.terminate.assert_called_once()
+            backend.wait.assert_called_once_with(timeout=3)
+            self.assertFalse(snapshot.call_args.kwargs["kernel_process_metadata"])
+            report = json.loads((root / "qemu-probe.json").read_text())
+            self.assertEqual(report["stop"], "300-second execution deadline reached")
+            self.assertEqual(report["cpu_snapshot"]["registers"], "PC=fixture")
+
     def test_keybag_diagnostics_require_no_sep_before_reading_files(self):
         from pathlib import Path
         from qemu_probe import make_probe

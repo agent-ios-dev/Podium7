@@ -1,3 +1,26 @@
+## Process snapshot diagnostic repair
+
+Run 38068590109 executed the original guest for 300 seconds but its host probe
+failed at snapshot collection: a later function-local hashlib import shadowed
+the module import, raising UnboundLocalError. Its serial still records early
+boot completion without kernel panic. It produced no process snapshot; do not
+interpret that missing evidence as a guest boot regression.
+
+Commit 0667361 removes the shadowing import. A deadline integration test now
+exercises the complete host snapshot-and-termination path and verifies the
+kernel layout hash check. QMP tests also verify rounded PID reads and ensure
+raw memory words are not retained. 122 local tests pass. Run 38081478064 is the
+real guest validation of that correction; its outcome is pending.
+
+The read-only process layout was independently resolved in the original kernel:
+_proc_find 0xfffffff0075d9f18 uses hash pointer 0xfffffff007137440 and mask
+0xfffffff007137448, PID +0x68 and hash link +0xa8. _proc_name at
+0xfffffff0075db80c copies the process name from +0x370. Layout use is gated by
+the exact original kernel SHA-256, and corrupt/cyclic/oversized lists are
+rejected. A process named SpringBoard alone does not prove visible desktop.
+
+---
+
 ## CPU UVLO panic resolved in real boot; SpringBoard remains open
 
 Run 38067643433 on f7dc7d3 completes 300 seconds without kernel panic, missing

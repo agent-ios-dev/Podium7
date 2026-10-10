@@ -41,13 +41,20 @@ def inspect(stream):
     return result
 
 
-def compare_readback(layout, trace):
+def compare_readback(layout, trace, stream=None):
     samples = []
     for cid, lba, status, payload in re.findall(
-            r'PODIUM7 NVME-READBACK cid=(\d+) lba=(\d+) result=(\d+) bytes=([0-9a-f]*)', trace):
+            r'^PODIUM7 NVME-READBACK cid=(\d+) lba=(\d+) result=(-?\d+) bytes=([0-9a-f]*)\r?$', trace, re.MULTILINE):
+        expected = layout['sectors'].get(lba)
+        if stream is not None and len(payload) % 2 == 0 and 0 < len(payload) <= 32768 and int(lba) <= 2:
+            stream.seek(int(lba) * 512)
+            expected = stream.read(len(payload) // 2).hex()
         samples.append({'cid': int(cid), 'lba': int(lba), 'readback_status': int(status),
-                        'matches_source': status == '0' and payload == layout['sectors'].get(lba)})
-    return {'samples': samples, 'all_observed_match': bool(samples) and all(
+                        'bytes': len(payload) // 2,
+                        'matches_source': status == '0' and bool(payload) and payload == expected})
+    incomplete = trace.count('PODIUM7 NVME-READBACK cid=') - len(samples)
+    return {'samples': samples, 'incomplete_records': incomplete,
+            'all_observed_match': bool(samples) and not incomplete and all(
         s['matches_source'] for s in samples), 'booted_ios': False}
 
 
@@ -57,8 +64,9 @@ if __name__ == '__main__':
     parser.add_argument('--output', type=pathlib.Path, required=True)
     parser.add_argument('--trace', type=pathlib.Path)
     args = parser.parse_args()
-    with args.disk.open('rb') as stream: result = inspect(stream)
-    if args.trace:
-        result['dma_readback'] = compare_readback(result, args.trace.read_text(errors='replace'))
+    with args.disk.open('rb') as stream:
+        result = inspect(stream)
+        if args.trace:
+            result['dma_readback'] = compare_readback(result, args.trace.read_text(errors='replace'), stream)
     args.output.write_text(json.dumps(result, indent=2))
     print(json.dumps({k: v for k, v in result.items() if k != 'sectors'}, indent=2))

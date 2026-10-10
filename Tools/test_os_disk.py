@@ -95,5 +95,22 @@ class OSDiskTests(unittest.TestCase):
             stream.seek(0);self.assertEqual(stream.read(16), payload[:16])
             self.assertLessEqual(len(stream.cache), 2)
 
+    def test_interleaved_readback_is_incomplete_not_a_source_mismatch(self):
+        layout = {'sectors': {'1': '454649'}}
+        broken = 'PODIUM7 NVME-READBACK cid=6 lba=1 result=0 bytes=4546PODIUM7 OTHER\n49\n'
+        result = compare_readback(layout, broken)
+        self.assertEqual(result['samples'], [])
+        self.assertEqual(result['incomplete_records'], 1)
+        self.assertFalse(result['all_observed_match'])
+
+    def test_readback_source_range_uses_actual_transfer_length(self):
+        disk, _ = self.disk()
+        layout = inspect_disk(disk)
+        disk.seek(512); data = disk.read(4096).hex()
+        trace = 'PODIUM7 NVME-READBACK cid=6 lba=1 result=0 bytes=' + data + '\n'
+        before = disk.getvalue()
+        self.assertTrue(compare_readback(layout, trace, disk)['all_observed_match'])
+        self.assertEqual(disk.getvalue(), before)
+
 
 if __name__ == '__main__':unittest.main()

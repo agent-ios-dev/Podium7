@@ -12,6 +12,27 @@ def node(properties, children=()):
 
 
 class DeviceTreePreparationTests(unittest.TestCase):
+    def test_fastsim_is_opt_in_preserves_devices_and_requires_original_board(self):
+        cpu = node([('name', b'cpu0\0'), ('device_type', b'cpu\0')])
+        sep = node([('name', b'sep\0'), ('compatible', b'iop,t8010\0'), ('reg', bytes(range(16)))])
+        arm = node([('name', b'arm-io\0'), ('compatible', b'arm-io,t8010\0')], [sep])
+        product = node([('name', b'product\0'), ('unrelated', b'original')])
+        tree = node([('name', b'device-tree\0')], [node([('name', b'cpus\0')], [cpu]), arm, product])
+        ordinary, _ = prepare(tree, 24000000, random_seed=bytes(64))
+        self.assertNotIn(b'FastSim', ordinary)
+        diagnostic, changes = prepare(tree, 24000000, random_seed=bytes(64), research_fastsim=True)
+        nodes = {n['path']: n['properties'] for n in device_tree(diagnostic)}
+        self.assertEqual(nodes['/device-tree/product']['product-name'], b'FastSim\0'.hex())
+        self.assertIn(b'unrelated'.ljust(32, b'\0') + struct.pack('<I', 8) + b'original', diagnostic)
+        self.assertEqual(nodes['/device-tree/arm-io/sep'], next(n['properties'] for n in device_tree(tree) if n['path'].endswith('/sep')))
+        self.assertFalse(next(c for c in changes if c.get('value') == 'FastSim')['sep_data_protection_confirmed'])
+        again, _ = prepare(diagnostic, 24000000, random_seed=bytes(64), research_fastsim=True)
+        self.assertEqual(again, diagnostic)
+        with self.assertRaises(ValueError):
+            prepare(tree.replace(b't8010', b't9999'), 24000000, research_fastsim=True)
+        with self.assertRaises(ValueError):
+            prepare(node([('name', b'device-tree\0')], [cpu, arm]), 24000000, research_fastsim=True)
+
     def test_system_storage_is_explicitly_builtin_only_on_verified_original_endpoint(self):
         cpu = node([('name', b'cpu0\0'), ('device_type', b'cpu\0')])
         disk = node([('name', b's3e\0'), ('device_type', b'pcie-device\0')])

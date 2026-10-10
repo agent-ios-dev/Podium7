@@ -4,6 +4,14 @@ from qemu_probe import boot_args, elf_image, PHYSICAL_BASE, RAM_SIZE, virtual_ba
 
 
 class QEMUProbeTests(unittest.TestCase):
+    def test_fastsim_requires_explicit_unsealed_system_experiment_before_reading_files(self):
+        from pathlib import Path
+        from qemu_probe import make_probe
+        for root, unsealed in ((None, False), ('disk0s1s1', False)):
+            with self.assertRaisesRegex(ValueError, 'FastSim diagnostic'):
+                make_probe(Path('nonexistent'), research_system_root=root,
+                           research_unsealed_root=unsealed, research_fastsim=True)
+
     def test_trace_budget_rejects_unbounded_values_before_preparation(self):
         from unittest.mock import patch
         from qemu_probe import run_probe

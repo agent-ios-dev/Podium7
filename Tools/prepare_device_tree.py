@@ -1,6 +1,6 @@
 """Prepare iBoot placeholder flags and CPU timer frequencies for kernel handoff.
 
-Leaves non-clock properties and all devices intact. Frequencies must agree
+Default preparation preserves devices; optional FastSim identity is diagnostic only. Frequencies must agree
 with the selected QEMU counter, not an invented boot-complete marker.
 """
 import struct
@@ -8,7 +8,7 @@ import secrets
 from analyze_firmware import device_tree
 
 
-def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, dram_size=2 * 1024 * 1024 * 1024, research_bridge_handoff=False, research_internal_storage=False):
+def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, dram_size=2 * 1024 * 1024 * 1024, research_bridge_handoff=False, research_internal_storage=False, research_fastsim=False):
     if not 1_000_000 <= counter_frequency <= 1_000_000_000:
         raise ValueError("invalid counter frequency")
     original_nodes = device_tree(data)  # Validate bounds/depth before rewriting.
@@ -30,6 +30,16 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
             cursor += (size + 3) & ~3
         names = {name.split(b"\0")[0]: value for name, value in properties}
         path = parent + "/" + names.get(b"name", b"?").split(b"\0")[0].decode("ascii", errors="replace")
+        if research_fastsim and path == '/device-tree/product':
+            arm_io = next((n for n in original_nodes if n['path'] == '/device-tree/arm-io'), None)
+            if arm_io is None or arm_io['properties'].get('compatible') != b'arm-io,t8010\0'.hex():
+                raise ValueError('FastSim diagnostic requires original T8010 tree')
+            key = b'product-name'
+            properties = [(raw, value) for raw, value in properties if raw.split(b'\0')[0] != key]
+            properties.append((key.ljust(32, b'\0'), b'FastSim\0'))
+            changes.append({'path': path, 'property': 'product-name', 'value': 'FastSim',
+                            'source': 'explicit no-SEP FastSim research diagnostic',
+                            'sep_data_protection_confirmed': False, 'authentic_iboot_handoff': False})
         if research_internal_storage and path == '/device-tree/arm-io/apcie/pci-bridge0/s3e':
             arm_io = next((n for n in original_nodes if n['path'] == '/device-tree/arm-io'), None)
             if arm_io is None or arm_io['properties'].get('compatible') != b'arm-io,t8010\0'.hex():
@@ -228,4 +238,6 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
     device_tree(prepared)
     if research_internal_storage and not any(c.get('property') == 'built-in' for c in changes):
         raise ValueError('original internal storage endpoint missing')
+    if research_fastsim and not any(c.get('value') == 'FastSim' for c in changes):
+        raise ValueError('original product node missing for FastSim diagnostic')
     return prepared, changes

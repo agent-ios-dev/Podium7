@@ -1,3 +1,26 @@
+## Mount-phase-1 passes; next task needs SEP-backed Gigalocker
+
+Run 38059471628 genuinely checks all six APFS volume superblocks and prints
+QUICKCHECK ONLY; FILESYSTEM CLEAN. Original mount discovers Data at disk0s1s4,
+mounts xART read-write and Preboot read-only, then launchd advances to
+data-protection. The previous missing-role / mount-phase-1 exit 66 is fixed.
+The run executes 12,179 genuine EL0 returns. It now panics because the xART
+Gigalocker file is absent: data-protection exits 2. No SpringBoard yet.
+
+Next experiment explicitly supplies a FastSim product identity in the
+research handoff, following the original qemu-t8030 research implementation:
+https://github.com/TrungNguyen1909/qemu-t8030/blob/master/hw/arm/t8030.c
+This selects Apple's simulator-style no-SEP path; it does not implement SEP,
+protect user data, establish authenticated boot, or replace system binaries.
+Default device identity remains unchanged. CLI requires an explicit unsealed
+APFS experiment and verifies the original T8010 tree. Hardware nodes stay
+intact, and the report records FastSim and unconfirmed SEP data protection.
+104 local tests pass; the real guest result remains to be measured.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38059471628
+
+---
+
 ## Real install roles under guest validation
 
 Run 38057428910 confirms native APFS expansion to the fixed 16-GiB disk:

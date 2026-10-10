@@ -82,7 +82,7 @@ def prepare(image):
         if len(resized_systems) != 1: raise ValueError('System UUID changed after resize')
         system = resized_systems[0]
         source = mount_volume(system, root / 'install-system', readonly=True)
-        for relative in ('private/var', 'private/etc/fstab', 'usr/standalone/firmware'):
+        for relative in ('private/var', 'private/etc/fstab', 'usr/standalone/firmware', 'System/Library/Caches/com.apple.factorydata'):
             if not (source/relative).resolve().is_relative_to(source):
                 raise ValueError('source path escapes mounted guest: ' + relative)
         report = {'system_fstab': (source/'private/etc/fstab').read_text() if (source/'private/etc/fstab').is_file() else None,
@@ -103,7 +103,7 @@ def prepare(image):
             command(args)
         updated = fixture_container(whole)
         mounted = {}
-        for role, label in [('Data', 'data'), ('Preboot', 'preboot')]:
+        for role, label in [('Data', 'data'), ('Preboot', 'preboot'), ('Hardware', 'hardware')]:
             volumes = [v for v in updated['Volumes'] if v.get('Name') == role and v.get('APFSVolumeUUID') != SYSTEM_UUID]
             if not volumes and role == 'Data': continue
             if len(volumes) != 1: raise ValueError('created role not uniquely present: ' + role)
@@ -112,6 +112,17 @@ def prepare(image):
         # iOS mounts the Data volume at /private/var, unlike macOS.
         if report['source_var_present'] and 'Data' in mounted:
             command(['sudo', 'ditto', '--rsrc', '--extattr', str(source/'private/var'), str(mounted['Data'])])
+        # Original mount-phase-2 binds this Hardware directory into System.
+        # Provide its actual mount source, without fabricated factory keys.
+        factory = mounted['Hardware'] / 'FactoryData/System/Library/Caches/com.apple.factorydata'
+        original_factory = source / 'System/Library/Caches/com.apple.factorydata'
+        command(['sudo', 'mkdir', '-p', str(factory)])
+        if original_factory.is_dir():
+            command(['sudo', 'ditto', '--rsrc', '--extattr', str(original_factory), str(factory)])
+        report['hardware_factory_cache'] = {'mount_source_prepared': True,
+            'original_cache_copied': original_factory.is_dir(),
+            'files': sum(1 for f in factory.rglob('*') if f.is_file()),
+            'factory_personalization_confirmed': False}
         # Current synthetic handoff has no boot-manifest hash; original mount
         # selected this exact 48-byte zero namespace in run 38053476211.
         firmware = mounted['Preboot'] / ('0' * 96) / 'usr/standalone/firmware'

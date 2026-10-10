@@ -1,3 +1,22 @@
+## Original no-SEP path advances to mount-phase-2
+
+Run 38061424058 executes 14,311 genuine EL0 returns. The original boot task
+reports No SEP present, then completes finish-obliteration and commit-boot-mode.
+Original mount mounts Data at /private/var, Update and Hardware. FastSim/no-SEP
+remain explicitly unauthenticated diagnostics, without SEP data protection.
+
+The next observed failure is mount-phase-2 exit 66: the Hardware volume lacks
+FactoryData/System/Library/Caches/com.apple.factorydata, required as the source
+of a bind mount into System. Preparation now creates that real directory and
+copies original System factory-cache contents when present. Empty directory
+creation does not invent factory keys or establish device personalization.
+The result records source availability, file count and unconfirmed factory
+personalization. Guest mount must validate the next stage. No SpringBoard yet.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38061424058
+
+---
+
 ## FastSim identity alone does not skip SEP
 
 Run 38060545190 confirms FastSim is enabled in original APFS and repeats

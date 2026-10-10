@@ -10,6 +10,10 @@ on:
         description: Explicit unauthenticated system launchd diagnostic
         type: boolean
         default: false
+      prepare_install_layout:
+        description: Create missing Data, Preboot and xART on isolated diagnostic disk
+        type: boolean
+        default: false
       root_device:
         description: Explicit research root-device name
         required: true
@@ -70,6 +74,9 @@ jobs:
           path: .firmware/system-disk
           run-id: ${{ inputs.disk_run_id }}
           github-token: ${{ github.token }}
+      - name: Prepare missing install volumes only on isolated downloaded fixture
+        if: inputs.prepare_install_layout
+        run: python3 Tools/prepare_install_layout.py --disk .firmware/system-disk/storage-16g.raw --output .firmware/install-layout.json
       - name: Boot original kernel with official system trust cache and APFS disk
         env:
           RESEARCH_ROOT: ${{ inputs.root_device }}
@@ -93,4 +100,5 @@ jobs:
             .firmware/system-boot/*.json
             .firmware/system-boot/*.txt
             .firmware/nvme-checks.json
+            .firmware/install-layout.json
           if-no-files-found: ignore

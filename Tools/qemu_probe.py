@@ -269,7 +269,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                     snapshot = capture_cpu(monitor_path, addresses, physical_windows=controls)
                     if dma_submitted:
                         from nvme_dma_diagnostics import inspect as inspect_nvme_dma
-                        dma_snapshot = inspect_nvme_dma(monitor_path, dma_trace)
+                        dma_snapshot = inspect_nvme_dma(monitor_path, dma_trace, dump_root_pages=True)
                         (directory / "nvme-dma-snapshot.json").write_text(json.dumps(dma_snapshot, indent=2))
                     (directory / "cpu-snapshot.txt").write_text(snapshot["registers"])
                     (directory / "cpu-stack.txt").write_text(snapshot["stack"])

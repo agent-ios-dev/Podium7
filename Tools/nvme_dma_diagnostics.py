@@ -11,7 +11,7 @@ def word_pair(snapshot):
     return int(values[0], 16) | (int(values[1], 16) << 32)
 
 
-def inspect(path, trace):
+def inspect(path, trace, *, dump_root_pages=False):
     queues = re.findall(r"pci_nvme_mmio_asqaddr .*address=(0x[0-9a-fA-F]+)", trace)
     if not queues:
         raise ValueError("original NVMe ASQ address missing")
@@ -20,6 +20,14 @@ def inspect(path, trace):
         r"PODIUM7 DART base=0000000601008000 write offset=(004[048c]) value=([0-9a-fA-F]+)", trace)}
     report = {"original_asq_iova": hex(iova), "candidates": [],
               "translation_applied": False, "guest_stopped_for_table_inspection": True}
+    if dump_root_pages:
+        windows = []
+        for value in roots.values():
+            base = (value & 0xfffffff) << 12
+            if value & 0x80000000 and 0x40000000 <= base <= 0xbffff000:
+                windows.extend((base + offset, 64) for offset in range(0, 4096, 256))
+        if windows:
+            report["original_root_table_pages"] = capture(path, physical_windows=tuple(windows))["physical_windows"]
     for shift in (12, 14):
         bits = shift - 3
         index = iova >> (shift + bits * 2)

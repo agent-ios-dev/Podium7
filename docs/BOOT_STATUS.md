@@ -26,6 +26,14 @@ is missing from the official distributable image, rather than merely hidden
 from macOS. The next isolated fixture experiment creates the real name via
 fs_snapshot_create, verifies it with the host snapshot listing and preserves
 the original artifact. Success still requires original guest APFS authentication.
+
+Host experiment38049627150 mounts the original System volume but the snapshot
+API returns EPERM. Apple XNU vfs_context_can_snapshot requires a snapshot
+entitlement even for root; the helper now requests the developer entitlement
+com.apple.developer.vfs.snapshot and verifies its ad-hoc signature on macOS.
+Repeat38049919032 is pending. No root-authentication assertion was skipped.
+89 local tests pass, including rejecting outside fixture paths, wrong mounted
+devices and detaching the isolated image after an error.
 Original APFS hexadecimal alphabet at005870405 is uppercase, confirming the
 expected name com.apple.os.update-BE9E51693FFC950DECA14C2D3916A94FF07C633FD3776E08E7258DBE38DC1606.
 

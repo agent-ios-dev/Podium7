@@ -52,7 +52,9 @@ def prepare(image, auth, helper, mount):
         mounted = plistlib.loads(subprocess.check_output(['diskutil', 'info', '-plist', str(mount)], timeout=60))
         if mounted.get('DeviceIdentifier') != device or mounted.get('MountPoint') != str(mount):
             raise ValueError('fixture mount does not identify the selected image volume')
-        subprocess.run(['sudo', str(helper), str(mount), name], check=True, timeout=60)
+        created = subprocess.run(['sudo', str(helper), str(mount), name], check=True, timeout=60,
+                                 capture_output=True, text=True)
+        print(created.stdout, end='')
         snapshots = plistlib.loads(subprocess.check_output([
             'diskutil', 'apfs', 'listSnapshots', device, '-plist'], timeout=60))
         subprocess.run(['diskutil', 'unmount', device], check=True, timeout=60)
@@ -76,6 +78,9 @@ if __name__ == '__main__':
         report = prepare(args.disk, args.auth, args.helper, args.mount)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         report = {'preparation_error': str(error), 'booted_ios': False}
+        if isinstance(error, subprocess.CalledProcessError):
+            report.update(command_stdout=error.stdout, command_stderr=error.stderr,
+                          command_exit=error.returncode)
     args.output.write_text(json.dumps(report, indent=2, default=str), encoding='utf-8')
     print(json.dumps(report, indent=2, default=str))
     if 'preparation_error' in report:

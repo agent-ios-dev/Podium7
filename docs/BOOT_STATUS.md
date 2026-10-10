@@ -18,6 +18,17 @@ primary hash at payload offset16. Run38048484989 inspects volume roles and
 snapshots through a read-only, unmounted macOS attachment of the prepared
 image, to distinguish a missing restore-install snapshot from a naming bug.
 
+Host run38048729480 recognizes one unencrypted System volume with UUID
+C16ECAF9-9EC3-42EB-9553-B3DA1A53090F and no Data volume. macOS
+listSnapshots exits1; direct read-only apfsutil probe38049010641 also finds the sole System
+volume and an empty snapshot tree. This confirms the named root snapshot
+is missing from the official distributable image, rather than merely hidden
+from macOS. The next isolated fixture experiment creates the real name via
+fs_snapshot_create, verifies it with the host snapshot listing and preserves
+the original artifact. Success still requires original guest APFS authentication.
+Original APFS hexadecimal alphabet at005870405 is uppercase, confirming the
+expected name com.apple.os.update-BE9E51693FFC950DECA14C2D3916A94FF07C633FD3776E08E7258DBE38DC1606.
+
 The latest NVMe readback report contains one interleaved log record, not
 confirmed disk corruption: its93-byte prefix matches the source GPT header.
 Readback logging now emits each bounded buffer in one call, the parser

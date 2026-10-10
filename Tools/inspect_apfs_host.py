@@ -37,7 +37,8 @@ def inspect(image):
                     continue
                 try:
                     snapshots[device] = plistlib.loads(subprocess.check_output([
-                        'diskutil', 'apfs', 'listSnapshots', device, '-plist'], timeout=60))
+                        'diskutil', 'apfs', 'listSnapshots', device, '-plist'], timeout=60,
+                        stderr=subprocess.STDOUT))
                 except subprocess.CalledProcessError as error:
                     snapshots[device] = {'command_exit': error.returncode,
                                          'output': (error.output or b'').decode(errors='replace')}

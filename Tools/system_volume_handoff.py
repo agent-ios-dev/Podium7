@@ -49,5 +49,6 @@ def attach(tree, container):
     return result, {"path": "/device-tree/chosen", "property": "system-volume-auth-blob",
                     "bytes": len(raw), "payload_sha256": hashlib.sha256(raw).hexdigest(),
                     "container_sha384": hashlib.sha384(container).hexdigest(),
+                    "expected_root_snapshot": "com.apple.os.update-" + raw[16:48].hex().upper(),
                     "source": "official IPSW SystemVolume isys payload",
                     "authenticated_iboot_handoff": False, "guest_root_authenticated": False}

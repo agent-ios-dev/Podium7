@@ -1024,9 +1024,10 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
     sep = sep.replace(".valid = { .min_access_size = 4, .max_access_size = 4 },",
         ".valid = { .min_access_size = 4, .max_access_size = 8 },\n"
         "    .impl = { .min_access_size = 4, .max_access_size = 4 },")
-    sep = "\n/* Passive T8010 SEP/SIO/PMP mailbox apertures. No firmware, DMA or IOP replies. */\n" + sep[sep.index("typedef struct "):]
+    sep = "\n/* T8010 IOP mailbox apertures; PMP has audited bidirectional peer views. No synthetic replies. */\n" + sep[sep.index("typedef struct "):]
     # Audited PMP firmware object at VA 0x010144b0 uses MMIO base +0xb80:
-    # tx-status +4, rx-status +8, tx-data +0x10, rx-data +0x18.
+    # rx-status +8 and rx-data +0x18. A distinct transmit object polls
+    # +0xba0 and writes the real boot hello at +0xbb0/+0xbb4 (run 37988746111).
     # Keep all other IOPs passive; only PMP has these verified peer views.
     sep = sep.replace("    bool inbox_pending;",
         "    bool inbox_pending;\n    bool outbox_pending;\n"
@@ -1037,7 +1038,7 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
         "        value = (value & 0xffffU) | ((bank->base == 0x20e300000ULL && bank->inbox_pending) ? (1U << 16) : (1U << 17));")
     read_end = "    if (bank->logged_accesses < 256) {"
     read_peer = """    if (bank->base == 0x20e300000ULL) {
-        if (address == 0xb84) {
+        if (address == 0xba0) {
             value = (value & 0xffffU) | (bank->outbox_pending ? (1U << 16) : (1U << 17));
         } else if (address == 0xb98 || address == 0xb9c) {
             value = bank->inbox_pending ? bank->registers[(0x4010 + address - 0xb98) >> 2] : 0;
@@ -1053,9 +1054,9 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
         raise ValueError("PMP read diagnostic anchor changed")
     sep = sep.replace(read_end, read_peer + read_end, 1)
     sep = sep.replace("if (address == 0x4008) {\n        /* Queue status is read-only. */",
-        "if (bank->base == 0x20e300000ULL && (address == 0xb90 || address == 0xb94)) {\n"
+        "if (bank->base == 0x20e300000ULL && (address == 0xbb0 || address == 0xbb4)) {\n"
         "        if (!bank->outbox_pending) {\n"
-        "            if (address == 0xb90) { bank->outbox_low = value; }\n"
+        "            if (address == 0xbb0) { bank->outbox_low = value; }\n"
         "            else { bank->outbox_high = value; bank->outbox_pending = true; }\n"
         "        }\n"
         "    } else if (address == 0x4008) {\n        /* Queue status is read-only. */")

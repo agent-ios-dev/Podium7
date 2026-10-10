@@ -122,32 +122,32 @@ mov w5, #0x20000
 cmp w6, w5
 b.ne failure
 // PMP transmit -> AP receive; low word alone must not publish a message.
-ldr w6, [x3, #0xb84]
+ldr w6, [x3, #0xba0]
 tbz w6, #17, failure
 mov w5, #0x5678
-str w5, [x3, #0xb90]
+str w5, [x3, #0xbb0]
 mov x4, #0x4020
 ldr w6, [x3, x4]
 tbz w6, #17, failure
 mov w5, #0x8765
-str w5, [x3, #0xb94]
-ldr w6, [x3, #0xb84]
+str w5, [x3, #0xbb4]
+ldr w6, [x3, #0xba0]
 tbz w6, #16, failure
-str wzr, [x3, #0xb90]
-str wzr, [x3, #0xb94]
+str wzr, [x3, #0xbb0]
+str wzr, [x3, #0xbb4]
 ldr w6, [x3, x4]
 tbz w6, #16, failure
 ldr w6, [x3, #0x4038]
 mov w5, #0x5678
 cmp w6, w5
 b.ne failure
-ldr w6, [x3, #0xb84]
+ldr w6, [x3, #0xba0]
 tbz w6, #16, failure
 ldr w6, [x3, #0x403c]
 mov w5, #0x8765
 cmp w6, w5
 b.ne failure
-ldr w6, [x3, #0xb84]
+ldr w6, [x3, #0xba0]
 tbz w6, #17, failure
 ldr w6, [x3, #0x4038]
 cbnz w6, failure

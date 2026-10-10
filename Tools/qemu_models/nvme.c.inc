@@ -15,6 +15,7 @@ static void podium7_storage_attach(VirtMachineState *vms, DeviceState *host)
     BlockBackend *disk = blk_by_name("podium7-storage");
     if (!disk) { return; }
     PCIHostState *pci = PCI_HOST_BRIDGE(host);
+    podium7_storage_iommu_setup(vms, pci);
     PCIDevice *port = NULL;
     /* Original DeviceTree exposes four host ports. Empty root ports still
      * have real PCI capabilities, but no endpoint or active link. */

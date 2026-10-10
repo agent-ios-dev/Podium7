@@ -1328,6 +1328,9 @@ static void podium7_pmp_start(void)
     dart = mipi.replace("MIPI-DSIM", "DART").replace("mipi_dsim", "dart")
     dart = dart.replace("Podium7MIPIDSIMBank", "Podium7DARTBank")
     dart = "\n/* T8010 DART discovery/configuration banks. DMA translation is absent. */\n" + dart[dart.index("typedef struct "):]
+    dart = dart.replace("} Podium7DARTBank;", "} Podium7DARTBank;\nstatic Podium7DARTBank *podium7_storage_dart;")
+    dart = dart.replace("    bank->base = base;",
+        "    bank->base = base;\n    if (base == 0x601008000ULL) { podium7_storage_dart = bank; }")
     start = dart.index("static void podium7_dart_create(")
     dart = dart[:start] + '''static void podium7_dart_create(MachineState *machine, MemoryRegion *memory)
 {
@@ -1348,6 +1351,13 @@ static void podium7_pmp_start(void)
     pcie = mipi.replace("MIPI-DSIM", "PCIE").replace("mipi_dsim", "pcie")
     pcie = pcie.replace("Podium7MIPIDSIMBank", "Podium7PCIeBank")
     pcie = "\n/* T8010 PCIe discovery controls; no endpoint, PHY-ready or link-up synthesis. */\n" + pcie[pcie.index("typedef struct "):]
+    # Polling reads must not exhaust the evidence budget for later programmed
+    # inbound translation/MSI controls. State and ACK behavior are unchanged.
+    pcie = pcie.replace("    unsigned logged_accesses;", "    unsigned logged_accesses;\n    unsigned logged_writes;")
+    pcie_write_start = pcie.index("static void podium7_pcie_write(")
+    pcie = pcie[:pcie_write_start] + pcie[pcie_write_start:].replace(
+        "bank->logged_accesses < 256", "bank->logged_writes < 512").replace(
+        "bank->logged_accesses++", "bank->logged_writes++")
     # Original T8010 common-control request +0x124 bit0 waits for +0x28 bits4 then0.
     # This is a research request acknowledgement, not PCI link/endpoint ready.
     pcie = pcie.replace("    uint32_t value = bank->registers[address >> 2];",
@@ -1446,6 +1456,7 @@ static void podium7_pcie_create(MachineState *machine, MemoryRegion *memory)
     if (!blk_by_name("podium7-storage")) { memory_region_add_subregion(memory, 0x610000000ULL, config); }
 }
 '''
+    pcie += (pathlib.Path(__file__).parent / 'qemu_models' / 'nvme_dart.c.inc').read_text(encoding='utf-8')
     pcie += (pathlib.Path(__file__).parent / 'qemu_models' / 'nvme.c.inc').read_text(encoding='utf-8')
     aop_system = mipi.replace("MIPI-DSIM", "AOP-SYSTEM").replace("mipi_dsim", "aop_system")
     aop_system = aop_system.replace("Podium7MIPIDSIMBank", "Podium7AOPSystemBank")

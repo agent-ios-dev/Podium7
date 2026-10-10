@@ -1,3 +1,29 @@
+## Original Identify queue located through observed port0 DART mapping
+
+Run38040341863 diagnostic captures ASQ IOVA0x86d30000. The observed31-bit PCIe
+window with4K tables reads TTBR0=0x80055de8, L1@0x55de81b0=0x55dee003,
+L2@0x55dee980=0x54c1c003, physical ASQ0x54c1c000. That queue contains actual
+opcode6, CNS1 and PRP1=0x86d48000: the original Identify Controller command.
+The direct DMA path had read opcode0 at the untransformed IOVA instead.
+
+A separately opted-in research port0 mapper now walks original little-endian
+4K tables, bounds tables/output to RAM and enforces leaf read/write permission.
+It preserves direct controls when disabled and reports unmapped DMA as errors.
+The new real NVMe guest uses nonidentity IOVAs for all queues/buffers and checks
+persistent sector I/O plus denied-write and invalid-leaf errors without changing
+destination pages. Original-kernel translation runs only after this guest passes.
+MSI, other streams, DAPF and hardware fault IRQ behavior remain unimplemented.
+
+The same run's full boot catches an intermittent genuine PMP NMI (no response
+to AP power notification in20s) before userland. The new strict restore regression
+gate correctly fails; earlier155/156 restored_extern boots are confirmed but
+stable launch and full desktop boot are not established. 66 local tests pass;
+new mapper compile/ARM64 execution validation follow.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38040341863
+
+---
+
 ## Original DART root pages captured before command timeout
 
 Run 38039924882 captures the original tables before any NVMe FatalHandling:

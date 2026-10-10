@@ -8,6 +8,8 @@ import json
 import pathlib
 import subprocess
 import tempfile
+import os
+import re
 
 from check_qemu_registers import text_section
 from qemu_probe import elf_image
@@ -15,8 +17,8 @@ from qemu_probe import elf_image
 DISK_BYTES = 16 << 30
 
 
-def assembly():
-    return '''.text
+def assembly(dart=False):
+    source = '''.text
 mov x20, #1
 // Apple port0 link bit reflects the real root port, only while enabled.
 movz x3, #0
@@ -133,6 +135,7 @@ subs x1, x1, #1
 b.ne ready
 b failure
 initialized:
+mov x27, #0
 // Each command has a distinct CID and completion entry.
 movz x23, #0
 movk x23, #0x4501, lsl #16
@@ -268,7 +271,12 @@ b.ne completion
 b failure
 completed:
 lsr w0, w0, #1
+cbnz x27, expected_error
 cbnz w0, failure
+b completion_id
+expected_error:
+cbz w0, failure
+completion_id:
 // Verify this completion belongs to the submitted command.
 ldrh w0, [x24, #12]
 ldrh w1, [x23, #2]
@@ -290,16 +298,103 @@ b .
 exit_block:
 .quad 0x20026, 0
 '''
+    if dart:
+        setup = '''// Real DMA uses distinct IOVAs and the original port0 register bank.
+movz x0, #0
+movk x0, #0x4503, lsl #16
+mov x1, #0x2000
+dart_zero:
+str xzr, [x0], #8
+subs x1, x1, #8
+b.ne dart_zero
+movz x0, #0
+movk x0, #0x4503, lsl #16
+movz x1, #0x1003
+movk x1, #0x4503, lsl #16
+str x1, [x0]
+add x0, x0, #1, lsl #12
+add x0, x0, #0x80
+movz x1, #3
+movk x1, #0x4501, lsl #16
+mov x2, #32
+dart_leaf:
+str x1, [x0], #8
+add x1, x1, #1, lsl #12
+subs x2, x2, #1
+b.ne dart_leaf
+movz x3, #0x8000
+movk x3, #0x100, lsl #16
+movk x3, #6, lsl #32
+movz w0, #0x5030
+movk w0, #0x8004, lsl #16
+str w0, [x3, #0x40]
+mov w0, #0x100
+str w0, [x3, #0x20]
+dsb sy
+'''
+        # CPU queue accesses stay physical. Only controller DMA pointers change.
+        source, changed = re.subn(r'(movk x0, #)0x450([12])(, lsl #16\nstr x0, \[x(?:22, #0x(?:28|30)|23, #24)\])',
+            lambda m: m[1] + '0x800' + m[2] + m[3], source)
+        if changed != 8:
+            raise ValueError(f"NVMe DMA pointer anchors changed: {changed}")
+        source = source.replace("movz w0, #0xf\nmovk w0, #0xf, lsl #16", setup + "movz w0, #0xf\nmovk w0, #0xf, lsl #16")
+        negative = '''// Denied write permissions and invalid leaf must produce actual CQ errors.
+mov x20, #10
+mov x27, #1
+movz x0, #0x1170
+movk x0, #0x4503, lsl #16
+movz x1, #0xe083
+movk x1, #0x4502, lsl #16
+str x1, [x0]
+movz w0, #2
+movk w0, #6, lsl #16
+str w0, [x23]
+mov w0, #1
+str w0, [x23, #4]
+movz x0, #0xe000
+movk x0, #0x8002, lsl #16
+str x0, [x23, #24]
+mov x0, #8
+str x0, [x23, #40]
+dsb sy
+bl submit_io
+mov x20, #11
+movz x0, #0x1178
+movk x0, #0x4503, lsl #16
+str xzr, [x0]
+movz w0, #2
+movk w0, #7, lsl #16
+str w0, [x23]
+mov w0, #1
+str w0, [x23, #4]
+movz x0, #0xf000
+movk x0, #0x8002, lsl #16
+str x0, [x23, #24]
+mov x0, #8
+str x0, [x23, #40]
+dsb sy
+bl submit_io
+movz x0, #0xe000
+movk x0, #0x4502, lsl #16
+mov x1, #0x2000
+unchanged:
+ldr x2, [x0], #8
+cbnz x2, failure
+subs x1, x1, #8
+b.ne unchanged
+'''
+        source = source.replace("mov x20, #0\nb finish", negative + "mov x20, #0\nb finish")
+    return source
 
 
-def check(executable, report):
+def check(executable, report, dart=False):
     report.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as temporary:
         root = pathlib.Path(temporary)
         disk = root / "scratch-16g.raw"
         with disk.open("xb") as stream:
             stream.truncate(DISK_BYTES)
-        (root / "test.s").write_text(assembly())
+        (root / "test.s").write_text(assembly(dart))
         subprocess.run(["xcrun", "clang", "-arch", "arm64", "-c", str(root / "test.s"),
                         "-o", str(root / "test.o")], check=True)
         code = text_section((root / "test.o").read_bytes())
@@ -310,7 +405,8 @@ def check(executable, report):
             "-serial", "none", "-semihosting-config", "enable=on,target=native",
             "-drive", f"if=none,id=podium7-storage,format=raw,file={disk}",
             "-trace", "enable=pci_nvme*", "-D", str(root / "nvme-trace.txt"),
-            "-device", f"loader,file={image},cpu-num=0"], capture_output=True, text=True, timeout=25)
+            "-device", f"loader,file={image},cpu-num=0"], capture_output=True, text=True, timeout=25,
+            env={**os.environ, "PODIUM7_RESEARCH_NVME_DART": "1" if dart else "0"})
         with disk.open("rb") as stream:
             stream.seek(8 * 512)
             persisted = stream.read(512) == bytes(range(256)) * 2
@@ -323,7 +419,8 @@ def check(executable, report):
                        "admin queue DMA: identify controller and 16 GiB namespace",
                        "I/O queue creation, 512-byte write and independent read comparison",
                        "host-side exact persisted sector verification"],
-            "interrupt_delivery_tested": False, "apple_dart_tested": False,
+            "interrupt_delivery_tested": False, "research_port0_dart_tested": dart,
+            "dma_permission_and_invalid_leaf_checked": dart,
             "stdout": result.stdout, "stderr": result.stderr,
             "nvme_trace_tail": (root / "nvme-trace.txt").read_text(errors="replace")[-8192:]
                 if (root / "nvme-trace.txt").exists() else ""}, indent=2))
@@ -335,5 +432,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--qemu", required=True)
     parser.add_argument("--report", type=pathlib.Path, default=pathlib.Path(".firmware/nvme-checks.json"))
+    parser.add_argument("--dart", action="store_true", help="Verify nonidentity IOVA DMA, read-only and invalid-page errors")
     args = parser.parse_args()
-    check(args.qemu, args.report)
+    check(args.qemu, args.report, args.dart)

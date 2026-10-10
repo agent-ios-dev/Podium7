@@ -91,11 +91,16 @@ jobs:
       - name: Verify real NVMe admin DMA and persistent 16 GiB disk I/O
         id: nvme_check
         run: python3 Tools/check_nvme.py --qemu .qemu/build/qemu-system-aarch64
+      - name: Verify nonidentity DART DMA and denied or invalid-page errors
+        id: nvme_dart_check
+        run: python3 Tools/check_nvme.py --qemu .qemu/build/qemu-system-aarch64 --dart --report .firmware/nvme-dart-checks.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: nvme-guest-evidence
-          path: .firmware/nvme-checks.json
+          path: |
+            .firmware/nvme-checks.json
+            .firmware/nvme-dart-checks.json
           if-no-files-found: ignore
       - name: Verify free-running AOP counter and firmware apertures
         run: python3 Tools/check_aop.py --qemu .qemu/build/qemu-system-aarch64
@@ -176,6 +181,23 @@ jobs:
           path: |
             .firmware/nvme-dma-experiment/*.json
             .firmware/nvme-dma-experiment/*.txt
+          if-no-files-found: ignore
+      - name: Probe original iOS NVMe with verified port0 DART translation
+        if: always() && steps.nvme_dart_check.outcome == 'success' && (steps.pmp_probe.outcome == 'success' || steps.pmp_probe.outcome == 'failure')
+        run: |
+          mkdir .firmware/nvme-dart-kernel-experiment
+          cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/nvme-dart-kernel-experiment/
+          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/nvme-dart-kernel-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --trust-cache .firmware/RestoreTrustCache.im4p --research-ramdisk-root --research-pmp-core --research-cfi-nvram --research-aes-root-fallback --research-nvme --research-nvme-dart --seconds 180
+          python3 Tools/inspect_boot_fault.py --directory .firmware/nvme-dart-kernel-experiment
+          python3 Tools/verify_restore_userland.py .firmware/nvme-dart-kernel-experiment
+      - name: Save original NVMe DART boot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nvme-dart-kernel-evidence
+          path: |
+            .firmware/nvme-dart-kernel-experiment/*.json
+            .firmware/nvme-dart-kernel-experiment/*.txt
           if-no-files-found: ignore
       - name: Repeat genuine PMP startup in a fresh machine to catch queue races
         run: |

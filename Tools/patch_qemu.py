@@ -1986,6 +1986,31 @@ static void podium7_irq_or_set(void *opaque, int input, int level)
         '        qemu_log("PODIUM7 NVME-MSI vector=%u address=%016" PRIx64\n'
         '                 " data=%08x\\n", vector, msg.address, msg.data);\n'
         '    }\n\n    msi_send_message(dev, msg);')
+    # Bounded, opt-in RAM readback after genuine disk DMA. This observes the
+    # GPT bytes delivered to the guest; it never supplies or repairs them.
+    replace_once(directory / "hw/nvme/ctrl.c",
+        '    trace_pci_nvme_rw_cb(nvme_cid(req), blk_name(blk));',
+        '    trace_pci_nvme_rw_cb(nvme_cid(req), blk_name(blk));\n'
+        '    static unsigned podium7_readback_count;\n'
+        '    if (!ret && req->cmd.opcode == NVME_CMD_READ && podium7_readback_count < 32 &&\n'
+        '        !g_strcmp0(g_getenv("PODIUM7_RESEARCH_DISK_READBACK"), "1")) {\n'
+        '        NvmeRwCmd *observed = (NvmeRwCmd *)&req->cmd;\n'
+        '        uint64_t lba = le64_to_cpu(observed->slba);\n'
+        '        if (lba <= 2) {\n'
+        '            podium7_readback_count++;\n'
+        '            uint8_t sample[512];\n'
+        '            int result = nvme_addr_read(nvme_ctrl(req),\n'
+        '                le64_to_cpu(req->cmd.dptr.prp1), sample, sizeof(sample));\n'
+        '            qemu_log("PODIUM7 NVME-READBACK cid=%u lba=%" PRIu64 " result=%d bytes=",\n'
+        '                     nvme_cid(req), lba, result);\n'
+        '            if (!result) {\n'
+        '                for (unsigned i = 0; i < sizeof(sample); i++) {\n'
+        '                    qemu_log("%02x", sample[i]);\n'
+        '                }\n'
+        '            }\n'
+        '            qemu_log("\\n");\n'
+        '        }\n'
+        '    }')
     subprocess.run(["git", "-C", str(directory), "diff", "--check"], check=True)
     print("Registered podium7-research on pinned QEMU; APRR enforcement remains unsupported")
 

@@ -62,8 +62,10 @@ jobs:
         run: |
           mkdir .firmware/system-boot
           cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/system-boot/
+          python3 Tools/inspect_system_disk.py .firmware/system-disk/storage-16g.raw --output .firmware/system-boot/system-disk-layout.json
           python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/system-boot --research-bridge-handoff --trust-cache .firmware/StaticTrustCache.im4p --research-system-root disk0s1s1 --research-pmp-core --research-cfi-nvram --research-aes-root-fallback --research-nvme --research-nvme-dart --research-nvme-msi --research-nvme-image .firmware/system-disk/storage-16g.raw --seconds 300
           python3 Tools/inspect_boot_fault.py --directory .firmware/system-boot
+          python3 Tools/inspect_system_disk.py .firmware/system-disk/storage-16g.raw --trace .firmware/system-boot/qemu-trace.txt --output .firmware/system-boot/system-disk-layout.json
           python3 Tools/verify_system_userland.py .firmware/system-boot
       - name: Save all full-system boot diagnostics regardless of boot outcome
         if: always()

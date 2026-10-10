@@ -3,6 +3,8 @@ import struct
 import unittest
 import zlib
 from prepare_os_disk import relocate_gpt
+from inspect_system_disk import inspect as inspect_disk
+from inspect_system_disk import compare_readback
 from fetch_firmware import RemoteZIP
 from unittest.mock import patch
 from qemu_probe import boot_args, make_probe, run_probe
@@ -54,6 +56,26 @@ class OSDiskTests(unittest.TestCase):
         before = disk.getvalue()
         with self.assertRaisesRegex(ValueError, 'CRC'):relocate_gpt(disk, 8192 * 512)
         self.assertEqual(before, disk.getvalue())
+
+    def test_read_only_disk_evidence_checks_crc_and_detects_real_apfs_prefix(self):
+        disk, _ = self.disk()
+        disk.seek(34 * 512 + 32); disk.write(b'NXSB')
+        before = disk.getvalue()
+        report = inspect_disk(disk)
+        self.assertEqual(disk.getvalue(), before)
+        self.assertEqual(report['partitions'][0]['first_lba'], 34)
+        self.assertTrue(report['partitions'][0]['nxsb_at_offset32'])
+        self.assertEqual(bytes.fromhex(report['sectors']['1'])[:8], b'EFI PART')
+        disk.seek(1024); disk.write(b'\xff')
+        with self.assertRaisesRegex(ValueError, 'table CRC'): inspect_disk(disk)
+
+    def test_guest_dma_must_match_source_bytes_not_just_completion(self):
+        layout = {'sectors': {'1': '454649'}}
+        trace = 'PODIUM7 NVME-READBACK cid=6 lba=1 result=0 bytes=454649\n'
+        self.assertTrue(compare_readback(layout, trace)['all_observed_match'])
+        self.assertFalse(compare_readback(layout, trace.replace('454649', '000000'))['all_observed_match'])
+        self.assertFalse(compare_readback(layout, trace.replace('result=0', 'result=1'))['all_observed_match'])
+        self.assertFalse(compare_readback(layout, '')['all_observed_match'])
 
     def test_large_download_cache_stays_bounded_and_checks_ranges(self):
         payload = bytes(range(96))

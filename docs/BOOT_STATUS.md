@@ -1,3 +1,41 @@
+## Official APFS system disk prepared; partial-page DMA corrected
+
+Preparation run38043188715 downloaded the complete official iOS15.8.8 OS
+image, verified its ZIP CRC and SHA256, converted UDIF/LZFSE on macOS and
+prepared a sparse raw disk of exactly17179869184 bytes. GPT backup headers
+were relocated to the final sector; the APFS partition extents were preserved.
+The `ios-system-disk` artifact is a real system volume, not a blank scratch disk.
+
+First full-system probe38043454159 initialized NVMe but stopped at
+`Still waiting for root device`. Its actual buffer descriptor
+`0x00001ff04f2e0001` exposed the wrong physical-address mask: the mapper treated
+the subpage end field as physical address bits. Original T8010 code masks
+physical addresses to36 bits. The mapper now applies that mask and enforces
+the inclusive byte bounds in bits48..59 and36..47 when bit1 is clear.
+
+The real ARM64 DART/MSI guest passes a512-byte permitted read, rejects a read
+beyond that subpage, preserves denied/unmapped destination pages, verifies a
+persisted disk sector and handles actual EL1 IRQs. A follow-up guest also
+exercises a write source whose permitted subpage starts at byte512.
+79 local Python tests pass. Full-system repeat38044369800 has no DMA rejection
+and reads LBAs0,1 and the32-sector GPT table at LBA2, but still waits for
+disk0s1s1 with zero EL0 returns. No kernel panic occurs in this system repeat.
+The separate restore repeat38044369497 reproduces the intermittent PMP NMI.
+
+The next probe adds read-only source GPT/type/extent/APFS-prefix inspection
+and bounded readback of the first512 bytes delivered by actual NVMe DMA.
+It compares guest bytes against the prepared disk, distinguishing transfer
+corruption from partition discovery without changing either source or guest.
+
+Full-system CI now requires original system launchd and actual EL0 returns,
+excludes restore userland and rejects a kernel panic. A timed root wait cannot
+produce a successful boot gate. SpringBoard and native IPA integration remain
+unconfirmed.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38043188715
+
+---
+
 ## Original iOS publishes disk0 and reads sectors through DART and MSI
 
 Run38042475924 original MSI profile logs `Successfully initialized NVMe drive`,

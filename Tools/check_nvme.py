@@ -327,6 +327,14 @@ movz x1, #0xc001
 movk x1, #0x4502, lsl #16
 movk x1, #0x1ff0, lsl #32
 str x1, [x0]
+// Write source exercises a nonzero subpage start: bytes512..1023 only.
+movz x0, #0x1140
+movk x0, #0x4503, lsl #16
+movz x1, #0x8001
+movk x1, #0x4502, lsl #16
+movk x1, #0x3ff0, lsl #32
+movk x1, #0x200, lsl #48
+str x1, [x0]
 movz x3, #0x8000
 movk x3, #0x100, lsl #16
 movk x3, #6, lsl #32
@@ -342,6 +350,11 @@ dsb sy
             lambda m: m[1] + '0x800' + m[2] + m[3], source)
         if changed != 8:
             raise ValueError(f"NVMe DMA pointer anchors changed: {changed}")
+        for high in ('4502', '8002'):
+            anchor = f'movz x0, #0x8000\nmovk x0, #0x{high}, lsl #16'
+            if source.count(anchor) != 1:
+                raise ValueError(f'NVMe subpage source anchor changed: {high}')
+            source = source.replace(anchor, anchor.replace('#0x8000', '#0x8200'))
         source = source.replace("movz w0, #0xf\nmovk w0, #0xf, lsl #16", setup + "movz w0, #0xf\nmovk w0, #0xf, lsl #16")
         negative = '''// Posted DMA writes may complete at NVMe despite a host IOMMU fault.
 // Require unchanged physical destination pages; verify mapper rejection in trace.

@@ -257,7 +257,8 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
     with serial.open("wb") as output:
         process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT,
             env={**os.environ, "PODIUM7_RESEARCH_NVME_DART": "1" if research_nvme_dart else "0",
-                 "PODIUM7_RESEARCH_NVME_MSI": "1" if research_nvme_msi else "0"})
+                 "PODIUM7_RESEARCH_NVME_MSI": "1" if research_nvme_msi else "0",
+                 "PODIUM7_RESEARCH_DISK_READBACK": "1" if research_system_root else "0"})
         start = time.monotonic()
         stop = "QEMU exited"
         panic_started = None

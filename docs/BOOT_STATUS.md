@@ -16,7 +16,7 @@ Its effect in this exact firmware remains to be tested. This is a diagnostic
 path, not working SEP/keybag support. Default boot arguments remain unchanged,
 and CLI requires the explicit no-SEP/unsealed experiment. Reports distinguish
 diagnostic keybag skip, early boot completion, userland and SpringBoard.
-Original boot-tool executables are preserved without edits for inspection.
+Original boot-tool metadata (name, size and SHA-256) is recorded without exporting executables.
 106 local tests pass. Full boot and protected storage remain open gates.
 
 Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38061956311

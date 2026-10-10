@@ -89,9 +89,7 @@ def prepare(image):
         report = {'system_fstab': (source/'private/etc/fstab').read_text() if (source/'private/etc/fstab').is_file() else None,
                   'source_var_present': (source/'private/var').is_dir(),
                   'source_firmware_present': (source/'usr/standalone/firmware').is_dir()}
-        # Preserve exact original boot-task programs for read-only analysis.
-        tools = root / 'boot-tools'
-        tools.mkdir(exist_ok=True)
+        # Record metadata only; never export original Apple executables.
         report['original_boot_tools'] = []
         for name in ('keybagd', 'init_keybag', 'init_data_protection', 'seputil'):
             candidate = source / 'usr/libexec' / name
@@ -100,7 +98,6 @@ def prepare(image):
             if candidate.is_file():
                 if candidate.stat().st_size > 16 << 20: raise ValueError('unexpected boot-tool size')
                 data = candidate.read_bytes()
-                (tools / name).write_bytes(data)
                 report['original_boot_tools'].append({'name': name, 'bytes': len(data),
                     'sha256': hashlib.sha256(data).hexdigest(), 'modified': False})
         report['container_before'] = container

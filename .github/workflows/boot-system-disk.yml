@@ -119,5 +119,4 @@ jobs:
             .firmware/system-boot/*.txt
             .firmware/nvme-checks.json
             .firmware/install-layout.json
-            .firmware/boot-tools/*
           if-no-files-found: ignore

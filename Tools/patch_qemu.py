@@ -1362,16 +1362,33 @@ static void podium7_pmp_start(void)
         "                   (bank->base & 0xffffff) == 0x4000;\n"
         "    bank->registers[address >> 2] = (channel && address == 4) ? (value & ~0x10000U) : value;")
     start = pcie.index("static void podium7_pcie_create(")
-    pcie = pcie[:start] + '''static uint64_t podium7_pcie_config_read(void *opaque, hwaddr address, unsigned size)
+    pcie = pcie[:start] + '''/* Explicit virtual root-port config, QEMU vendor/device identity.
+ * Root ports on bus0 devices0..3; downstream buses remain absent. */
+static uint32_t podium7_pcie_config[4][1024];
+static bool podium7_pcie_root_config(hwaddr address, unsigned *port, unsigned *offset)
 {
-    /* No endpoint is attached: PCI configuration reads return all ones. */
+    *port = (address >> 15) & 31; *offset = address & 0xfff;
+    return (address >> 20) == 0 && ((address >> 12) & 7) == 0 && *port < 4;
+}
+static uint64_t podium7_pcie_config_read(void *opaque, hwaddr address, unsigned size)
+{
+    unsigned port, offset;
+    if (podium7_pcie_root_config(address, &port, &offset)) {
+        uint32_t value = podium7_pcie_config[port][offset >> 2];
+        return (value >> ((offset & 3) * 8)) & (size == 4 ? 0xffffffffULL : ((1ULL << (size * 8)) - 1));
+    }
     return size == 4 ? 0xffffffffULL : ((1ULL << (size * 8)) - 1);
 }
-
-static void podium7_pcie_config_write(void *opaque, hwaddr address,
-                                      uint64_t data, unsigned size)
+static void podium7_pcie_config_write(void *opaque, hwaddr address, uint64_t data, unsigned size)
 {
-    /* Writes to a nonexistent PCI function have no effect. */
+    unsigned port, offset;
+    if (!podium7_pcie_root_config(address, &port, &offset) ||
+        offset < 4 || (offset >= 8 && offset < 16) || offset == 0x34 ||
+        (offset >= 0x80 && offset < 0x84) || (offset >= 0x90 && offset < 0x94)) { return; }
+    unsigned shift = (offset & 3) * 8;
+    uint32_t mask = (size == 4 ? 0xffffffffU : ((1U << (size * 8)) - 1)) << shift;
+    uint32_t *word = &podium7_pcie_config[port][offset >> 2];
+    *word = (*word & ~mask) | ((uint32_t)data << shift & mask);
 }
 
 static const MemoryRegionOps podium7_pcie_config_ops = {
@@ -1394,6 +1411,15 @@ static void podium7_pcie_create(MachineState *machine, MemoryRegion *memory)
     for (unsigned i = 0; i < ARRAY_SIZE(banks); i++) {
         podium7_pcie_bank_create(machine, memory, banks[i].base, banks[i].size,
                                  "podium7-t8010-pcie-control");
+    }
+    for (unsigned port = 0; port < 4; port++) {
+        podium7_pcie_config[port][0] = 0x000c1b36; /* Virtual QEMU root port. */
+        podium7_pcie_config[port][1] = 0x00100000; /* Capability list. */
+        podium7_pcie_config[port][2] = 0x06040001; /* PCI bridge class. */
+        podium7_pcie_config[port][3] = 0x00010000; /* Type1 header. */
+        podium7_pcie_config[port][0x34 >> 2] = 0x80;
+        podium7_pcie_config[port][0x80 >> 2] = 0x00420010; /* PCIe v2 RootPort. */
+        /* Link status remains zero: no downstream endpoint exists. */
     }
     MemoryRegion *config = g_new0(MemoryRegion, 1);
     memory_region_init_io(config, OBJECT(machine), &podium7_pcie_config_ops,

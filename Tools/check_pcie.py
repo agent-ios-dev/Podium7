@@ -71,6 +71,22 @@ movz x3, #0
 movk x3, #0x1000, lsl #16
 movk x3, #6, lsl #32
 ldr w4, [x3]
+movz w5, #0x1b36
+movk w5, #0xc, lsl #16
+cmp w4, w5
+b.ne failure
+ldr w4, [x3, #0x34]
+cmp w4, #0x80
+b.ne failure
+ldr w4, [x3, #0x80]
+movz w5, #0x10
+movk w5, #0x42, lsl #16
+cmp w4, w5
+b.ne failure
+ldr w4, [x3, #0x90]
+cbnz w4, failure
+add x3, x3, #0x100, lsl #12
+ldr w4, [x3]
 cmn w4, #1
 b.ne failure
 str wzr, [x3]
@@ -85,7 +101,7 @@ mov w5, #0xffff
 cmp w4, w5
 b.ne failure
 mov x6, #0xfffc
-movk x6, #0xff, lsl #16
+movk x6, #0xef, lsl #16
 ldr w4, [x3, x6]
 cmn w4, #1
 b.ne failure

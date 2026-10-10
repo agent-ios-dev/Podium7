@@ -1036,19 +1036,22 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
         "        value = (value & 1U) | (bank->outbox_pending ? (1U << 16) : (1U << 17));")
     sep = sep.replace("        value |= 1U << 17; /* Observed ARM32 receive-control offset +8. */",
         "        value = (value & 0xffffU) | ((bank->base == 0x20e300000ULL && bank->inbox_pending) ? (1U << 16) : (1U << 17));")
-    sep = sep.replace("    return value;", """    if (bank->base == 0x20e300000ULL && address == 0x81c) {
-        /* Original IOP interrupt dispatch at 0x0100bf94 reads this event word.
-         * Type 4/source 0 selects its mailbox-receive handler (0x0100c1fc). */
-        value = bank->inbox_pending && (bank->registers[0xb88 >> 2] & 1) ? 0x40000 : 0;
-    }
-    return value;""")
     read_end = "    if (bank->logged_accesses < 256) {"
     read_peer = """    if (bank->base == 0x20e300000ULL) {
+        if (address == 0x81c) {
+            /* Original private IOP interrupt dispatch consumes type 4/source 0. */
+            value = bank->inbox_pending && (bank->registers[0xb88 >> 2] & 1) ? 0x40000 : 0;
+        }
         if (address == 0xba0) {
             value = (value & 0xffffU) | (bank->outbox_pending ? (1U << 16) : (1U << 17));
         } else if (address == 0xb98 || address == 0xb9c) {
-            value = bank->inbox_pending ? bank->registers[(0x4010 + address - 0xb98) >> 2] : 0;
-            if (address == 0xb9c) { bank->inbox_pending = false; }
+            uint64_t message = bank->inbox_count ? bank->inbox_fifo[bank->inbox_head] : 0;
+            value = address == 0xb98 ? (uint32_t)message : (uint32_t)(message >> 32);
+            if (address == 0xb9c && bank->inbox_count) {
+                bank->inbox_head = (bank->inbox_head + 1) % 16;
+                bank->inbox_count--;
+                bank->inbox_pending = bank->inbox_count != 0;
+            }
         } else if (address == 0x4038 || address == 0x403c) {
             value = bank->outbox_pending ? (address == 0x4038 ? bank->outbox_low : bank->outbox_high) : 0;
             if (address == 0x403c) { bank->outbox_pending = false; }
@@ -1067,6 +1070,12 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
         "        }\n"
         "    } else if (address == 0x4008) {\n        /* Queue status is read-only. */")
     sep = sep.replace("    bool inbox_pending;", "    qemu_irq pmp_receive_irq;\n    bool inbox_pending;")
+    sep = sep.replace("    bool inbox_pending;",
+        "    bool inbox_pending;\n    uint64_t inbox_fifo[16];\n    unsigned inbox_head, inbox_count;")
+    sep = sep.replace("value = bank->inbox_pending ? (1U << 16) : (1U << 17);",
+        "value = bank->base == 0x20e300000ULL ? (bank->inbox_count == 16 ? (1U << 16) : (bank->inbox_count == 0 ? (1U << 17) : 0)) : (bank->inbox_pending ? (1U << 16) : (1U << 17));")
+    sep = sep.replace("((bank->base == 0x20e300000ULL && bank->inbox_pending) ? (1U << 16) : (1U << 17))",
+        "(bank->base == 0x20e300000ULL ? (bank->inbox_count == 0 ? (1U << 17) : (bank->inbox_count == 16 ? (1U << 16) : 0)) : (1U << 17))")
     sep = sep.replace("typedef struct Podium7SEPMailboxBank {",
         "static ARMCPU *podium7_pmp_cpu;\n"
         "static void podium7_pmp_start(void);\n"
@@ -1100,6 +1109,21 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
         }
     }
 """ + sep[last:]
+    sep = sep.replace("    } else if (address == 0x4010 || address == 0x4014) {",
+        """    } else if (bank->base == 0x20e300000ULL && (address == 0x4010 || address == 0x4014)) {
+        /* Bounded research FIFO: original AP sends endpoint-start bursts.
+         * Stage the low word independently; publish only on the high word.
+         * Exact hardware depth is not yet established, so capacity 16 is explicit. */
+        if (bank->inbox_count < 16) {
+            bank->registers[address >> 2] = value;
+            if (address == 0x4014) {
+                unsigned tail = (bank->inbox_head + bank->inbox_count) % 16;
+                bank->inbox_fifo[tail] = ((uint64_t)value << 32) | bank->registers[0x4010 >> 2];
+                bank->inbox_count++;
+                bank->inbox_pending = true;
+            }
+        }
+    } else if (address == 0x4010 || address == 0x4014) {""")
     sep = sep.replace("static void podium7_sep_mailbox_bank_create(",
                       "static Podium7SEPMailboxBank *podium7_sep_mailbox_bank_create(")
     bank_end = "    memory_region_add_subregion(memory, base, &bank->io);\n}"

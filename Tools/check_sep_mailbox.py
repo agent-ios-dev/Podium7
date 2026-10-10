@@ -11,7 +11,7 @@ from qemu_probe import elf_image
 def check(executable, report):
     assembly = """.text
 adr x10, banks
-mov x9, #4
+mov x9, #3
 next_bank:
 ldr x3, [x10], #8
 ldr w6, [x3, #0xb88]
@@ -100,6 +100,12 @@ b.ne next_bank
 movz x3, #0
 movk x3, #0xe30, lsl #16
 movk x3, #2, lsl #32
+mov x4, #0x4020
+mov w5, #1
+str w5, [x3, x4]
+movz x5, #0x1234
+movk x5, #0xabcd, lsl #48
+str x5, [x3, #0x4010]
 ldr w6, [x3, #0x81c]
 cbnz w6, failure
 mov w5, #1
@@ -109,13 +115,13 @@ mov w5, #0x40000
 cmp w6, w5
 b.ne failure
 ldr w6, [x3, #0xb88]
-tbz w6, #16, failure
+tbnz w6, #17, failure
 ldr w6, [x3, #0xb98]
 mov w5, #0x1234
 cmp w6, w5
 b.ne failure
 ldr w6, [x3, #0xb88]
-tbz w6, #16, failure
+tbnz w6, #17, failure
 ldr w6, [x3, #0xb9c]
 mov w5, #0xabcd0000
 cmp w6, w5
@@ -131,6 +137,32 @@ ldr w6, [x3, x4]
 mov w5, #0x20000
 cmp w6, w5
 b.ne failure
+// Burst 16 distinct messages; full/empty flags and no overwrite at capacity.
+mov x13, #1
+fill_fifo:
+mov x5, x13
+movk x5, #0x77, lsl #48
+str x5, [x3, #0x4010]
+add x13, x13, #1
+cmp x13, #17
+b.ne fill_fifo
+mov x4, #0x4008
+ldr w6, [x3, x4]
+tbz w6, #16, failure
+mov x5, #0xdead
+str x5, [x3, #0x4010]
+mov x13, #1
+drain_fifo:
+ldr x6, [x3, #0xb98]
+mov x5, x13
+movk x5, #0x77, lsl #48
+cmp x5, x6
+b.ne failure
+add x13, x13, #1
+cmp x13, #17
+b.ne drain_fifo
+ldr w6, [x3, x4]
+tbz w6, #17, failure
 // PMP transmit -> AP receive; low word alone must not publish a message.
 ldr w6, [x3, #0xba0]
 tbz w6, #17, failure
@@ -253,7 +285,7 @@ success_exit:
 failure_exit:
 .quad 0x20026, 1
 banks:
-.quad 0x20da00000, 0x20ae00000, 0x20e300000, 0x210800000
+.quad 0x20da00000, 0x20ae00000, 0x210800000
 """
     with tempfile.TemporaryDirectory() as temporary:
         root = pathlib.Path(temporary)
@@ -275,7 +307,7 @@ banks:
         passed = all(r["returncode"] == 0 for r in results)
         report.write_text(json.dumps({"passed": passed, "iop_firmware_execution": False,
             "checks": ["observed IOP boot-parameter and IRQ-mask writes", "empty modern and legacy ARM32 receive views",
-                       "64-bit send occupies one slot without overwrite", "queue status cannot be forged", "PMP bidirectional peer views, atomic publication, consume and refill", "PMP original AP receive AIC event and deassertion", "private IOP receive-event word respects enable and queue consumption", "each bank starts empty after filling the other",
+                       "64-bit send occupies one slot without overwrite", "queue status cannot be forged", "PMP bidirectional peer views, atomic publication, consume and refill", "PMP 16-message FIFO burst, ordered drain, and full-slot overflow protection", "PMP original AP receive AIC event and deassertion", "private IOP receive-event word respects enable and queue consumption", "each bank starts empty after filling the other",
                        "PMP SRAM firmware word, byte order and final 64-bit boundary; separate system bank"],
             "results": results}, indent=2))
         if not passed:

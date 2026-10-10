@@ -1348,6 +1348,13 @@ static void podium7_pmp_start(void)
     pcie = mipi.replace("MIPI-DSIM", "PCIE").replace("mipi_dsim", "pcie")
     pcie = pcie.replace("Podium7MIPIDSIMBank", "Podium7PCIeBank")
     pcie = "\n/* T8010 PCIe discovery controls; no endpoint, PHY-ready or link-up synthesis. */\n" + pcie[pcie.index("typedef struct "):]
+    # Original T8010 common-control request +0x124 bit0 waits for +0x28 bit4.
+    # This is a research request acknowledgement, not PCI link/endpoint ready.
+    pcie = pcie.replace("    uint32_t value = bank->registers[address >> 2];",
+        "    uint32_t value = bank->registers[address >> 2];\n"
+        "    if (bank->base == 0x600000000ULL && address == 0x28) {\n"
+        "        value = (value & ~0x10U) | ((bank->registers[0x124 >> 2] & 1) ? 0x10U : 0);\n"
+        "    }")
     start = pcie.index("static void podium7_pcie_create(")
     pcie = pcie[:start] + '''static uint64_t podium7_pcie_config_read(void *opaque, hwaddr address, unsigned size)
 {

@@ -1,3 +1,31 @@
+## First genuine EL0 execution observed; Samsung SPI polling livelock fixed
+
+Run 38035038416 passes QEMU build and all mandatory hardware guests, including
+AES CBC STORE_IV DMA. Its normal PMP probe confirms original firmware startup,
+mounts restore md0, and records nine genuine EL1-to-EL0 exception returns,
+first PC 0x105375170. launchd hello, restore environment and SpringBoard are
+absent, so booted_ios and userland_execution_confirmed correctly remain false.
+This probe does not enable the AES SecureRoot fallback or CFI NVRAM experiment.
+
+Its stopped PC 0xfffffff005d77b7c and stack are in the original Samsung SPI
+controller polling path. Trace repeatedly reads +8 status 0x0040000f, writes
+that same value to acknowledge it, and reads the unchanged value again.
+The old register backing store manufactured permanently pending events by
+latching the acknowledge. SPI +8 now clears written bits (W1C). An ARM64 guest
+checks the original mask, configuration independence and refusal to create
+pending events by acknowledgement. SPI slave transfers are still absent.
+The next real boot probe must establish whether clearing this livelock lets
+userland advance; no completed iOS boot is claimed.
+
+Previous independent AES experiment 38034538374 executed actual AES-256 CBC
+with the original kernel's software key, then panicked on missing STORE_IV.
+The two-word STORE_IV handler writes the actual chaining IV to bounded RAM,
+verified against the final ciphertext of the CBC decryption known answer.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38035038416
+
+---
+
 ## AES software-key known answers, DMA guards and IRQ verified; iOS boot pending
 
 Run 38032593352 confirms original PMP startup in both normal fresh-machine

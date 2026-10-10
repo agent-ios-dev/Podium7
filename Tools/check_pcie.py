@@ -44,6 +44,18 @@ b.ne failure
 subs x9, x9, #1
 b.ne next_bank
 movz x3, #0
+movk x3, #6, lsl #32
+ldr w4, [x3, #0x28]
+cbnz w4, failure
+mov w5, #1
+str w5, [x3, #0x124]
+ldr w4, [x3, #0x28]
+cmp w4, #0x10
+b.ne failure
+str wzr, [x3, #0x124]
+ldr w4, [x3, #0x28]
+cbnz w4, failure
+movz x3, #0
 movk x3, #0x1000, lsl #16
 movk x3, #6, lsl #32
 ldr w4, [x3]

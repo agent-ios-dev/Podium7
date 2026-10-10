@@ -1,3 +1,24 @@
+## Real system launchd reached in explicit unsealed-root diagnostic
+
+Run 38051230231 executes original system launchd from the APFS System volume
+and records 9,813 returns to EL0, without a kernel panic. This is system
+userland, not the restore environment. SpringBoard is not confirmed. This
+optional exact-kernel diagnostic is unauthenticated; strict-root defaults
+remain unchanged.
+
+The serial log reports QUICKCHECK ONLY; FILESYSTEM CLEAN. The harness then
+stopped at its 16 MiB trace cap after 69 seconds, despite a 300-second budget.
+This is not evidence of a filesystem hang. Full-system tests now explicitly
+allow a bounded 128 MiB trace, keeping the 16 MiB bootstrap default and
+recording the selected limit. The next test must establish further progress.
+
+Host snapshot attempts failed with EPERM, ad-hoc entitlement rejection, or
+missing Preboot for bless. No authenticated installed image was produced.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38051230231
+
+---
+
 ## System volume found; official auth blob accepted; named snapshot missing
 
 Run38047075315 confirms original iOS creates disk0s1s1 and mounts

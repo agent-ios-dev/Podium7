@@ -1,3 +1,30 @@
+## Repeated genuine PMP startup and progress through ISP/display discovery
+
+Runs 38030604802, 38030933219 and 38031286874 each pass both mandatory
+fresh-machine PMP startup probes. The separate bounded message-port log budget
+records genuine firmware reads even after AP status polling; all strict protocol
+and original-firmware startup evidence is now present in both runs of each pair.
+
+Run 38030604802 passes VXD discovery and stops at ISP revision read
+0x205ba0000. Run 38030933219 passes that ISP access and stops at disp0 control
+read 0x206400004. Run 38031286874 passes the display read and stops at uart5
+UCON read 0x20a0d4004. Every physical address is resolved from the exact stopped
+AP virtual fault address by QMP and matched against the original n112ap DT.
+
+Independent discovery/control apertures and ARM64 guest checks were added for
+VXD, ISP and all nine disp0 banks. This does not implement image processing,
+video decode, display scanout or camera frames. Five separate polling UARTs are
+now mapped from the original DT, with console output only for UART0 and no
+fabricated RX data or Bluetooth peer; their next kernel validation is pending.
+
+61 Python tests continue to pass. Actual restore launchd/EL0, normal iOS root
+storage and graphical SpringBoard are not confirmed. All progress here is in
+the external QEMU research backend, not a verified working iOS emulator IPA.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38031286874
+
+---
+
 ## PMP startup, bounded message FIFO and later display/video faults
 
 Runs 38030017923 and 38030307496 both print genuine `ApplePMP: started`

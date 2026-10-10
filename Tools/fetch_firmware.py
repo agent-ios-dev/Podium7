@@ -16,10 +16,13 @@ SIZE = 5013514038
 
 
 class RemoteZIP(io.RawIOBase):
-    def __init__(self, url, size):
+    def __init__(self, url, size, *, max_cache_blocks=None):
         self.url, self.size, self.position = url, size, 0
         self.cache = {}
         self.block = 1024 * 1024
+        if max_cache_blocks is not None and max_cache_blocks < 1:
+            raise ValueError("cache must retain at least one block")
+        self.max_cache_blocks = max_cache_blocks
 
     def seekable(self):
         return True
@@ -56,6 +59,9 @@ class RemoteZIP(io.RawIOBase):
                     if len(data) != end - start + 1:
                         raise ValueError("truncated/oversized range")
                     self.cache[index] = data
+                    if self.max_cache_blocks is not None:
+                        while len(self.cache) > self.max_cache_blocks:
+                            del self.cache[next(iter(self.cache))]
             data = self.cache[index]
             count = min(size, len(data) - offset)
             parts.append(data[offset:offset + count])

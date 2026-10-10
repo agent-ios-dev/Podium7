@@ -1,0 +1,30 @@
+name: Prepare official iOS APFS disk for research boot
+on:
+  workflow_dispatch:
+jobs:
+  prepare:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify bounded download and GPT relocation before large image work
+        run: python3 -m unittest discover -s Tools -p 'test_os_disk.py'
+      - name: Fetch official image and convert a fresh fixed 16 GiB APFS disk
+        run: python3 Tools/prepare_os_disk.py --output .firmware/full-os
+      - name: Save system preparation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: system-disk-evidence
+          path: .firmware/full-os/*.json
+          if-no-files-found: ignore
+      - name: Save prepared disk for the next original-kernel boot
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-system-disk
+          compression-level: 1
+          retention-days: 3
+          path: .firmware/full-os/storage-16g.raw

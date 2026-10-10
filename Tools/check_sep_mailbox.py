@@ -96,6 +96,69 @@ cmp w5, w6
 b.ne failure
 subs x9, x9, #1
 b.ne next_bank
+// PMP: AP inbox -> observed ARM32 receive port, consume on high word.
+movz x3, #0
+movk x3, #0xe30, lsl #16
+movk x3, #2, lsl #32
+ldr w6, [x3, #0xb88]
+tbz w6, #16, failure
+ldr w6, [x3, #0xb98]
+mov w5, #0x1234
+cmp w6, w5
+b.ne failure
+ldr w6, [x3, #0xb88]
+tbz w6, #16, failure
+ldr w6, [x3, #0xb9c]
+mov w5, #0xabcd0000
+cmp w6, w5
+b.ne failure
+ldr w6, [x3, #0xb88]
+tbz w6, #17, failure
+ldr w6, [x3, #0xb98]
+cbnz w6, failure
+mov x4, #0x4008
+ldr w6, [x3, x4]
+mov w5, #0x20000
+cmp w6, w5
+b.ne failure
+// PMP transmit -> AP receive; low word alone must not publish a message.
+ldr w6, [x3, #0xb84]
+tbz w6, #17, failure
+mov w5, #0x5678
+str w5, [x3, #0xb90]
+mov x4, #0x4020
+ldr w6, [x3, x4]
+tbz w6, #17, failure
+mov w5, #0x8765
+str w5, [x3, #0xb94]
+ldr w6, [x3, #0xb84]
+tbz w6, #16, failure
+str wzr, [x3, #0xb90]
+str wzr, [x3, #0xb94]
+ldr w6, [x3, x4]
+tbz w6, #16, failure
+ldr w6, [x3, #0x4038]
+mov w5, #0x5678
+cmp w6, w5
+b.ne failure
+ldr w6, [x3, #0xb84]
+tbz w6, #16, failure
+ldr w6, [x3, #0x403c]
+mov w5, #0x8765
+cmp w6, w5
+b.ne failure
+ldr w6, [x3, #0xb84]
+tbz w6, #17, failure
+ldr w6, [x3, #0x4038]
+cbnz w6, failure
+// A consumed inbox accepts a new message.
+mov x5, #0x99
+str x5, [x3, #0x4010]
+ldr x6, [x3, #0xb98]
+cmp x6, x5
+b.ne failure
+ldr w6, [x3, #0xb88]
+tbz w6, #17, failure
 movz x3, #0
 movk x3, #0xe50, lsl #16
 movk x3, #2, lsl #32
@@ -181,7 +244,7 @@ banks:
         passed = all(r["returncode"] == 0 for r in results)
         report.write_text(json.dumps({"passed": passed, "iop_firmware_execution": False,
             "checks": ["observed IOP boot-parameter and IRQ-mask writes", "empty modern and legacy ARM32 receive views",
-                       "64-bit send occupies one slot without overwrite", "queue status cannot be forged", "each bank starts empty after filling the other",
+                       "64-bit send occupies one slot without overwrite", "queue status cannot be forged", "PMP bidirectional peer views, atomic publication, consume and refill", "each bank starts empty after filling the other",
                        "PMP SRAM firmware word, byte order and final 64-bit boundary; separate system bank"],
             "results": results}, indent=2))
         if not passed:

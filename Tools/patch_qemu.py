@@ -1025,6 +1025,40 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
         ".valid = { .min_access_size = 4, .max_access_size = 8 },\n"
         "    .impl = { .min_access_size = 4, .max_access_size = 4 },")
     sep = "\n/* Passive T8010 SEP/SIO/PMP mailbox apertures. No firmware, DMA or IOP replies. */\n" + sep[sep.index("typedef struct "):]
+    # Audited PMP firmware object at VA 0x010144b0 uses MMIO base +0xb80:
+    # tx-status +4, rx-status +8, tx-data +0x10, rx-data +0x18.
+    # Keep all other IOPs passive; only PMP has these verified peer views.
+    sep = sep.replace("    bool inbox_pending;",
+        "    bool inbox_pending;\n    bool outbox_pending;\n"
+        "    uint32_t outbox_low, outbox_high;")
+    sep = sep.replace("        value = (value & 1U) | (1U << 17);",
+        "        value = (value & 1U) | (bank->outbox_pending ? (1U << 16) : (1U << 17));")
+    sep = sep.replace("        value |= 1U << 17; /* Observed ARM32 receive-control offset +8. */",
+        "        value = (value & 0xffffU) | ((bank->base == 0x20e300000ULL && bank->inbox_pending) ? (1U << 16) : (1U << 17));")
+    read_end = "    if (bank->logged_accesses < 256) {"
+    read_peer = """    if (bank->base == 0x20e300000ULL) {
+        if (address == 0xb84) {
+            value = (value & 0xffffU) | (bank->outbox_pending ? (1U << 16) : (1U << 17));
+        } else if (address == 0xb98 || address == 0xb9c) {
+            value = bank->inbox_pending ? bank->registers[(0x4010 + address - 0xb98) >> 2] : 0;
+            if (address == 0xb9c) { bank->inbox_pending = false; }
+        } else if (address == 0x4038 || address == 0x403c) {
+            value = bank->outbox_pending ? (address == 0x4038 ? bank->outbox_low : bank->outbox_high) : 0;
+            if (address == 0x403c) { bank->outbox_pending = false; }
+        }
+    }
+"""
+    # First occurrence belongs to read; the second is the write diagnostic.
+    if sep.count(read_end) != 2:
+        raise ValueError("PMP read diagnostic anchor changed")
+    sep = sep.replace(read_end, read_peer + read_end, 1)
+    sep = sep.replace("if (address == 0x4008) {\n        /* Queue status is read-only. */",
+        "if (bank->base == 0x20e300000ULL && (address == 0xb90 || address == 0xb94)) {\n"
+        "        if (!bank->outbox_pending) {\n"
+        "            if (address == 0xb90) { bank->outbox_low = value; }\n"
+        "            else { bank->outbox_high = value; bank->outbox_pending = true; }\n"
+        "        }\n"
+        "    } else if (address == 0x4008) {\n        /* Queue status is read-only. */")
     sep = sep.replace("static void podium7_sep_mailbox_bank_create(",
                       "static Podium7SEPMailboxBank *podium7_sep_mailbox_bank_create(")
     bank_end = "    memory_region_add_subregion(memory, base, &bank->io);\n}"

@@ -10,7 +10,7 @@ def pointer(value):
     return 0xffffffe000000000 <= value < 0xfffffffffffffff8 and value % 8 == 0
 
 
-def inspect(read):
+def inspect(read, *, thread_metadata=False):
     """read(address, size) returns bytes; never write or export raw memory."""
     def data(address, size):
         if not pointer(address) or not 1 <= size <= 512:
@@ -21,6 +21,36 @@ def inspect(read):
         return result
     def word(address):
         return struct.unpack("<Q", data(address, 8))[0]
+    total_threads = 0
+    def threads(proc):
+        nonlocal total_threads
+        task = word(proc + 0x10)
+        # Original task_hold path 0xfffffff0071fb1b4/21c walks task +0x58,
+        # following thread +0x3a8 until the task queue head sentinel.
+        head = task + 0x58
+        current = word(head)
+        seen_threads, result = set(), []
+        while current != head:
+            if not pointer(current) or current in seen_threads:
+                raise ValueError("invalid or cyclic task thread queue")
+            if len(seen_threads) >= 128 or total_threads >= 1024:
+                raise ValueError("thread metadata limit exceeded")
+            seen_threads.add(current); total_threads += 1
+            # _thread_tid 0xfffffff00720aa00; _thread_block_parameter's
+            # shared path 0xfffffff0071ea608 saves continuation at +0xd0,
+            # and tests scheduler state at +0x198. Do not read parameters,
+            # user stacks, credentials, or arbitrary wait-event contents.
+            tid = word(current + 0x458)
+            continuation = word(current + 0xd0)
+            state = struct.unpack("<I", data(current + 0x198, 4))[0]
+            if tid > (1 << 48) or continuation and not (
+                    0xffffffe000000000 <= continuation < 0xffffffffffffffff
+                    and continuation % 4 == 0):
+                raise ValueError("invalid thread identity or continuation")
+            result.append({"tid": tid, "scheduler_state": state,
+                           "kernel_continuation": hex(continuation)})
+            current = word(current + 0x3a8)
+        return result
     base, mask = word(HASH_POINTER), word(HASH_MASK)
     if not pointer(base) or mask > 8191 or mask & (mask + 1):
         raise ValueError("invalid process hash layout")
@@ -55,9 +85,16 @@ def inspect(read):
             if max(pid, ppid) > 1000000 or any(byte < 32 or byte > 126 for byte in name_bytes):
                 raise ValueError("invalid process identity metadata")
             name = name_bytes.decode("ascii")
-            processes.append({"pid": pid, "ppid": ppid, "uid": uid, "name": name})
+            process = {"pid": pid, "ppid": ppid, "uid": uid, "name": name}
+            if thread_metadata:
+                try:
+                    process["threads"] = threads(current)
+                except (ValueError, KeyError) as error:
+                    process["thread_capture_error"] = str(error)
+            processes.append(process)
             current = word(current + 0xa8)
     return {"source": "stopped original kernel process hash", "read_only": True,
             "processes": sorted(processes, key=lambda item: item["pid"]),
             "springboard_process_seen": any(item["name"] == "SpringBoard" for item in processes),
+            "backboardd_process_seen": any(item["name"] == "backboardd" for item in processes),
             "visible_springboard_confirmed": False}

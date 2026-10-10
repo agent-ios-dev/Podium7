@@ -71,7 +71,7 @@ def capture(path, virtual_addresses=(), memory_windows=(), physical_windows=(), 
                             raise ValueError("unreadable kernel process metadata")
                         return b"".join(value.to_bytes(8, "little") for value in words)[:size]
                     try:
-                        result["guest_process_metadata"] = inspect(read_metadata)
+                        result["guest_process_metadata"] = inspect(read_metadata, thread_metadata=True)
                     except ValueError as error:
                         result["guest_process_metadata"] = {"capture_error": str(error)}
                 sp = re.search(r"\bSP=([0-9a-fA-F]{16})\b", result["registers"])

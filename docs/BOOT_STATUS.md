@@ -1,3 +1,24 @@
+## Keybag diagnostic handoff experiment (not yet boot-confirmed)
+
+Read-only inspection 38065058205 confirms both diagnostic and ephemeral skip
+messages in original keybagd. It exported only bounded analysis/metadata after
+explicit user authorization, never original executables or shared caches.
+Reference decoding now handles linker-relaxed ADR and C-string log prefixes.
+
+Primary qemu-t8030 code supplies product/boot-ios-diagnostics=1; debug=0x14e
+alone was ineffective in our exact firmware. An independent opt-in handoff now
+supplies that one 32-bit property on verified T8010, requiring the existing
+no-SEP/FastSim/unsealed experiment. Persistent 16-GiB disk and original keybagd
+remain unchanged; ephemeral-storage is not enabled. Reports distinguish the
+handoff being supplied from its effect in the actual guest. SEP data protection
+and SpringBoard remain unconfirmed until real runtime evidence.
+
+Reference: https://raw.githubusercontent.com/TrungNguyen1909/qemu-t8030/master/hw/arm/xnu.c
+114 local tests pass, including default preservation, corrupt handoff rejection,
+linker-relaxed string references and symbol-stub bounds.
+
+---
+
 ## Mount-phase-2 and FIPS pass; original keybag task waits
 
 Run 38061956311 completes the full 300-second experiment without panic,

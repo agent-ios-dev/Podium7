@@ -49,3 +49,29 @@ class KeybagInspectionTests(unittest.TestCase):
         with patch('inspect_keybag_host.command') as command:
             with self.assertRaisesRegex(ValueError, 'isolated'): inspect('other.raw')
             command.assert_not_called()
+
+    def test_imported_condition_identified_and_corrupt_stub_index_rejected(self):
+        data = bytearray(4096)
+        # One executable segment/one stub section, SYMTAB and DYSYMTAB.
+        struct.pack_into('<8I', data, 0, 0xfeedfacf, 0x100000c, 0, 2, 3, 256, 0, 0)
+        struct.pack_into('<II', data, 32, 0x19, 152)
+        struct.pack_into('<QQQQII', data, 56, 0x100000000, 4096, 0, 4096, 5, 5)
+        struct.pack_into('<I', data, 96, 1)
+        struct.pack_into('<QQ', data, 104 + 32, 0x100000240, 12)
+        struct.pack_into('<III', data, 104 + 64, 8, 0, 12)
+        struct.pack_into('<6I', data, 184, 2, 24, 1024, 1, 1100, 64)
+        struct.pack_into('<II', data, 208, 0xb, 80)
+        struct.pack_into('<II', data, 208 + 56, 1200, 1)
+        struct.pack_into('<I', data, 1024, 1)
+        name = b'_os_variant_uses_ephemeral_storage\0'
+        data[1101:1101+len(name)] = name
+        marker = b'DEVICE HAS EPHEMERAL DATA VOLUME\0'
+        data[768:768+len(marker)] = marker
+        # BL stub at #576 from #512; ADR string at #768 from #516.
+        struct.pack_into('<II', data, 512, 0x94000010, 0x100007e0)
+        result = inspect_bytes(data)
+        instructions = result['markers'][0]['references'][0]['instructions']
+        self.assertEqual(next(i['imported_callee'] for i in instructions if i['mnemonic'] == 'bl'),
+                         '_os_variant_uses_ephemeral_storage')
+        struct.pack_into('<I', data, 1200, 2)
+        with self.assertRaisesRegex(ValueError, 'indirect symbol exceeds'): inspect_bytes(data)

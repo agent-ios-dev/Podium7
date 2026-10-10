@@ -8,11 +8,13 @@ import secrets
 from analyze_firmware import device_tree
 
 
-def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, dram_size=2 * 1024 * 1024 * 1024, research_bridge_handoff=False, research_internal_storage=False, research_fastsim=False, research_no_sep=False):
+def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, dram_size=2 * 1024 * 1024 * 1024, research_bridge_handoff=False, research_internal_storage=False, research_fastsim=False, research_no_sep=False, research_keybag_diagnostics=False):
     if not 1_000_000 <= counter_frequency <= 1_000_000_000:
         raise ValueError("invalid counter frequency")
     if research_no_sep and not research_fastsim:
         raise ValueError('no-SEP diagnostic requires explicit FastSim identity')
+    if research_keybag_diagnostics and not research_no_sep:
+        raise ValueError('keybag diagnostic requires explicit no-SEP experiment')
     original_nodes = device_tree(data)  # Validate bounds/depth before rewriting.
     seed = secrets.token_bytes(64) if random_seed is None else random_seed
     if len(seed) != 64:
@@ -42,6 +44,15 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
             changes.append({'path': path, 'property': 'product-name', 'value': 'FastSim',
                             'source': 'explicit no-SEP FastSim research diagnostic',
                             'sep_data_protection_confirmed': False, 'authentic_iboot_handoff': False})
+            if research_keybag_diagnostics:
+                key = b'boot-ios-diagnostics'
+                if key in names and names[key] not in (bytes(4), struct.pack('<I', 1)):
+                    raise ValueError('unexpected original diagnostic handoff value')
+                properties = [(raw, value) for raw, value in properties if raw.split(b'\0')[0] != key]
+                properties.append((key.ljust(32, b'\0'), struct.pack('<I', 1)))
+                changes.append({'path': path, 'property': 'boot-ios-diagnostics', 'value': 1,
+                                'source': 'explicit keybag diagnostic DeviceTree handoff experiment',
+                                'sep_data_protection_confirmed': False, 'authentic_iboot_handoff': False})
         if research_internal_storage and path == '/device-tree/arm-io/apcie/pci-bridge0/s3e':
             arm_io = next((n for n in original_nodes if n['path'] == '/device-tree/arm-io'), None)
             if arm_io is None or arm_io['properties'].get('compatible') != b'arm-io,t8010\0'.hex():

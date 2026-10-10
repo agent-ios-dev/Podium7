@@ -4,6 +4,12 @@ from qemu_probe import boot_args, elf_image, PHYSICAL_BASE, RAM_SIZE, virtual_ba
 
 
 class QEMUProbeTests(unittest.TestCase):
+    def test_keybag_diagnostics_require_no_sep_before_reading_files(self):
+        from pathlib import Path
+        from qemu_probe import make_probe
+        with self.assertRaisesRegex(ValueError, 'keybag diagnostic'):
+            make_probe(Path('nonexistent'), research_keybag_diagnostics=True)
+
     def test_debug_profile_is_explicit_and_keeps_default_boot_arguments(self):
         default = boot_args(0xfffffff004000000, 0xfffffff007d00000, 1234, 0x48000000, system_root='disk0s1s1')
         diagnostic = boot_args(0xfffffff004000000, 0xfffffff007d00000, 1234, 0x48000000, system_root='disk0s1s1', research_debug_diagnostics=True)

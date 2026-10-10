@@ -41,6 +41,7 @@ def verify(directory):
     tree_report = json.loads((directory/'device-tree-preparation.json').read_text()) if (directory/'device-tree-preparation.json').exists() else {}
     result['fastsim_diagnostic'] = any(change.get('value') == 'FastSim' for change in tree_report.get('device_tree_changes', []))
     result['no_sep_diagnostic'] = any(change.get('action') == 'omit' and change.get('path') == '/device-tree/arm-io/sep' for change in tree_report.get('device_tree_changes', []))
+    result['keybag_diagnostic_handoff'] = any(change.get('property') == 'boot-ios-diagnostics' and change.get('value') == 1 for change in tree_report.get('device_tree_changes', []))
     result['sep_data_protection_confirmed'] = False
     result['authenticated_boot_confirmed'] = False
     (directory/'system-userland-checks.json').write_text(json.dumps(result, indent=2))

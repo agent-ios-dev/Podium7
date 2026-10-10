@@ -12,6 +12,26 @@ def node(properties, children=()):
 
 
 class DeviceTreePreparationTests(unittest.TestCase):
+    def test_keybag_handoff_is_explicit_and_preserves_storage_mode(self):
+        cpu = node([('name', b'cpu0\0'), ('device_type', b'cpu\0')])
+        sep = node([('name', b'sep\0'), ('compatible', b'iop,t8010\0iop,s8000\0')])
+        arm = node([('name', b'arm-io\0'), ('compatible', b'arm-io,t8010\0')], [sep])
+        chosen = node([('name', b'chosen\0'), ('ephemeral-storage', bytes(4))])
+        product = node([('name', b'product\0')])
+        tree = node([('name', b'device-tree\0')], [cpu, arm, chosen, product])
+        with self.assertRaisesRegex(ValueError, 'keybag diagnostic'):
+            prepare(tree, 24000000, research_keybag_diagnostics=True)
+        normal, changes = prepare(tree, 24000000, random_seed=bytes(64))
+        self.assertNotIn(b'boot-ios-diagnostics', normal)
+        diagnostic, changes = prepare(tree, 24000000, random_seed=bytes(64),
+            research_fastsim=True, research_no_sep=True, research_keybag_diagnostics=True)
+        self.assertIn(b'boot-ios-diagnostics'.ljust(32, b'\0') + struct.pack('<II', 4, 1), diagnostic)
+        self.assertIn(b'ephemeral-storage'.ljust(32, b'\0') + struct.pack('<I', 4) + bytes(4), diagnostic)
+        self.assertEqual(next(c for c in changes if c.get('property') == 'boot-ios-diagnostics')['path'], '/device-tree/product')
+        invalid = tree[:-len(product)] + node([('name', b'product\0'), ('boot-ios-diagnostics', b'bad')])
+        with self.assertRaisesRegex(ValueError, 'unexpected original'):
+            prepare(invalid, 24000000, research_fastsim=True, research_no_sep=True, research_keybag_diagnostics=True)
+
     def test_no_sep_diagnostic_omits_only_verified_sep_and_requires_fastsim(self):
         cpu = node([('name', b'cpu0\0'), ('device_type', b'cpu\0')])
         sep = node([('name', b'sep\0'), ('compatible', b'iop,t8010\0iop,s8000\0')], [node([('name', b'xART\0')])])

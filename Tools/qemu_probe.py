@@ -43,12 +43,16 @@ def virtual_base_for_kernel(minimum, maximum, physical_base=PHYSICAL_BASE):
     return base
 
 
-def boot_args(virtual_base, tree_address, tree_size, top, *, ramdisk=False):
+def boot_args(virtual_base, tree_address, tree_size, top, *, ramdisk=False, system_root=None):
+    if system_root not in (None, "disk0s1", "disk0s1s1") or (system_root and ramdisk):
+        raise ValueError("system root requires a separate APFS disk profile")
     args = bytearray(736)
     struct.pack_into("<HH", args, 0, 2, 2)
     struct.pack_into("<4Q", args, 8, virtual_base, PHYSICAL_BASE, RAM_SIZE, top)
     struct.pack_into("<QI", args, 96, tree_address, tree_size)
     command = b"-v serial=3 debug=0x8 cpus=1" + (b" rd=md0" if ramdisk else b"")
+    if system_root:
+        command += (" rd=" + system_root).encode("ascii")
     args[108:108 + len(command)] = command
     struct.pack_into("<Q", args, 728, RAM_SIZE)
     return bytes(args)
@@ -69,8 +73,10 @@ def elf_image(entry, segments):
     return header + b"".join(headers) + b"".join(bodies)
 
 
-def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, research_ramdisk_root=False, trust_cache=None, research_cfi_nvram=False, research_aes_root_fallback=False):
-    if research_aes_root_fallback and not research_ramdisk_root:
+def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, research_ramdisk_root=False, trust_cache=None, research_cfi_nvram=False, research_aes_root_fallback=False, research_system_root=None):
+    if research_system_root not in (None, "disk0s1", "disk0s1s1") or (research_system_root and (ramdisk is not None or research_ramdisk_root)):
+        raise ValueError("system-root experiment must use a separate APFS disk, no restore ramdisk")
+    if research_aes_root_fallback and not (research_ramdisk_root or research_system_root):
         raise ValueError("AES fallback requires the explicit research restore root gate skip")
     if research_ramdisk_root and ramdisk is None:
         raise ValueError("research root gate skip is restricted to explicit restore ramdisk probes")
@@ -97,8 +103,11 @@ def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, resear
             "original_nvme_hardware": False, "kernel_driver": "AppleARMCHRPNVRAM",
             "persistent_backing_file": str(flash)}, indent=2))
     info = macho(kernel)
-    if research_ramdisk_root:
+    if research_ramdisk_root or research_system_root:
         kernel, patch_report = skip_restore_secure_root(kernel, info["segments"], aes_root_fallback=research_aes_root_fallback)
+        if research_system_root:
+            patch_report["name"] = "research APFS system SecureRootName gate skip"
+            patch_report["root_device"] = research_system_root
         (directory / "guest-patches.json").write_text(json.dumps([patch_report], indent=2))
     else:
         (directory / "guest-patches.json").write_text("[]")
@@ -125,7 +134,7 @@ def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, resear
         (directory / "trust-cache-handoff.json").write_text(json.dumps(cache_report, indent=2))
         clocks.append({"path": "/device-tree/chosen/memory-map", "property": "TrustCache",
                        "physical_address": hex(cache_address), "bytes": len(cache_region),
-                       "source": "official IPSW restore trust cache", "entries": cache_report["entries"]})
+                       "source": "official IPSW system trust cache" if research_system_root else "official IPSW restore trust cache", "entries": cache_report["entries"]})
     disk = ramdisk.read_bytes() if ramdisk is not None else None
     if disk is not None:
         disk_info = validate_hfs(disk)
@@ -159,7 +168,7 @@ def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, resear
     segments = [(int(x["address"], 16) - virtual_base + PHYSICAL_BASE, x["length"],
                  kernel[x["offset"]:x["offset"] + x["file_size"]]) for x in regions]
     segments += [(stub_address, 0x4000, b"".join(struct.pack("<I", x) for x in stub)),
-                 (args_address, 0x4000, boot_args(virtual_base, virtual_base + tree_address - PHYSICAL_BASE, len(tree), top, ramdisk=disk is not None)),
+                 (args_address, 0x4000, boot_args(virtual_base, virtual_base + tree_address - PHYSICAL_BASE, len(tree), top, ramdisk=disk is not None, system_root=research_system_root)),
                  (tree_address, align(len(tree)), tree)]
     if disk is not None:
         segments.append((disk_address, align(len(disk)), disk))
@@ -191,7 +200,11 @@ def panic_capture_complete(serial_bytes):
         serial_bytes[header:]) is not None
 
 
-def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, research_bridge_handoff=False, ramdisk=None, seconds=30, research_ramdisk_root=False, trust_cache=None, research_cfi_nvram=False, research_pmp_core=False, research_aes_root_fallback=False, research_nvme=False, research_nvme_dma_snapshot=False, research_nvme_dart=False, research_nvme_msi=False):
+def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, research_bridge_handoff=False, ramdisk=None, seconds=30, research_ramdisk_root=False, trust_cache=None, research_cfi_nvram=False, research_pmp_core=False, research_aes_root_fallback=False, research_nvme=False, research_nvme_dma_snapshot=False, research_nvme_dart=False, research_nvme_msi=False, research_system_root=None, research_nvme_image=None):
+    if research_system_root and not (research_nvme and research_nvme_dart and research_nvme_msi and research_nvme_image):
+        raise ValueError("system root requires a prepared 16 GiB disk with verified NVMe, DART and MSI")
+    if research_nvme_image and not research_nvme:
+        raise ValueError("storage image requires research NVMe")
     if not 1 <= seconds <= 600:
         raise ValueError("execution budget must be between 1 and 600 seconds")
     if research_bridge_handoff and cpu != "podium7-research":
@@ -204,7 +217,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
         raise ValueError("MSI research requires the verified port0 DART path")
     if research_nvme_dart and not research_nvme:
         raise ValueError("port0 DART translation requires the real NVMe backend")
-    image, kernel_entry, rorgn = make_probe(directory, research_bridge_handoff=research_bridge_handoff, ramdisk=ramdisk, research_ramdisk_root=research_ramdisk_root, trust_cache=trust_cache, research_cfi_nvram=research_cfi_nvram, research_aes_root_fallback=research_aes_root_fallback)
+    image, kernel_entry, rorgn = make_probe(directory, research_bridge_handoff=research_bridge_handoff, ramdisk=ramdisk, research_ramdisk_root=research_ramdisk_root, trust_cache=trust_cache, research_cfi_nvram=research_cfi_nvram, research_aes_root_fallback=research_aes_root_fallback, research_system_root=research_system_root)
     trace, serial = directory / "qemu-trace.txt", directory / "qemu-serial.txt"
     command = [executable, "-machine", "virt,secure=off,virtualization=off", "-cpu", f"{cpu},cntfrq={COUNTER_FREQUENCY}", "-accel", "tcg",
                "-m", "2048", "-smp", "1", "-display", "none", "-monitor", "none", "-serial", "stdio",
@@ -222,7 +235,9 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
     if research_cfi_nvram:
         command += ["-drive", f"if=none,id=podium7-nvram,format=raw,cache=writeback,file={directory / 'nvram-flash.raw'}"]
     if research_nvme:
-        disk_path = directory / "storage-16g.raw"
+        disk_path = pathlib.Path(research_nvme_image).resolve() if research_nvme_image else directory / "storage-16g.raw"
+        if research_nvme_image and not disk_path.is_file():
+            raise FileNotFoundError("prepared disk does not exist; refusing blank replacement")
         if not disk_path.exists():
             with disk_path.open("xb") as storage:
                 storage.truncate(16 << 30)
@@ -323,7 +338,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
     from inspect_pmgr_handoff import inspect_tree
     handoff = inspect_tree((directory / "PreparedDeviceTree.bin").read_bytes())
     (directory / "pmgr-handoff.json").write_text(json.dumps(handoff, indent=2))
-    summary = {"research_nvme_msi": research_nvme_msi, "research_nvme_dart": research_nvme_dart, "research_nvme_dma_snapshot": research_nvme_dma_snapshot, "research_nvme": research_nvme, "research_storage_bytes": (16 << 30) if research_nvme else None, "research_aes_root_fallback": research_aes_root_fallback, "research_pmp_core": research_pmp_core, "research_cfi_nvram": research_cfi_nvram, "research_bridge_handoff": research_bridge_handoff,
+    summary = {"research_system_root": research_system_root, "research_nvme_msi": research_nvme_msi, "research_nvme_dart": research_nvme_dart, "research_nvme_dma_snapshot": research_nvme_dma_snapshot, "research_nvme": research_nvme, "research_storage_bytes": (16 << 30) if research_nvme else None, "research_aes_root_fallback": research_aes_root_fallback, "research_pmp_core": research_pmp_core, "research_cfi_nvram": research_cfi_nvram, "research_bridge_handoff": research_bridge_handoff,
                "authentic_iboot_handoff": False, "pmgr_handoff": handoff, "booted_ios": False, "kernel_entry_seen": entry_seen, "physical_kernel_entry": hex(kernel_entry),
                "boot_milestones": inspect_boot_milestones(serial.read_text(errors="replace"), trace_text),
                "last_translated_blocks": re.findall(r"^0x([0-9a-fA-F]+):", trace_text, re.MULTILINE)[-8:],
@@ -353,9 +368,10 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                "pmgr_power_transactions": pmgr_power_transactions[:128],
                "pmgr_raw_transactions": pmgr_raw_transactions[:128],
                "execution_budget_seconds": seconds, "cpu_snapshot": snapshot,
-               "restore_trust_cache_supplied": trust_cache is not None,
+               "restore_trust_cache_supplied": trust_cache is not None and not research_system_root,
+               "system_trust_cache_supplied": trust_cache is not None and bool(research_system_root),
                "research_ramdisk_root_gate_skip": research_ramdisk_root,
-               "original_kernel_unpatched": not research_ramdisk_root,
+               "original_kernel_unpatched": not (research_ramdisk_root or research_system_root),
                "restore_ramdisk_requested": ramdisk is not None,
                "backend": version, "board": "QEMU virt bootstrap experiment, not T8010",
                "physical_ram_base": hex(PHYSICAL_BASE), "command": command, "stop": stop,
@@ -402,6 +418,8 @@ if __name__ == "__main__":
     parser.add_argument("--research-nvme-dma-snapshot", action="store_true", help="Stop a separate run at the first NVMe command and inspect original DART tables")
     parser.add_argument("--research-nvme-dart", action="store_true", help="Opt-in observed port0 4K DART page-table walk and PCIe address-window mapping")
     parser.add_argument("--research-nvme-msi", action="store_true", help="Opt-in original port0 MSI doorbell routing to AIC")
+    parser.add_argument("--research-system-root", choices=("disk0s1", "disk0s1s1"), help="Separate modified-kernel APFS boot experiment; no authenticated boot claim")
+    parser.add_argument("--research-nvme-image", type=pathlib.Path, help="Existing prepared isolated 16 GiB system disk")
     args = parser.parse_args()
     run_probe(args.directory, executable=args.qemu, cpu=args.cpu,
-              research_bridge_handoff=args.research_bridge_handoff, ramdisk=args.ramdisk, seconds=args.seconds, research_ramdisk_root=args.research_ramdisk_root, trust_cache=args.trust_cache, research_cfi_nvram=args.research_cfi_nvram, research_pmp_core=args.research_pmp_core, research_aes_root_fallback=args.research_aes_root_fallback, research_nvme=args.research_nvme, research_nvme_dma_snapshot=args.research_nvme_dma_snapshot, research_nvme_dart=args.research_nvme_dart, research_nvme_msi=args.research_nvme_msi)
+              research_bridge_handoff=args.research_bridge_handoff, ramdisk=args.ramdisk, seconds=args.seconds, research_ramdisk_root=args.research_ramdisk_root, trust_cache=args.trust_cache, research_cfi_nvram=args.research_cfi_nvram, research_pmp_core=args.research_pmp_core, research_aes_root_fallback=args.research_aes_root_fallback, research_nvme=args.research_nvme, research_nvme_dma_snapshot=args.research_nvme_dma_snapshot, research_nvme_dart=args.research_nvme_dart, research_nvme_msi=args.research_nvme_msi, research_system_root=args.research_system_root, research_nvme_image=args.research_nvme_image)

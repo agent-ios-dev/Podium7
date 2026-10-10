@@ -5,9 +5,22 @@ import zlib
 from prepare_os_disk import relocate_gpt
 from fetch_firmware import RemoteZIP
 from unittest.mock import patch
+from qemu_probe import boot_args, make_probe, run_probe
+import pathlib
 
 
 class OSDiskTests(unittest.TestCase):
+    def test_system_boot_profile_cannot_silently_use_ramdisk_or_blank_storage(self):
+        with self.assertRaises(ValueError):
+            boot_args(0, 0, 0, 0, ramdisk=True, system_root='disk0s1s1')
+        with self.assertRaises(ValueError):
+            make_probe(pathlib.Path('not-read'), ramdisk=pathlib.Path('not-read'), research_system_root='disk0s1s1')
+        with self.assertRaisesRegex(ValueError, 'prepared 16 GiB'):
+            run_probe(pathlib.Path('not-read'), research_system_root='disk0s1s1')
+        args = boot_args(0, 0, 0, 0, system_root='disk0s1s1')
+        self.assertIn(b'rd=disk0s1s1', args)
+        self.assertNotIn(b'rd=md0', args)
+
     def disk(self):
         data = io.BytesIO(bytes(4096 * 512))
         mbr = bytearray(512);mbr[450] = 0xee;mbr[510:] = b'\x55\xaa'

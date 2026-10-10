@@ -70,7 +70,7 @@ class RemoteZIP(io.RawIOBase):
         return b"".join(parts)
 
 
-def stage(output, url=URL, size=SIZE, *, restore_ramdisk=False):
+def stage(output, url=URL, size=SIZE, *, restore_ramdisk=False, system_trust_cache=False):
     output.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(RemoteZIP(url, size)) as archive:
         manifest_data = archive.read("BuildManifest.plist")  # zipfile verifies member CRC.
@@ -84,7 +84,7 @@ def stage(output, url=URL, size=SIZE, *, restore_ramdisk=False):
         report = {"url": url, "version": manifest["ProductVersion"], "build": manifest["ProductBuildVersion"],
                   "device": "iPod9,1", "identity": identity["Info"], "components": {}}
         (output / "BuildManifest.plist").write_bytes(manifest_data)
-        for component in ["KernelCache", "DeviceTree"] + (["RestoreRamDisk", "RestoreTrustCache"] if restore_ramdisk else []):
+        for component in ["KernelCache", "DeviceTree"] + (["RestoreRamDisk", "RestoreTrustCache"] if restore_ramdisk else []) + (["StaticTrustCache"] if system_trust_cache else []):
             source = identity["Manifest"][component]["Info"]["Path"]
             info = archive.getinfo(source)
             if info.file_size > 128 * 1024 * 1024:
@@ -103,5 +103,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=pathlib.Path, default=pathlib.Path(".firmware"))
     parser.add_argument("--restore-ramdisk", action="store_true", help="Also fetch the bounded restore disk, never the full OS volume")
+    parser.add_argument("--system-trust-cache", action="store_true", help="Fetch official full-system StaticTrustCache")
     args = parser.parse_args()
-    stage(args.output, restore_ramdisk=args.restore_ramdisk)
+    stage(args.output, restore_ramdisk=args.restore_ramdisk, system_trust_cache=args.system_trust_cache)

@@ -28,5 +28,18 @@ class SystemUserlandTests(unittest.TestCase):
         self.assertFalse(result['booted_ios'])
         self.assertFalse(evidence(self.hello+'panic(cpu 0', self.trace)['system_userland_confirmed'])
 
+    def test_mount_tasks_and_failure_report_exact_observations(self):
+        serial = self.hello + ('Doing boot task: fsck\r\nDoing boot task: mount-phase-1\n'
+            'DT_get_fstab_entries:9975: failed to get volume for role: 256\n'
+            'Boot task failed: mount-phase-1 - exited due to exit(66)\n')
+        result = evidence(serial, self.trace)
+        self.assertEqual(result['launchd_boot_tasks_observed'], ['fsck', 'mount-phase-1'])
+        self.assertEqual(result['launchd_boot_failures'], ['mount-phase-1 - exited due to exit(66)'])
+        self.assertEqual(result['fstab_missing_roles'], [256])
+        self.assertFalse(result['springboard_confirmed'])
+        result = evidence(self.hello, self.trace)
+        self.assertEqual(result['launchd_boot_tasks_observed'], [])
+        self.assertEqual(result['fstab_missing_roles'], [])
+
 
 if __name__ == '__main__':unittest.main()

@@ -5,6 +5,7 @@ SpringBoard/display boot remains a separate, unconfirmed milestone.
 import argparse
 import json
 import pathlib
+import re
 from boot_milestones import inspect
 
 
@@ -18,6 +19,9 @@ def evidence(serial, trace):
             "kernel_panic_seen": 'panic(cpu ' in serial,
             "system_userland_confirmed": stages['userland_execution_confirmed'] and not stages['restore_environment_seen'] and 'panic(cpu ' not in serial,
             "filesystem_quickcheck_clean": "QUICKCHECK ONLY; FILESYSTEM CLEAN" in serial,
+            "launchd_boot_tasks_observed": re.findall(r'Doing boot task: ([^\r\n]+)', serial),
+            "launchd_boot_failures": re.findall(r'Boot task failed: ([^\r\n]+)', serial),
+            "fstab_missing_roles": [int(role) for role in re.findall(r'failed to get volume for role: (\d+)', serial)],
             "springboard_confirmed": False, "booted_ios": False}
 
 

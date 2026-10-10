@@ -1,3 +1,33 @@
+## APFS probe rejects external NVMe; internal DT handoff under test
+
+Full-system run38046156960 proves byte-for-byte equality of the protective
+MBR, GPT header and entire16384-byte partition table in guest RAM after actual
+NVMe DMA. Source CRCs are valid; partition1 has APFS GUID
+7C3457EF-0000-11AA-AA11-00306543ECAC and real NXSB at its superblock offset32.
+The optimized mapper also passes the hardware four-page PRP read and all
+protected-range checks. The system still waits for disk0s1s1 without a panic.
+
+Original instruction traces show IOGUIDPartitionScheme validating both CRCs,
+creating and attaching a partition, then AppleAPFSContainer::probe rejecting
+it before reading its superblock. At00672d320, its protocol-location helper
+returns non-internal and the probe returns null at00672d328/00672d478.
+IONVMeFamily checks the provider's `built-in` property at00699b9b4..00699b9cc;
+without it,00699bd0c..00699bd38 explicitly sets location External.
+
+The explicit system-root profile now describes the fixed internal virtual
+disk with `built-in` on the original n112ap s3e endpoint. Original IPSW files
+are preserved; no APFS branch or driver return value is patched. Ordinary
+restore/control profiles retain their original DeviceTree. A test validates
+SoC/endpoint guards and idempotence;81 local Python tests pass. Actual APFS
+mount and system userland still require the next original-kernel run.
+
+PMP early snapshots now capture controls/registers/ARM32 stack at the real
+power notification and1/5 seconds later, then resume the guest even if capture
+fails. Two control repeats reach restore launchd with13586/13551 EL0 returns;
+this is restore userland evidence, not a system desktop.
+
+---
+
 ## Official APFS system disk prepared; partial-page DMA corrected
 
 Preparation run38043188715 downloaded the complete official iOS15.8.8 OS

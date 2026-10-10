@@ -12,6 +12,24 @@ def node(properties, children=()):
 
 
 class DeviceTreePreparationTests(unittest.TestCase):
+    def test_system_storage_is_explicitly_builtin_only_on_verified_original_endpoint(self):
+        cpu = node([('name', b'cpu0\0'), ('device_type', b'cpu\0')])
+        disk = node([('name', b's3e\0'), ('device_type', b'pcie-device\0')])
+        bridge = node([('name', b'pci-bridge0\0')], [disk])
+        pci = node([('name', b'apcie\0')], [bridge])
+        arm_io = node([('name', b'arm-io\0'), ('compatible', b'arm-io,t8010\0')], [pci])
+        tree = node([('name', b'device-tree\0')], [node([('name', b'cpus\0')], [cpu]), arm_io])
+        ordinary, _ = prepare(tree, 24000000, random_seed=bytes(64))
+        self.assertNotIn(b'built-in', ordinary)
+        internal, changes = prepare(tree, 24000000, random_seed=bytes(64), research_internal_storage=True)
+        self.assertIn(b'built-in'.ljust(32, b'\0') + bytes(4), internal)
+        again, _ = prepare(internal, 24000000, random_seed=bytes(64), research_internal_storage=True)
+        self.assertEqual(internal, again)
+        self.assertEqual(next(c for c in changes if c.get('property') == 'built-in')['path'],
+                         '/device-tree/arm-io/apcie/pci-bridge0/s3e')
+        with self.assertRaises(ValueError):
+            prepare(tree.replace(b't8010', b't9999'), 24000000, research_internal_storage=True)
+
     def test_cpu_clocks_match_counter_and_other_devices_are_preserved(self):
         cpu = node([("name", b"cpu0\0"), ("device_type", b"cpu\0"), ("timebase-frequency", bytes(4))])
         uart = node([("name", b"uart0\0"), ("reg", bytes(range(16)))])

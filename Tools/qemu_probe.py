@@ -83,7 +83,8 @@ def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, resear
     kernel = (directory / "KernelCache.macho").read_bytes()
     original_tree = (directory / "DeviceTree.bin").read_bytes()
     tree, clocks = prepare(original_tree, COUNTER_FREQUENCY, dram_base=QEMU_RAM_BASE, dram_size=QEMU_RAM_SIZE,
-                           research_bridge_handoff=research_bridge_handoff)
+                           research_bridge_handoff=research_bridge_handoff,
+                           research_internal_storage=bool(research_system_root))
     if research_cfi_nvram:
         if not research_bridge_handoff:
             raise ValueError("CFI NVRAM requires synthetic research handoff")

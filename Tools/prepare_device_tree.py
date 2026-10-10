@@ -8,7 +8,7 @@ import secrets
 from analyze_firmware import device_tree
 
 
-def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, dram_size=2 * 1024 * 1024 * 1024, research_bridge_handoff=False):
+def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, dram_size=2 * 1024 * 1024 * 1024, research_bridge_handoff=False, research_internal_storage=False):
     if not 1_000_000 <= counter_frequency <= 1_000_000_000:
         raise ValueError("invalid counter frequency")
     original_nodes = device_tree(data)  # Validate bounds/depth before rewriting.
@@ -30,6 +30,15 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
             cursor += (size + 3) & ~3
         names = {name.split(b"\0")[0]: value for name, value in properties}
         path = parent + "/" + names.get(b"name", b"?").split(b"\0")[0].decode("ascii", errors="replace")
+        if research_internal_storage and path == '/device-tree/arm-io/apcie/pci-bridge0/s3e':
+            arm_io = next((n for n in original_nodes if n['path'] == '/device-tree/arm-io'), None)
+            if arm_io is None or arm_io['properties'].get('compatible') != b'arm-io,t8010\0'.hex():
+                raise ValueError('internal research storage requires original T8010 endpoint')
+            if b'built-in' not in names:
+                properties.append((b'built-in'.ljust(32, b'\0'), b''))
+            changes.append({'path': path, 'property': 'built-in',
+                            'source': 'fixed internal research NVMe system disk',
+                            'authentic_iboot_handoff': False})
         if names.get(b"device_type", b"").rstrip(b"\0") == b"cpu" or parent.endswith("/cpus"):
             for clock in [b"timebase-frequency", b"fixed-frequency"]:
                 value = struct.pack("<Q", counter_frequency)
@@ -217,4 +226,6 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
     if research_bridge_handoff and not any(c.get("source") == "synthetic research bridge model" for c in changes):
         raise ValueError("missing T8010 PMGR node for research bridge handoff")
     device_tree(prepared)
+    if research_internal_storage and not any(c.get('property') == 'built-in' for c in changes):
+        raise ValueError('original internal storage endpoint missing')
     return prepared, changes

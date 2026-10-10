@@ -125,7 +125,7 @@ jobs:
         run: |
           mkdir .firmware/pmp-cfi-experiment
           cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/pmp-cfi-experiment/
-          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/pmp-cfi-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --trust-cache .firmware/RestoreTrustCache.im4p --research-ramdisk-root --research-pmp-core --research-cfi-nvram --seconds 180
+          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/pmp-cfi-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --trust-cache .firmware/RestoreTrustCache.im4p --research-ramdisk-root --research-pmp-core --research-cfi-nvram --research-aes-root-fallback --seconds 180
           python3 Tools/inspect_boot_fault.py --directory .firmware/pmp-cfi-experiment
       - name: Save independent post-mount NVRAM experiment evidence
         if: always()

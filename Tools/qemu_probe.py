@@ -68,7 +68,9 @@ def elf_image(entry, segments):
     return header + b"".join(headers) + b"".join(bodies)
 
 
-def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, research_ramdisk_root=False, trust_cache=None, research_cfi_nvram=False):
+def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, research_ramdisk_root=False, trust_cache=None, research_cfi_nvram=False, research_aes_root_fallback=False):
+    if research_aes_root_fallback and not research_ramdisk_root:
+        raise ValueError("AES fallback requires the explicit research restore root gate skip")
     if research_ramdisk_root and ramdisk is None:
         raise ValueError("research root gate skip is restricted to explicit restore ramdisk probes")
     kernel = (directory / "KernelCache.macho").read_bytes()
@@ -95,7 +97,7 @@ def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, resear
             "persistent_backing_file": str(flash)}, indent=2))
     info = macho(kernel)
     if research_ramdisk_root:
-        kernel, patch_report = skip_restore_secure_root(kernel, info["segments"])
+        kernel, patch_report = skip_restore_secure_root(kernel, info["segments"], aes_root_fallback=research_aes_root_fallback)
         (directory / "guest-patches.json").write_text(json.dumps([patch_report], indent=2))
     else:
         (directory / "guest-patches.json").write_text("[]")
@@ -188,12 +190,12 @@ def panic_capture_complete(serial_bytes):
         serial_bytes[header:]) is not None
 
 
-def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, research_bridge_handoff=False, ramdisk=None, seconds=30, research_ramdisk_root=False, trust_cache=None, research_cfi_nvram=False, research_pmp_core=False):
+def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, research_bridge_handoff=False, ramdisk=None, seconds=30, research_ramdisk_root=False, trust_cache=None, research_cfi_nvram=False, research_pmp_core=False, research_aes_root_fallback=False):
     if not 1 <= seconds <= 600:
         raise ValueError("execution budget must be between 1 and 600 seconds")
     if research_bridge_handoff and cpu != "podium7-research":
         raise ValueError("synthetic bridge handoff requires the research bridge model")
-    image, kernel_entry, rorgn = make_probe(directory, research_bridge_handoff=research_bridge_handoff, ramdisk=ramdisk, research_ramdisk_root=research_ramdisk_root, trust_cache=trust_cache, research_cfi_nvram=research_cfi_nvram)
+    image, kernel_entry, rorgn = make_probe(directory, research_bridge_handoff=research_bridge_handoff, ramdisk=ramdisk, research_ramdisk_root=research_ramdisk_root, trust_cache=trust_cache, research_cfi_nvram=research_cfi_nvram, research_aes_root_fallback=research_aes_root_fallback)
     trace, serial = directory / "qemu-trace.txt", directory / "qemu-serial.txt"
     command = [executable, "-machine", "virt,secure=off,virtualization=off", "-cpu", f"{cpu},cntfrq={COUNTER_FREQUENCY}", "-accel", "tcg",
                "-m", "2048", "-smp", "1", "-display", "none", "-monitor", "none", "-serial", "stdio",
@@ -286,7 +288,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
     from inspect_pmgr_handoff import inspect_tree
     handoff = inspect_tree((directory / "PreparedDeviceTree.bin").read_bytes())
     (directory / "pmgr-handoff.json").write_text(json.dumps(handoff, indent=2))
-    summary = {"research_pmp_core": research_pmp_core, "research_cfi_nvram": research_cfi_nvram, "research_bridge_handoff": research_bridge_handoff,
+    summary = {"research_aes_root_fallback": research_aes_root_fallback, "research_pmp_core": research_pmp_core, "research_cfi_nvram": research_cfi_nvram, "research_bridge_handoff": research_bridge_handoff,
                "authentic_iboot_handoff": False, "pmgr_handoff": handoff, "booted_ios": False, "kernel_entry_seen": entry_seen, "physical_kernel_entry": hex(kernel_entry),
                "boot_milestones": inspect_boot_milestones(serial.read_text(errors="replace"), trace_text),
                "last_translated_blocks": re.findall(r"^0x([0-9a-fA-F]+):", trace_text, re.MULTILINE)[-8:],
@@ -360,6 +362,7 @@ if __name__ == "__main__":
     parser.add_argument("--trust-cache", type=pathlib.Path, help="Official RestoreTrustCache rtsc IM4P, loaded below kernel")
     parser.add_argument("--research-cfi-nvram", action="store_true", help="Synthetic AMD NOR provider; not original A10 NVMe hardware")
     parser.add_argument("--research-pmp-core", action="store_true", help="Opt-in generic ARM32 PMP core sharing original SRAM; not exact hardware")
+    parser.add_argument("--research-aes-root-fallback", action="store_true", help="Exact-kernel diagnostic SecureRoot unsupported fallback; requires explicit restore root gate skip, no AES crypto bypass")
     args = parser.parse_args()
     run_probe(args.directory, executable=args.qemu, cpu=args.cpu,
-              research_bridge_handoff=args.research_bridge_handoff, ramdisk=args.ramdisk, seconds=args.seconds, research_ramdisk_root=args.research_ramdisk_root, trust_cache=args.trust_cache, research_cfi_nvram=args.research_cfi_nvram, research_pmp_core=args.research_pmp_core)
+              research_bridge_handoff=args.research_bridge_handoff, ramdisk=args.ramdisk, seconds=args.seconds, research_ramdisk_root=args.research_ramdisk_root, trust_cache=args.trust_cache, research_cfi_nvram=args.research_cfi_nvram, research_pmp_core=args.research_pmp_core, research_aes_root_fallback=args.research_aes_root_fallback)

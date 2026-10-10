@@ -32,3 +32,26 @@ class GuestPatchTests(unittest.TestCase):
         with patch.object(gp, "REFERENCE_SHA256", hashlib.sha256(original).hexdigest()):
             with self.assertRaisesRegex(ValueError, "not file-backed"):
                 gp.skip_restore_secure_root(original, [])
+
+    def test_aes_fallback_is_opt_in_exact_and_preserves_all_other_bytes(self):
+        original, segments = self.fixture()
+        offset = len(original)
+        original += gp.AES_CALL_SIGNATURE + b"TAIL"
+        segments += [{"address": hex(gp.AES_SECURE_ROOT_CALL), "file_size": len(gp.AES_CALL_SIGNATURE), "offset": offset}]
+        with patch.object(gp, "REFERENCE_SHA256", hashlib.sha256(original).hexdigest()):
+            control, report = gp.skip_restore_secure_root(original, segments)
+            self.assertEqual(control[offset:], original[offset:])
+            self.assertEqual(report["additional_edits"], [])
+            changed, report = gp.skip_restore_secure_root(original, segments, aes_root_fallback=True)
+        self.assertEqual(changed[:offset], control[:offset])
+        self.assertEqual(changed[offset:offset+8], gp.AES_UNSUPPORTED)
+        self.assertEqual(changed[offset+8:], original[offset+8:])
+        self.assertEqual(len(report["additional_edits"]), 1)
+        self.assertFalse(report["authenticated_boot"])
+        with patch.object(gp, "REFERENCE_SHA256", hashlib.sha256(original).hexdigest()):
+            with self.assertRaisesRegex(ValueError, "not file-backed"):
+                gp.skip_restore_secure_root(original, segments[:1], aes_root_fallback=True)
+        wrong = original[:offset] + b"WRONG!!!" + original[offset+8:]
+        with patch.object(gp, "REFERENCE_SHA256", hashlib.sha256(wrong).hexdigest()):
+            with self.assertRaisesRegex(ValueError, "signature mismatch"):
+                gp.skip_restore_secure_root(wrong, segments, aes_root_fallback=True)

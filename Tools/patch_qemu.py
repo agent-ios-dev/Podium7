@@ -247,6 +247,7 @@ static void podium7_research_initfn(Object *obj)
 typedef struct Podium7UART {
     MemoryRegion region;
     uint32_t registers[64];
+    bool console;
 } Podium7UART;
 static uint64_t podium7_uart_read(void *opaque, hwaddr address, unsigned size)
 {
@@ -259,7 +260,7 @@ static void podium7_uart_write(void *opaque, hwaddr address, uint64_t value,
                               unsigned size)
 {
     Podium7UART *uart = opaque;
-    if (address == 0x20) { putchar(value & 0xff); fflush(stdout); return; }
+    if (address == 0x20) { if (uart->console) { putchar(value & 0xff); fflush(stdout); } return; }
     if (address < sizeof(uart->registers)) { uart->registers[address / 4] = value; }
 }
 static const MemoryRegionOps podium7_uart_ops = {
@@ -269,10 +270,17 @@ static const MemoryRegionOps podium7_uart_ops = {
 };
 static void podium7_uart_create(MachineState *machine, MemoryRegion *memory)
 {
-    Podium7UART *uart = g_new0(Podium7UART, 1);
-    memory_region_init_io(&uart->region, OBJECT(machine), &podium7_uart_ops,
-                         uart, "podium7-uart-tx-only", 0x4000);
-    memory_region_add_subregion(memory, 0x20a0c0000ULL, &uart->region);
+    static const hwaddr banks[] = {
+        0x20a0c0000ULL, 0x20a0c4000ULL, 0x20a0d0000ULL,
+        0x20a0d4000ULL, 0x20a0d8000ULL,
+    };
+    for (unsigned i = 0; i < ARRAY_SIZE(banks); i++) {
+        Podium7UART *uart = g_new0(Podium7UART, 1);
+        uart->console = i == 0;
+        memory_region_init_io(&uart->region, OBJECT(machine), &podium7_uart_ops,
+                             uart, "podium7-uart-tx-only", 0x4000);
+        memory_region_add_subregion(memory, banks[i], &uart->region);
+    }
 }
 
 /* Minimal one-plane A10 MCC RoRgn research model. GPL-2.0-or-later.

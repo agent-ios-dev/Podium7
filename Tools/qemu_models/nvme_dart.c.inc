@@ -52,13 +52,23 @@ static IOMMUTLBEntry podium7_storage_translate(IOMMUMemoryRegion *mr,
                 unsigned start = (leaf >> 48) & 0xfff;
                 unsigned end = (leaf >> 36) & 0xfff;
                 unsigned offset = address & 0xfff;
-                entry.addr_mask = (start % 4 == 0 && end % 4 == 3) ? 3 : 0;
-                entry.iova = address & ~entry.addr_mask;
-                entry.translated_addr = physical + (offset & ~entry.addr_mask);
                 if (start > end || offset < start || offset > end) {
                     entry.perm = IOMMU_NONE;
                     subpage_fault = true;
+                    entry.addr_mask = 0;
+                } else {
+                    /* Largest aligned power-of-two span containing this byte
+                     * entirely inside the descriptor's permitted interval.
+                     * Full-page byte windows must not fragment DMA into1024
+                     * tiny mappings; partial windows never expose neighbours. */
+                    entry.addr_mask = 0xfff;
+                    while ((offset & ~entry.addr_mask) < start ||
+                           (offset & ~entry.addr_mask) + entry.addr_mask > end) {
+                        entry.addr_mask >>= 1;
+                    }
                 }
+                entry.iova = address & ~entry.addr_mask;
+                entry.translated_addr = physical + (offset & ~entry.addr_mask);
             }
         }
     }

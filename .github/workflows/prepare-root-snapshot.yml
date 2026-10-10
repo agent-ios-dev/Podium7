@@ -25,7 +25,7 @@ jobs:
           run-id: ${{ inputs.disk_run_id }}
           github-token: ${{ github.token }}
       - name: Create actual named snapshot only on the isolated source-volume fixture
-        run: python3 Tools/prepare_system_snapshot.py --disk .firmware/system-disk/storage-16g.raw --auth .firmware/SystemVolume.im4p --helper .firmware/create-apfs-snapshot --apple-systemsnapshot --mount .firmware/snapshot-mount --output .firmware/root-snapshot.json
+        run: python3 Tools/prepare_system_snapshot.py --disk .firmware/system-disk/storage-16g.raw --auth .firmware/SystemVolume.im4p --helper .firmware/create-apfs-snapshot --apple-bless --mount .firmware/snapshot-mount --output .firmware/root-snapshot.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

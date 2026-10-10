@@ -12,7 +12,7 @@ import time
 from analyze_firmware import payload
 
 
-def prepare(image, auth, helper, mount, *, apple_systemsnapshot=False):
+def prepare(image, auth, helper, mount, *, apple_systemsnapshot=False, apple_bless=False):
     image, helper, mount = (pathlib.Path(p).resolve() for p in (image, helper, mount))
     workspace = pathlib.Path.cwd().resolve()
     if not image.is_relative_to(workspace / '.firmware' / 'system-disk') or image.name != 'storage-16g.raw':
@@ -54,6 +54,9 @@ def prepare(image, auth, helper, mount, *, apple_systemsnapshot=False):
             raise ValueError('fixture mount does not identify the selected image volume')
         command = ['sudo', '/System/Library/Filesystems/apfs.fs/Contents/Resources/apfs_systemsnapshot',
                    '-s', name, '-v', str(mount)] if apple_systemsnapshot else ['sudo', str(helper), str(mount), name]
+        if apple_bless:
+            # No --setBoot: operate solely on the attached image's folder.
+            command = ['sudo', 'bless', '--folder', str(mount), '--create-snapshot', '--verbose']
         created = subprocess.run(command, check=True, timeout=60,
                                  capture_output=True, text=True)
         print(created.stdout, end='')
@@ -61,7 +64,8 @@ def prepare(image, auth, helper, mount, *, apple_systemsnapshot=False):
             'diskutil', 'apfs', 'listSnapshots', device, '-plist'], timeout=60))
         subprocess.run(['diskutil', 'unmount', device], check=True, timeout=60)
         if name not in json.dumps(snapshots, default=str):
-            raise ValueError('host snapshot API returned success without the expected snapshot listing')
+            raise ValueError('host snapshot tool returned success without expected name; listing: ' +
+                             json.dumps(snapshots, default=str)[:16384])
         return {'snapshot_created_by_host_api': True, 'expected_name': name,
                 'snapshot_listing': snapshots, 'authenticated_guest_root': False, 'booted_ios': False}
     finally:
@@ -76,9 +80,11 @@ if __name__ == '__main__':
     parser.add_argument('--mount', required=True)
     parser.add_argument('--output', type=pathlib.Path, required=True)
     parser.add_argument('--apple-systemsnapshot', action='store_true', help='Use installed Apple-signed snapshot utility')
+    parser.add_argument('--apple-bless', action='store_true', help='Use signed bless on image folder without changing host boot settings')
     args = parser.parse_args()
     try:
-        report = prepare(args.disk, args.auth, args.helper, args.mount, apple_systemsnapshot=args.apple_systemsnapshot)
+        report = prepare(args.disk, args.auth, args.helper, args.mount, apple_systemsnapshot=args.apple_systemsnapshot,
+                         apple_bless=args.apple_bless)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         report = {'preparation_error': str(error), 'booted_ios': False}
         if isinstance(error, subprocess.CalledProcessError):

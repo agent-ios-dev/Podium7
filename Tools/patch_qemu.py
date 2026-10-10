@@ -1198,6 +1198,13 @@ static void podium7_pmp_start(void)
     qemu_log("PODIUM7 PMP firmware release result=%d\\n", result);
 }
 '''
+    # Polling must not exhaust evidence for actual message delivery. Keep a
+    # separate bounded budget for data-port accesses (not status loops).
+    sep = sep.replace("    unsigned logged_accesses;", "    unsigned logged_accesses;\n    unsigned logged_messages;")
+    sep = sep.replace("if (bank->logged_accesses < 256) {",
+        "if (bank->logged_accesses < 256 || (bank->base == 0x20e300000ULL && bank->logged_messages < 4096 && (address == 0xb98 || address == 0xb9c || address == 0xbb0 || address == 0xbb4 || address == 0x4010 || address == 0x4014 || address == 0x4038 || address == 0x403c))) {")
+    sep = sep.replace("bank->logged_accesses++;",
+        "bank->logged_accesses++;\n        if (address == 0xb98 || address == 0xb9c || address == 0xbb0 || address == 0xbb4 || address == 0x4010 || address == 0x4014 || address == 0x4038 || address == 0x403c) { bank->logged_messages++; }")
     # Next original-XNU data abort is AppleJPEGDriver's reset write at +8.
     # The n112ap DT has two 16-KiB JPEG engines adjacent to their DARTs.
     # Discovery/reset controls only: no encode/decode DMA or completion IRQ.
@@ -1230,6 +1237,18 @@ static void podium7_pmp_start(void)
 }
 '''
     scaler = "\n/* Original scaler0 control banks; pixel processing/DMA absent. */\n" + scaler[scaler.index("typedef struct "):]
+    # Original VXD power/reset control read +4 faults in run 38030307496.
+    # Exact n112ap DT windows; no video decode, DMA or synthetic IRQ.
+    vxd = scaler.replace("SCALER", "VXD").replace("scaler", "vxd").replace("Podium7ScalerBank", "Podium7VXDBank")
+    start = vxd.index("static void podium7_vxd_create(")
+    vxd = vxd[:start] + '''static void podium7_vxd_create(MachineState *machine, MemoryRegion *memory)
+{
+    podium7_vxd_bank_create(machine, memory, 0x208100000ULL, 0x30000,
+                            "podium7-t8010-vxd-primary-control");
+    podium7_vxd_bank_create(machine, memory, 0x208130000ULL, 0x1000,
+                            "podium7-t8010-vxd-power-control");
+}
+'''
     # Original Samsung SPI starts by disabling +0/+0xc and setting +8.
     # Discovery/control storage only; no codec/touch traffic or fake IRQs.
     spi = mipi.replace("MIPI-DSIM", "SPI").replace("mipi_dsim", "spi")
@@ -1727,7 +1746,7 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"\n#include "qemu/timer.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + jpeg + scaler + spi + i2c + pmp_system + dart + pcie + aop_system + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + jpeg + scaler + vxd + spi + i2c + pmp_system + dart + pcie + aop_system + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
     timer_fiq = r'''
 /* Research A10 EL1 timers arrive as FIQ, not GIC PPIs. External AIC device
  * interrupts use a separate CPU IRQ route; EL2 timer-enable controls are absent. */
@@ -1825,6 +1844,7 @@ static void podium7_irq_or_set(void *opaque, int input, int level)
         podium7_sep_mailbox_create(machine, sysmem);
         podium7_jpeg_create(machine, sysmem);
         podium7_scaler_create(machine, sysmem);
+        podium7_vxd_create(machine, sysmem);
         podium7_spi_create(machine, sysmem);
         podium7_i2c_create(machine, sysmem);
         podium7_pmp_system_create(machine, sysmem);

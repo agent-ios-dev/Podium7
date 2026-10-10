@@ -48,6 +48,17 @@ class LaunchInspectionTests(unittest.TestCase):
                 services.inspect(image)
             self.assertEqual(command.call_args.args[0], ['hdiutil', 'detach', '/dev/disk99'])
 
+    def test_delayed_apfs_publication_is_retried_without_relaxing_identity(self):
+        image = pathlib.Path.cwd().resolve() / '.firmware/system-disk/storage-16g.raw'
+        attached = plistlib.dumps({'system-entities': [{'dev-entry': '/dev/disk99'}]})
+        container = {'Volumes': [{'APFSVolumeUUID': services.SYSTEM_UUID, 'Roles': ['System']}]}
+        with patch.object(pathlib.Path, 'stat') as stat, patch.object(services, 'command', return_value=attached), patch.object(services, 'fixture_container', side_effect=[ValueError('isolated fixture container not uniquely identified'), container]) as lookup, patch.object(services.time, 'sleep') as sleep, patch.object(services, 'mount_volume') as mount, patch.object(services, 'collect', return_value={'read_only': True}):
+            stat.return_value.st_size = 16 << 30
+            self.assertEqual(services.inspect(image), {'read_only': True})
+            self.assertEqual(lookup.call_count, 2)
+            sleep.assert_called_once_with(1)
+            self.assertTrue(mount.call_args.kwargs['readonly'])
+
 
 if __name__ == '__main__':
     unittest.main()

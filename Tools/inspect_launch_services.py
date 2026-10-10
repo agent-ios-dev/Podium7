@@ -3,6 +3,7 @@ import argparse
 import json
 import pathlib
 import plistlib
+import time
 from prepare_install_layout import SYSTEM_UUID, command, fixture_container, mount_volume
 
 FIELDS = ('Label', 'Program', 'ProgramArguments', 'UserName', 'GroupName',
@@ -72,7 +73,14 @@ def inspect(image):
         raise ValueError('fixture attachment returned no device')
     whole = min(devices, key=len)
     try:
-        container = fixture_container(whole)
+        for attempt in range(10):
+            try:
+                container = fixture_container(whole)
+                break
+            except ValueError as error:
+                if str(error) != 'isolated fixture container not uniquely identified' or attempt == 9:
+                    raise
+                time.sleep(1)
         volumes = container.get('Volumes', [])
         if len(volumes) != 1 or volumes[0].get('APFSVolumeUUID') != SYSTEM_UUID or volumes[0].get('Roles') != ['System']:
             raise ValueError('expected unchanged official single System-volume fixture')

@@ -23,11 +23,16 @@ str w5, [x3, #0x24]
 ldr w4, [x3, #0x24]
 cmp w4, w5
 b.ne failure
+movz x11, #0x8000
+movk x11, #6, lsl #32
+cmp x3, x11
+b.eq skip_phy_status
 mov w5, #0x80808080
 str w5, [x3, #0xc]
 ldr w4, [x3, #0xc]
 cmp w4, w5
 b.ne failure
+skip_phy_status:
 mov w5, #0x1234
 str w5, [x3, #0x30]
 str w5, [x3, #0x20]
@@ -43,6 +48,19 @@ cmp w4, w5
 b.ne failure
 subs x9, x9, #1
 b.ne next_bank
+movz x3, #0
+movk x3, #0x0100, lsl #16
+movk x3, #6, lsl #32
+mov w5, #0x31
+str w5, [x3, #0x124]
+movz x11, #0x8000
+movk x11, #6, lsl #32
+ldr w4, [x11, #0xc]
+cmp w4, #3
+b.ne failure
+str wzr, [x3, #0x124]
+ldr w4, [x11, #0xc]
+cbnz w4, failure
 movz x3, #0x4000
 movk x3, #0x0100, lsl #16
 movk x3, #6, lsl #32

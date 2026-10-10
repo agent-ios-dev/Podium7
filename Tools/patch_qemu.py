@@ -1361,6 +1361,18 @@ static void podium7_pmp_start(void)
         "    bool channel = bank->base >= 0x601004000ULL && bank->base <= 0x604004000ULL &&\n"
         "                   (bank->base & 0xffffff) == 0x4000;\n"
         "    bank->registers[address >> 2] = (channel && address == 4) ? (value & ~0x10000U) : value;")
+    pcie = "static uint32_t podium7_pcie_lane_requests;\n" + pcie
+    pcie = pcie.replace("    uint32_t value = bank->registers[address >> 2];",
+        "    uint32_t value = bank->registers[address >> 2];\n"
+        "    if (bank->base == 0x600008000ULL && address == 0xc) { value = podium7_pcie_lane_requests; }")
+    pcie = pcie.replace("    uint32_t value = (uint32_t)data;",
+        "    uint32_t value = (uint32_t)data;\n"
+        "    if (bank->base >= 0x601000000ULL && bank->base <= 0x604000000ULL &&\n"
+        "        (bank->base & 0xffffff) == 0 && address == 0x124) {\n"
+        "        unsigned port = (bank->base - 0x601000000ULL) >> 24;\n"
+        "        uint32_t mask = port == 0 ? 3 : (1U << port);\n"
+        "        podium7_pcie_lane_requests = (podium7_pcie_lane_requests & ~mask) | ((value & 1) ? mask : 0);\n"
+        "    }")
     start = pcie.index("static void podium7_pcie_create(")
     pcie = pcie[:start] + '''/* Explicit virtual root-port config, QEMU vendor/device identity.
  * Root ports on bus0 devices0..3; downstream buses remain absent. */

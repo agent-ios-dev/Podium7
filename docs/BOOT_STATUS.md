@@ -1,3 +1,17 @@
+## Original PCIe v2 speed-vector dependency identified
+
+Run 38036762119 still panics at limitedSpeed > 0 despite valid Gen1
+LinkCapabilities. Original code 0xfffffff006822314..3b4 instead reads PCIe v2
+Supported Link Speeds Vector (capability +0x2c), searches bits1..7 and rejects
+an empty vector. The virtual root port now advertises only Gen1 in this
+read-only vector (0x2), covered by the ARM64 config guest. Kernel validation
+runs in 38036919703. LinkStatus stays zero and downstream buses stay absent.
+No usable iOS boot has been verified.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38036762119
+
+---
+
 ## PCIe capability list accepted; virtual maximum speed added
 
 Run 38036534007 passes root-port configuration guest checks. Both original

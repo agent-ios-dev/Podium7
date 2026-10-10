@@ -59,3 +59,18 @@ class QMPTests(unittest.TestCase):
         connection.makefile.return_value = stream
         with patch("qmp_diagnostics.socket.AF_UNIX", 1, create=True), patch("qmp_diagnostics.socket.socket", return_value=connection):
             with self.assertRaisesRegex(ValueError, "denied"): capture("local.sock")
+
+    def test_physical_control_snapshot_uses_xp_not_virtual_x(self):
+        stream = Stream([
+            {"QMP": {}}, {"id": "qmp_capabilities", "return": {}},
+            {"id": "stop", "return": {}},
+            {"id": "query-cpus-fast", "return": [{"cpu-index": 0}]},
+            {"id": "human-monitor-command", "return": "PC=fffffff0071904e8"},
+            {"id": "human-monitor-command", "return": "20e300b84: 0x0 0x1"}])
+        connection = MagicMock()
+        connection.__enter__.return_value = connection
+        connection.makefile.return_value = stream
+        with patch("qmp_diagnostics.socket.AF_UNIX", 1, create=True), patch("qmp_diagnostics.socket.socket", return_value=connection):
+            result = capture("local.sock", physical_windows=((0x20e300b84, 2),))
+        self.assertEqual(stream.sent[-1]["arguments"]["command-line"], "xp/2wx 0x20e300b84")
+        self.assertEqual(result["physical_windows"][0]["physical_address"], "0x20e300b84")

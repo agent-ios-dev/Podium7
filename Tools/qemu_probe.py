@@ -243,7 +243,10 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                     # page tables still exist; register snapshots alone show VA.
                     panic_fars = re.findall(rb"\bfar:\s*(0x[0-9a-fA-F]+)", serial_bytes)
                     addresses = tuple(dict.fromkeys(int(value, 16) for value in panic_fars[-4:]))
-                    snapshot = capture_cpu(monitor_path, addresses)
+                    # Only PMP control words: exclude FIFO data/pop and event-claim ports.
+                    controls = ((0x20e300b84, 5), (0x20e300ba0, 2),
+                                (0x20e304008, 1), (0x20e304020, 1)) if research_pmp_core else ()
+                    snapshot = capture_cpu(monitor_path, addresses, physical_windows=controls)
                     (directory / "cpu-snapshot.txt").write_text(snapshot["registers"])
                     (directory / "cpu-stack.txt").write_text(snapshot["stack"])
                     (directory / "cpu-snapshot.json").write_text(json.dumps(snapshot, indent=2))

@@ -1,3 +1,17 @@
+## Exact PHY base fixed; original driver requires per-lane stride apertures
+
+Run 38037441527 reads and programs PHY lane0 at exact 0x60a000000, then
+aborts at FAR translated by QMP to 0x60a010088, original PC0xfffffff00694d73c.
+Original driver addresses lane-specific controls at stride0x10000; the reg[11]
+base span alone excludes lane1. Separate bounded0x4000 lane1..3 controls now
+follow this observed accessor layout. The guest exercises +0x88 across these
+independent banks in addition to the original DeviceTree-declared ranges.
+No analog PHY, link-up or DMA completion is inferred. Kernel validation pending.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38037441527
+
+---
+
 ## Genuine PCIe PHY register FAR reveals a preexisting aperture typo
 
 Run 38037265062 passes the lane-state guest and original driver exits its

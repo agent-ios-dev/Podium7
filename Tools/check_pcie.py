@@ -59,6 +59,21 @@ cmp w4, w5
 b.ne failure
 subs x9, x9, #1
 b.ne next_bank
+movz x14, #0
+movk x14, #0x0a01, lsl #16
+movk x14, #6, lsl #32
+mov x15, #3
+phy_lane:
+ldr w4, [x14, #0x88]
+cbnz w4, failure
+mov w5, #0x19
+str w5, [x14, #0x88]
+ldr w4, [x14, #0x88]
+cmp w4, w5
+b.ne failure
+add x14, x14, #0x10, lsl #12
+subs x15, x15, #1
+b.ne phy_lane
 movz x3, #0
 movk x3, #0x0100, lsl #16
 movk x3, #6, lsl #32

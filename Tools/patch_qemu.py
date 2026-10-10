@@ -1424,6 +1424,11 @@ static void podium7_pcie_create(MachineState *machine, MemoryRegion *memory)
         podium7_pcie_bank_create(machine, memory, banks[i].base, banks[i].size,
                                  "podium7-t8010-pcie-control");
     }
+    /* Original PHY accessor uses lane stride 0x10000 beyond reg[11]. */
+    for (unsigned lane = 1; lane < 4; lane++) {
+        podium7_pcie_bank_create(machine, memory, 0x60a000000ULL + lane * 0x10000, 0x4000,
+                                 "podium7-t8010-pcie-phy-lane-control");
+    }
     for (unsigned port = 0; port < 4; port++) {
         podium7_pcie_config[port][0] = 0x000c1b36; /* Virtual QEMU root port. */
         podium7_pcie_config[port][1] = 0x00100000; /* Capability list. */

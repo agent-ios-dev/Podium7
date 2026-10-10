@@ -13,6 +13,9 @@ jobs:
           mkdir snapshot-tools
           bless --help > snapshot-tools/bless-help.txt 2>&1 || true
           diskutil apfs > snapshot-tools/diskutil-apfs-help.txt 2>&1 || true
+          asr help restore > snapshot-tools/asr-restore-help.txt 2>&1 || true
+          codesign -d --entitlements :- /usr/sbin/asr > snapshot-tools/asr-entitlements.txt 2>&1 || true
+          /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs_checkseal -h > snapshot-tools/apfs-checkseal-help.txt 2>&1 || true
           /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -h > snapshot-tools/apfs-util-help.txt 2>&1 || true
           ls /System/Library/Filesystems/apfs.fs/Contents/Resources > snapshot-tools/apfs-resource-list.txt
           /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs_systemsnapshot -h > snapshot-tools/apfs-systemsnapshot-help.txt 2>&1 || true

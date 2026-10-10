@@ -1,3 +1,34 @@
+## Restore md0 mounted; VXD NULL dereference removed, userland still absent
+
+Run 38031635420 passed UART discovery and mounted the genuine restore HFS
+RAMDisk md0, then panicked in AppleD5500 at PC 0xfffffff006451c70 with FAR 0x14.
+Original disassembly proves the decoder's firmware descriptor is NULL: its
+SRAM-size query +0x500 returns zero, so the embedded-image selector rejects it.
+The caller nevertheless dereferences that absent image after logging failure.
+
+The original SRAM-size formula at 0xfffffff006461738 decodes bank geometry;
+firmware descriptor VA 0xfffffff007a4f318 has image size 0xa1a0. The model now
+explicitly advertises one 64-KiB research SRAM bank (config 0x0e000100). Exact
+ASIC geometry is unknown; this is not a claim of a working VXD decoder. An
+ARM64 guest checks the exact driver's capacity calculation and read-only config.
+
+Run 38032087540 passes all register checks, mounts md0, and executes the entire
+120-second interval without the previous panic. There are zero observed EL0
+returns and no launchd hello. ApplePMP reports started, but the original firmware
+console startup line is absent, so the mandatory PMP evidence gate correctly
+fails. The peer still executes its original scheduler; genuine message exchange
+continues. This run is not a confirmed PMP or iOS boot.
+
+A separate firmware-transmit staging word now preserves the published message
+while staging the next low word, with an ARM64 consumer-between-words test.
+An independent 180-second probe adds the existing synthetic CFI NVRAM provider
+to isolate post-mount startup; the ordinary strict probe remains separate. Both
+follow-ups are pending. 61 Python tests pass locally. No usable iOS IPA exists.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38032087540
+
+---
+
 ## Repeated genuine PMP startup and progress through ISP/display discovery
 
 Runs 38030604802, 38030933219 and 38031286874 each pass both mandatory

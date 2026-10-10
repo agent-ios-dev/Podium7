@@ -15,6 +15,13 @@ class SystemUserlandTests(unittest.TestCase):
     def test_restore_launchd_does_not_pass_full_system_gate(self):
         self.assertFalse(evidence(self.hello + '<Notice>: Restore environment starting.', self.trace)['system_userland_confirmed'])
 
+    def test_clean_fsck_is_a_distinct_milestone_not_a_complete_boot(self):
+        result = evidence(self.hello + "QUICKCHECK ONLY; FILESYSTEM CLEAN", self.trace)
+        self.assertTrue(result['filesystem_quickcheck_clean'])
+        self.assertFalse(result['springboard_confirmed'])
+        self.assertFalse(result['booted_ios'])
+        self.assertFalse(evidence(self.hello, self.trace)['filesystem_quickcheck_clean'])
+
     def test_actual_system_launchd_and_el0_is_userland_only(self):
         result = evidence(self.hello, self.trace)
         self.assertTrue(result['system_userland_confirmed'])

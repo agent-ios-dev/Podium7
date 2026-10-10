@@ -17,6 +17,7 @@ def evidence(serial, trace):
             "dma_rejection_seen": 'NVME-DART rejected' in trace,
             "kernel_panic_seen": 'panic(cpu ' in serial,
             "system_userland_confirmed": stages['userland_execution_confirmed'] and not stages['restore_environment_seen'] and 'panic(cpu ' not in serial,
+            "filesystem_quickcheck_clean": "QUICKCHECK ONLY; FILESYSTEM CLEAN" in serial,
             "springboard_confirmed": False, "booted_ios": False}
 
 
@@ -27,6 +28,9 @@ def verify(directory):
     patches = json.loads((directory/'guest-patches.json').read_text()) if (directory/'guest-patches.json').exists() else []
     result['unsealed_root_diagnostic'] = any(edit.get('name') == 'research unsealed system root diagnostic'
         for patch in patches for edit in patch.get('additional_edits', []))
+    probe = json.loads((directory/'qemu-probe.json').read_text()) if (directory/'qemu-probe.json').exists() else {}
+    result['probe_stop_reason'] = probe.get('stop')
+    result['probe_trace_budget_exhausted'] = 'trace limit reached' in (probe.get('stop') or '')
     result['authenticated_boot_confirmed'] = False
     (directory/'system-userland-checks.json').write_text(json.dumps(result, indent=2))
     print(json.dumps(result, indent=2))

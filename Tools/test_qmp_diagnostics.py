@@ -36,6 +36,24 @@ class QMPTests(unittest.TestCase):
         self.assertEqual([item["execute"] for item in stream.sent],
                          ["qmp_capabilities", "stop", "query-cpus-fast", "human-monitor-command", "human-monitor-command"])
 
+    def test_secondary_arm32_core_is_captured_and_ap_selection_restored(self):
+        stream = Stream([
+            {"QMP": {}}, {"id": "qmp_capabilities", "return": {}},
+            {"id": "stop", "return": {}},
+            {"id": "query-cpus-fast", "return": [{"cpu-index": 0}, {"cpu-index": 1}]},
+            {"id": "human-monitor-command", "return": "PC=fffffff0071904e8"},
+            {"id": "human-monitor-command", "return": ""},
+            {"id": "human-monitor-command", "return": "R15=01007718 PSR=600000ff"},
+            {"id": "human-monitor-command", "return": ""}])
+        connection = MagicMock()
+        connection.__enter__.return_value = connection
+        connection.makefile.return_value = stream
+        with patch("qmp_diagnostics.socket.AF_UNIX", 1, create=True), patch("qmp_diagnostics.socket.socket", return_value=connection):
+            result = capture("local.sock")
+        self.assertEqual(result["registers"], "PC=fffffff0071904e8")
+        self.assertEqual(result["peer_cpu_registers"], [{"cpu-index": 1, "registers": "R15=01007718 PSR=600000ff"}])
+        self.assertEqual(stream.sent[-1]["arguments"]["command-line"], "cpu 0")
+
     def test_server_error_is_not_reported_as_successful_snapshot(self):
         stream = Stream([{"QMP": {}}, {"id": "qmp_capabilities", "error": {"desc": "denied"}}])
         connection = MagicMock()

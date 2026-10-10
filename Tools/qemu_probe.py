@@ -201,6 +201,9 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
     if research_pmp_core:
         if cpu != "podium7-research":
             raise ValueError("integrated PMP requires the research ARM64 backend")
+        # Reserve a second TCG context for the non-AP coprocessor without
+        # creating another ARM64 guest CPU or changing XNU's cpus=1 topology.
+        command[command.index("-smp") + 1] = "1,maxcpus=2"
         from probe_pmp_core import extract
         marker = directory / "PMPFirmware.bin"
         marker.write_bytes(extract((directory / "KernelCache.macho").read_bytes()))

@@ -49,4 +49,16 @@ def capture(path, virtual_addresses=(), memory_windows=()):
             sp = re.search(r"\bSP=([0-9a-fA-F]{16})\b", result["registers"])
             result["stack"] = (request("human-monitor-command", {"command-line": f"x/256gx 0x{sp.group(1)}"})
                                if sp else "Stack capture unavailable: SP missing from CPU registers")
+            # A stopped AP snapshot alone cannot distinguish a PMP stall from
+            # a PMP reset/abort. Keep the original AP fields and capture peers.
+            peers = [cpu["cpu-index"] for cpu in result["cpus"] if cpu["cpu-index"] != 0]
+            if peers:
+                result["peer_cpu_registers"] = []
+                try:
+                    for index in peers:
+                        request("human-monitor-command", {"command-line": f"cpu {index}"})
+                        registers = request("human-monitor-command", {"command-line": "info registers"})
+                        result["peer_cpu_registers"].append({"cpu-index": index, "registers": registers})
+                finally:
+                    request("human-monitor-command", {"command-line": "cpu 0"})
             return result

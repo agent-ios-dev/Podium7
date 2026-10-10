@@ -343,8 +343,17 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                     from guest_processes import KERNEL_SHA256
                     process_layout_verified = bool(research_system_root) and hashlib.sha256(
                         (directory / "KernelCache.macho").read_bytes()).hexdigest() == KERNEL_SHA256
+                    service_labels = set()
+                    launch_report = directory.parent / 'install-layout.json'
+                    if process_layout_verified and launch_report.is_file():
+                        report = json.loads(launch_report.read_text())
+                        for item in report.get('original_launch_metadata', {}).get('service_identities', [])[:3000]:
+                            label = item.get('label')
+                            if isinstance(label, str) and re.fullmatch(r'[A-Za-z0-9_.-]{1,255}', label):
+                                service_labels.add(label)
                     snapshot = capture_cpu(monitor_path, addresses, physical_windows=controls,
-                                           kernel_process_metadata=process_layout_verified)
+                                           kernel_process_metadata=process_layout_verified,
+                                           service_labels=service_labels)
                     if dma_submitted:
                         from nvme_dma_diagnostics import inspect as inspect_nvme_dma
                         dma_snapshot = inspect_nvme_dma(monitor_path, dma_trace, dump_root_pages=True)

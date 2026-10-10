@@ -1,3 +1,23 @@
+## Bounded diagnostics for the outstanding launch stall
+
+The stopped, hash-gated process snapshot now records original thread IDs,
+scheduler state integers and kernel continuation addresses. Original task_hold
+code at 0xfffffff0071fb1b4/21c walks task +0x58 and thread +0x3a8;
+_thread_tid at 0xfffffff00720aa00 returns +0x458; the common thread_block path
+at 0xfffffff0071ea608 stores continuation +0xd0 and checks state +0x198.
+Queue cycles and per-task/global size limits are enforced. A failed thread
+read does not discard the verified process identity. These fields reveal wait
+primitives, not proof that a service has finished initialization.
+
+A separate reader can retain only xpcproxy's launch label present in the
+original launch metadata. It follows the original 16-KiB pmap geometry,
+restricts physical reads to the research machine's DRAM, and stops after argv1.
+Original sysctl procargs2 at 0xfffffff0075ed578 identifies argslen +0x340,
+argc +0x344 and user_stack +0x348. No argument/environment bytes, user stack
+dumps or binaries are exported. The expected xpcproxy layout is checked rather
+than searching arbitrary user memory. 135 host tests pass; real guest validation
+is required before treating recovered labels as evidence.
+
 ## Original SpringBoard launch restriction and missing environment handoff
 
 Read-only run 38084032951 scans 425 original launch plists. SpringBoard and

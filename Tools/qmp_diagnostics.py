@@ -4,7 +4,7 @@ import re
 import socket
 
 
-def capture(path, virtual_addresses=(), memory_windows=(), physical_windows=(), *, resume_after=False, kernel_process_metadata=False):
+def capture(path, virtual_addresses=(), memory_windows=(), physical_windows=(), *, resume_after=False, kernel_process_metadata=False, service_labels=()):
     family = getattr(socket, "AF_UNIX", None)
     if family is None:
         raise OSError("local QMP snapshots require Unix-domain sockets")
@@ -58,10 +58,10 @@ def capture(path, virtual_addresses=(), memory_windows=(), physical_windows=(), 
                                 "command-line": f"xp/{words}wx {hex(address)}"})})
                 if kernel_process_metadata:
                     from guest_processes import inspect
-                    def read_metadata(address, size):
+                    def read_words(address, size, physical=False):
                         count = (size + 7) // 8
                         reply = request("human-monitor-command", {
-                            "command-line": f"x/{count}gx {hex(address)}", "cpu-index": 0})
+                            "command-line": f"{'xp' if physical else 'x'}/{count}gx {hex(address)}", "cpu-index": 0})
                         words = []
                         for line in reply.splitlines():
                             if ":" in line:
@@ -70,8 +70,12 @@ def capture(path, virtual_addresses=(), memory_windows=(), physical_windows=(), 
                         if len(words) != count:
                             raise ValueError("unreadable kernel process metadata")
                         return b"".join(value.to_bytes(8, "little") for value in words)[:size]
+                    def read_metadata(address, size):
+                        return read_words(address, size)
                     try:
-                        result["guest_process_metadata"] = inspect(read_metadata, thread_metadata=True)
+                        result["guest_process_metadata"] = inspect(read_metadata, thread_metadata=True,
+                            read_physical=lambda address, size: read_words(address, size, True),
+                            service_labels=service_labels)
                     except ValueError as error:
                         result["guest_process_metadata"] = {"capture_error": str(error)}
                 sp = re.search(r"\bSP=([0-9a-fA-F]{16})\b", result["registers"])

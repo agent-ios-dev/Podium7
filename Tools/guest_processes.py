@@ -10,7 +10,7 @@ def pointer(value):
     return 0xffffffe000000000 <= value < 0xfffffffffffffff8 and value % 8 == 0
 
 
-def inspect(read, *, thread_metadata=False):
+def inspect(read, *, thread_metadata=False, read_physical=None, service_labels=()):
     """read(address, size) returns bytes; never write or export raw memory."""
     def data(address, size):
         if not pointer(address) or not 1 <= size <= 512:
@@ -86,6 +86,13 @@ def inspect(read, *, thread_metadata=False):
                 raise ValueError("invalid process identity metadata")
             name = name_bytes.decode("ascii")
             process = {"pid": pid, "ppid": ppid, "uid": uid, "name": name}
+            if name == 'xpcproxy' and read_physical is not None and service_labels:
+                from guest_proxy_label import inspect as proxy_label
+                try:
+                    process['launch_service_label'] = proxy_label(
+                        current, data, read_physical, service_labels)
+                except (ValueError, KeyError) as error:
+                    process['label_capture_error'] = str(error)
             if thread_metadata:
                 try:
                     process["threads"] = threads(current)

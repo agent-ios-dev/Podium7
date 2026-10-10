@@ -1,5 +1,5 @@
 /* Research fixture only: create a real APFS snapshot with the host API. */
-#include <sys/fs_snapshot.h>
+#include <sys/snapshot.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>

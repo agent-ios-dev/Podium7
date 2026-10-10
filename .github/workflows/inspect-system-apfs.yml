@@ -15,6 +15,13 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - name: Build pinned read-only APFS metadata inspector
+        run: |
+          git clone https://github.com/sgan81/apfs-fuse.git .apfs-inspector
+          git -C .apfs-inspector checkout 66b86bd525e8cb90f9012543be89b1f092b75cf3
+          git -C .apfs-inspector submodule update --init --recursive
+          cmake -S .apfs-inspector -B .apfs-inspector/build -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+          cmake --build .apfs-inspector/build --target apfsutil -j 3
       - uses: actions/download-artifact@v4
         with:
           name: ios-system-disk
@@ -23,8 +30,12 @@ jobs:
           github-token: ${{ github.token }}
       - name: Inspect original volumes and snapshots without modifying or mounting them
         run: python3 Tools/inspect_apfs_host.py .firmware/system-disk/storage-16g.raw --output .firmware/apfs-host.json
+      - name: Read actual APFS snapshot metadata directly from the image
+        run: .apfs-inspector/build/apfsutil .firmware/system-disk/storage-16g.raw > .firmware/apfsutil.txt 2>&1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: apfs-host-evidence
-          path: .firmware/apfs-host.json
+          path: |
+            .firmware/apfs-host.json
+            .firmware/apfsutil.txt

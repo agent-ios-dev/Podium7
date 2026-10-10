@@ -1079,12 +1079,12 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
     }
 """ + sep[last:]
     sep = sep.replace("    return value;", """    if (bank->base == 0x20e300000ULL) {
-        podium7_aic_set_external(167, bank->outbox_pending && (bank->registers[0x4020 >> 2] & 1));
+        podium7_aic_set_external(170, bank->outbox_pending && (bank->registers[0x4020 >> 2] & 1));
     }
     return value;""")
     last = sep.rindex("    if (bank->logged_accesses < 256) {")
     sep = sep[:last] + """    if (bank->base == 0x20e300000ULL) {
-        podium7_aic_set_external(167, bank->outbox_pending && (bank->registers[0x4020 >> 2] & 1));
+        podium7_aic_set_external(170, bank->outbox_pending && (bank->registers[0x4020 >> 2] & 1));
     }
 """ + sep[last:]
     sep = sep.replace("static void podium7_sep_mailbox_bank_create(",

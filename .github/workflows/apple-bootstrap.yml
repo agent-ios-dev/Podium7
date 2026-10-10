@@ -90,6 +90,13 @@ jobs:
         run: python3 Tools/check_cfi_nvram.py --qemu .qemu/build/qemu-system-aarch64
       - name: Probe actual embedded PMP firmware on an ARMv7 core
         run: python3 Tools/probe_pmp_core.py --qemu .qemu/build/qemu-system-aarch64
+      - name: Probe original PMP and ARM64 kernel together with shared SRAM
+        run: |
+          mkdir .firmware/pmp-integrated-experiment
+          cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/pmp-integrated-experiment/
+          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/pmp-integrated-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --trust-cache .firmware/RestoreTrustCache.im4p --research-ramdisk-root --research-pmp-core --seconds 120
+          python3 Tools/inspect_boot_fault.py --directory .firmware/pmp-integrated-experiment
+          python3 Tools/verify_pmp_integration.py .firmware/pmp-integrated-experiment
       - name: Execute original kernel and retain the next failure
         run: python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research
       - name: Probe synthetic bridge handoff separately from original metadata
@@ -111,13 +118,6 @@ jobs:
           cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/restore-userland-experiment/
           python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/restore-userland-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --trust-cache .firmware/RestoreTrustCache.im4p --research-ramdisk-root --seconds 120
           python3 Tools/inspect_boot_fault.py --directory .firmware/restore-userland-experiment
-      - name: Probe original PMP and ARM64 kernel together with shared SRAM
-        run: |
-          mkdir .firmware/pmp-integrated-experiment
-          cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/pmp-integrated-experiment/
-          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/pmp-integrated-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --trust-cache .firmware/RestoreTrustCache.im4p --research-ramdisk-root --research-pmp-core --seconds 120
-          python3 Tools/inspect_boot_fault.py --directory .firmware/pmp-integrated-experiment
-          python3 Tools/verify_pmp_integration.py .firmware/pmp-integrated-experiment
       - name: Require actual restore launchd and EL0 execution
         run: python3 Tools/verify_restore_userland.py .firmware/restore-userland-experiment
       - name: Probe original CHRP driver with synthetic NOR separately

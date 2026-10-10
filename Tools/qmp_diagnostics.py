@@ -54,11 +54,10 @@ def capture(path, virtual_addresses=(), memory_windows=()):
             peers = [cpu["cpu-index"] for cpu in result["cpus"] if cpu["cpu-index"] != 0]
             if peers:
                 result["peer_cpu_registers"] = []
-                try:
-                    for index in peers:
-                        request("human-monitor-command", {"command-line": f"cpu {index}"})
-                        registers = request("human-monitor-command", {"command-line": "info registers"})
-                        result["peer_cpu_registers"].append({"cpu-index": index, "registers": registers})
-                finally:
-                    request("human-monitor-command", {"command-line": "cpu 0"})
+                for index in peers:
+                    # QMP creates a separate monitor context per HMP request;
+                    # a previous `cpu N` command does not select the next request.
+                    registers = request("human-monitor-command", {
+                        "command-line": "info registers", "cpu-index": index})
+                    result["peer_cpu_registers"].append({"cpu-index": index, "registers": registers})
             return result

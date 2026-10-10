@@ -129,19 +129,19 @@ str w5, [x3, #0xbb0]
 mov x4, #0x4020
 ldr w6, [x3, x4]
 tbz w6, #17, failure
-// Enable the original PMP AP receive interrupt (DTS interrupt index 1 = 167).
+// Enable the original PMP AP receive interrupt (original driver enables DTS interrupt index 2 = 170).
 movz x11, #0
 movk x11, #0xe10, lsl #16
 movk x11, #2, lsl #32
 mov w5, #1
-str w5, [x11, #0x329c]
-mov w5, #0x80
+str w5, [x11, #0x32a8]
+mov w5, #0x400
 mov x12, #0x4194
 str w5, [x11, x12]
 mov w5, #0x8765
 str w5, [x3, #0xbb4]
 ldr w6, [x11, #0x2004]
-mov w5, #0xa7
+mov w5, #0xaa
 movk w5, #1, lsl #16
 cmp w6, w5
 b.ne failure
@@ -165,7 +165,7 @@ cmp w6, w5
 b.ne failure
 ldr w6, [x3, #0xba0]
 tbz w6, #17, failure
-mov w5, #0x80
+mov w5, #0x400
 str w5, [x11, x12]
 ldr w6, [x11, #0x2004]
 cbnz w6, failure

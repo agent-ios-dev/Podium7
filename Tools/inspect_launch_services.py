@@ -10,7 +10,9 @@ FIELDS = ('Label', 'Program', 'ProgramArguments', 'UserName', 'GroupName',
           'LimitLoadToSessionType', 'ProcessType', 'EnableTransactions',
           'POSIXSpawnType', 'LaunchOnlyOnce', 'EnablePressuredExit',
           'WaitForDebugger', 'SessionCreate', 'LaunchConstraints',
-          'ThrottleInterval', 'ExitTimeOut', 'IOKitMatching')
+          'ThrottleInterval', 'ExitTimeOut', 'IOKitMatching',
+          'LimitLoadFromHardware', 'LimitLoadToHardware',
+          'EmbeddedHomeScreen', 'CFBundleIdentifier', '_AdditionalProperties')
 TARGETS = ('springboard', 'backboard', 'frontboard', 'runningboard',
            'keybag', 'usermanager', 'loginwindow', 'graphics', 'display', 'iomobile')
 

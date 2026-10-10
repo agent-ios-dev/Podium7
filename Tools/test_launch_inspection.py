@@ -14,13 +14,15 @@ class LaunchInspectionTests(unittest.TestCase):
             folder.mkdir(parents=True)
             (folder / 'com.apple.backboardd.plist').write_bytes(plistlib.dumps({
                 'Label': 'com.apple.backboardd', 'Program': '/usr/libexec/backboardd',
-                'KeepAlive': {'AfterInitialDemand': True}, 'Secret': b'not exported'}))
+                'KeepAlive': {'AfterInitialDemand': True},
+                'LimitLoadFromHardware': {'machine': ['example']}, 'Secret': b'not exported'}))
             (folder / 'other.plist').write_bytes(plistlib.dumps({'Label': 'other'}))
             report = services.collect(root)
             self.assertEqual(report['plists_scanned'], 2)
             self.assertEqual(len(report['services']), 1)
             self.assertNotIn('Secret', report['services'][0]['configuration'])
             self.assertEqual(report['services'][0]['configuration']['KeepAlive'], {'AfterInitialDemand': True})
+            self.assertEqual(report['services'][0]['configuration']['LimitLoadFromHardware'], {'machine': ['example']})
 
     def test_nested_or_binary_metadata_rejected(self):
         with self.assertRaises(ValueError):

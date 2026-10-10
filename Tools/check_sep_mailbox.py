@@ -205,6 +205,9 @@ ldr w6, [x3, #0xba0]
 tbz w6, #16, failure
 str wzr, [x3, #0xbb0]
 str wzr, [x3, #0xbb4]
+// Stage next low word while full without changing the published packet.
+mov w5, #0xabcd
+str w5, [x3, #0xbb0]
 ldr w6, [x3, x4]
 tbz w6, #16, failure
 mov x4, #0x4038
@@ -217,6 +220,21 @@ tbz w6, #16, failure
 mov x4, #0x403c
 ldr w6, [x3, x4]
 mov w5, #0x8765
+cmp w6, w5
+b.ne failure
+ldr w6, [x3, #0xba0]
+tbz w6, #17, failure
+// Publish staged word after AP pop, with no second low-word write.
+mov w5, #0xcafe
+str w5, [x3, #0xbb4]
+mov x4, #0x4038
+ldr w6, [x3, x4]
+mov w5, #0xabcd
+cmp w6, w5
+b.ne failure
+mov x4, #0x403c
+ldr w6, [x3, x4]
+mov w5, #0xcafe
 cmp w6, w5
 b.ne failure
 ldr w6, [x3, #0xba0]

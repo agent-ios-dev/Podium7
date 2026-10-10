@@ -1039,7 +1039,7 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
     # Keep all other IOPs passive; only PMP has these verified peer views.
     sep = sep.replace("    bool inbox_pending;",
         "    bool inbox_pending;\n    bool outbox_pending;\n"
-        "    uint32_t outbox_low, outbox_high;")
+        "    uint32_t outbox_low, outbox_high, outbox_staged_low;")
     sep = sep.replace("        value = (value & 1U) | (1U << 17);",
         "        value = (value & 1U) | (bank->outbox_pending ? (1U << 16) : (1U << 17));")
     sep = sep.replace("        value |= 1U << 17; /* Observed ARM32 receive-control offset +8. */",
@@ -1072,9 +1072,11 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
     sep = sep.replace(read_end, read_peer + read_end, 1)
     sep = sep.replace("if (address == 0x4008) {\n        /* Queue status is read-only. */",
         "if (bank->base == 0x20e300000ULL && (address == 0xbb0 || address == 0xbb4)) {\n"
-        "        if (!bank->outbox_pending) {\n"
-        "            if (address == 0xbb0) { bank->outbox_low = value; }\n"
-        "            else { bank->outbox_high = value; bank->outbox_pending = true; }\n"
+        "        if (address == 0xbb0) {\n"
+        "            bank->outbox_staged_low = value;\n"
+        "        } else if (!bank->outbox_pending) {\n"
+        "            bank->outbox_low = bank->outbox_staged_low;\n"
+        "            bank->outbox_high = value; bank->outbox_pending = true;\n"
         "        }\n"
         "    } else if (address == 0x4008) {\n        /* Queue status is read-only. */")
     sep = sep.replace("    bool inbox_pending;", "    qemu_irq pmp_receive_irq;\n    bool inbox_pending;")

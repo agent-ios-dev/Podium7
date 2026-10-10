@@ -1,0 +1,61 @@
+"""Inspect original port0 DART tables at a real NVMe submission; no translation guess is applied."""
+import re
+from qmp_diagnostics import capture
+
+
+def word_pair(snapshot):
+    text = snapshot["physical_windows"][0]["backend_result"]
+    values = re.findall(r"0x([0-9a-fA-F]{8})(?![0-9a-fA-F])", text.split(":", 1)[-1])
+    if len(values) < 2:
+        raise ValueError("QMP did not return both words of the original DART PTE")
+    return int(values[0], 16) | (int(values[1], 16) << 32)
+
+
+def inspect(path, trace):
+    queues = re.findall(r"pci_nvme_mmio_asqaddr .*address=(0x[0-9a-fA-F]+)", trace)
+    if not queues:
+        raise ValueError("original NVMe ASQ address missing")
+    iova = int(queues[-1], 16)
+    roots = {int(offset, 16): int(value, 16) for offset, value in re.findall(
+        r"PODIUM7 DART base=0000000601008000 write offset=(004[048c]) value=([0-9a-fA-F]+)", trace)}
+    report = {"original_asq_iova": hex(iova), "candidates": [],
+              "translation_applied": False, "guest_stopped_for_table_inspection": True}
+    for shift in (12, 14):
+        bits = shift - 3
+        index = iova >> (shift + bits * 2)
+        candidate = {"page_shift": shift, "root_index": index}
+        report["candidates"].append(candidate)
+        ttbr = roots.get(0x40 + index * 4, 0)
+        candidate["ttbr"] = hex(ttbr)
+        if index >= 4 or not ttbr & 0x80000000:
+            candidate["error"] = "root descriptor is absent or invalid"
+            continue
+        base = (ttbr & 0xfffffff) << 12
+        l1 = base + ((iova >> (shift + bits)) & ((1 << bits) - 1)) * 8
+        candidate["l1_address"] = hex(l1)
+        if not 0x40000000 <= l1 <= 0xbffffff8:
+            candidate["error"] = "root table outside research RAM"
+            continue
+        first = word_pair(capture(path, physical_windows=((l1, 2),)))
+        candidate["l1_descriptor"] = hex(first)
+        if not first & 1:
+            candidate["error"] = "invalid level1 descriptor"
+            continue
+        mask = ((1 << 40) - 1) & ~((1 << shift) - 1)
+        l2 = (first & mask) + ((iova >> shift) & ((1 << bits) - 1)) * 8
+        candidate["l2_address"] = hex(l2)
+        if not 0x40000000 <= l2 <= 0xbffffff8:
+            candidate["error"] = "level2 table outside research RAM"
+            continue
+        second = word_pair(capture(path, physical_windows=((l2, 2),)))
+        candidate["l2_descriptor"] = hex(second)
+        if not second & 1:
+            candidate["error"] = "invalid level2 descriptor"
+            continue
+        physical = (second & mask) | (iova & ((1 << shift) - 1))
+        candidate["translated_asq"] = hex(physical)
+        if not 0x40000000 <= physical <= 0xbfffffc0:
+            candidate["error"] = "submission queue outside research RAM"
+            continue
+        candidate["queue_words"] = capture(path, physical_windows=((physical, 16),))["physical_windows"][0]
+    return report

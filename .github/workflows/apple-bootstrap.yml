@@ -161,6 +161,21 @@ jobs:
             .firmware/nvme-kernel-experiment/*.json
             .firmware/nvme-kernel-experiment/*.txt
           if-no-files-found: ignore
+      - name: Inspect original DART tables at the first real NVMe submission
+        if: always() && steps.nvme_check.outcome == 'success' && (steps.pmp_probe.outcome == 'success' || steps.pmp_probe.outcome == 'failure')
+        run: |
+          mkdir .firmware/nvme-dma-experiment
+          cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/nvme-dma-experiment/
+          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/nvme-dma-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --trust-cache .firmware/RestoreTrustCache.im4p --research-ramdisk-root --research-pmp-core --research-cfi-nvram --research-aes-root-fallback --research-nvme --research-nvme-dma-snapshot --seconds 120
+      - name: Save original DART submission evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nvme-dma-evidence
+          path: |
+            .firmware/nvme-dma-experiment/*.json
+            .firmware/nvme-dma-experiment/*.txt
+          if-no-files-found: ignore
       - name: Repeat genuine PMP startup in a fresh machine to catch queue races
         run: |
           mkdir .firmware/pmp-integrated-repeat

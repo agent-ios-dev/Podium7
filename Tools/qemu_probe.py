@@ -190,13 +190,15 @@ def panic_capture_complete(serial_bytes):
         serial_bytes[header:]) is not None
 
 
-def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, research_bridge_handoff=False, ramdisk=None, seconds=30, research_ramdisk_root=False, trust_cache=None, research_cfi_nvram=False, research_pmp_core=False, research_aes_root_fallback=False, research_nvme=False):
+def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, research_bridge_handoff=False, ramdisk=None, seconds=30, research_ramdisk_root=False, trust_cache=None, research_cfi_nvram=False, research_pmp_core=False, research_aes_root_fallback=False, research_nvme=False, research_nvme_dma_snapshot=False):
     if not 1 <= seconds <= 600:
         raise ValueError("execution budget must be between 1 and 600 seconds")
     if research_bridge_handoff and cpu != "podium7-research":
         raise ValueError("synthetic bridge handoff requires the research bridge model")
     if research_nvme and cpu != "podium7-research":
         raise ValueError("research NVMe requires the explicitly modeled PCIe backend")
+    if research_nvme_dma_snapshot and not research_nvme:
+        raise ValueError("original DART queue inspection requires the real NVMe backend")
     image, kernel_entry, rorgn = make_probe(directory, research_bridge_handoff=research_bridge_handoff, ramdisk=ramdisk, research_ramdisk_root=research_ramdisk_root, trust_cache=trust_cache, research_cfi_nvram=research_cfi_nvram, research_aes_root_fallback=research_aes_root_fallback)
     trace, serial = directory / "qemu-trace.txt", directory / "qemu-serial.txt"
     command = [executable, "-machine", "virt,secure=off,virtualization=off", "-cpu", f"{cpu},cntfrq={COUNTER_FREQUENCY}", "-accel", "tcg",
@@ -245,8 +247,11 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                 panic_started = time.monotonic()
             complete = panic_capture_complete(serial_bytes)
             panic_timeout = panic_started is not None and time.monotonic() - panic_started > 2
-            if deadline or full_trace or complete or panic_timeout:
-                stop = ("XNU panic captured" if complete else
+            dma_trace = trace.read_text(errors="replace") if research_nvme_dma_snapshot and trace.exists() else ""
+            dma_submitted = "pci_nvme_admin_cmd" in dma_trace
+            if deadline or full_trace or complete or panic_timeout or dma_submitted:
+                stop = ("original NVMe first command captured for DART inspection" if dma_submitted else
+                        "XNU panic captured" if complete else
                         "XNU panic capture incomplete" if panic_seen else
                         f"{seconds}-second execution deadline reached" if deadline else "16-MiB trace limit reached")
                 try:
@@ -257,7 +262,15 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                     # Only PMP control words: exclude FIFO data/pop and event-claim ports.
                     controls = ((0x20e300b84, 5), (0x20e300ba0, 2),
                                 (0x20e304008, 1), (0x20e304020, 1)) if research_pmp_core else ()
+                    if research_nvme:
+                        # Read-only PCI config and link-state evidence, never queue data.
+                        controls += tuple((0x610000000 + (port << 15), 64) for port in range(4))
+                        controls += ((0x610100000, 64), (0x601000208, 3))
                     snapshot = capture_cpu(monitor_path, addresses, physical_windows=controls)
+                    if dma_submitted:
+                        from nvme_dma_diagnostics import inspect as inspect_nvme_dma
+                        dma_snapshot = inspect_nvme_dma(monitor_path, dma_trace)
+                        (directory / "nvme-dma-snapshot.json").write_text(json.dumps(dma_snapshot, indent=2))
                     (directory / "cpu-snapshot.txt").write_text(snapshot["registers"])
                     (directory / "cpu-stack.txt").write_text(snapshot["stack"])
                     (directory / "cpu-snapshot.json").write_text(json.dumps(snapshot, indent=2))
@@ -378,6 +391,7 @@ if __name__ == "__main__":
     parser.add_argument("--research-pmp-core", action="store_true", help="Opt-in generic ARM32 PMP core sharing original SRAM; not exact hardware")
     parser.add_argument("--research-aes-root-fallback", action="store_true", help="Exact-kernel diagnostic SecureRoot unsupported fallback; requires explicit restore root gate skip, no AES crypto bypass")
     parser.add_argument("--research-nvme", action="store_true", help="Separate real QEMU NVMe backend, fixed 16 GiB scratch disk; no Apple DART/MSI claim")
+    parser.add_argument("--research-nvme-dma-snapshot", action="store_true", help="Stop a separate run at the first NVMe command and inspect original DART tables")
     args = parser.parse_args()
     run_probe(args.directory, executable=args.qemu, cpu=args.cpu,
-              research_bridge_handoff=args.research_bridge_handoff, ramdisk=args.ramdisk, seconds=args.seconds, research_ramdisk_root=args.research_ramdisk_root, trust_cache=args.trust_cache, research_cfi_nvram=args.research_cfi_nvram, research_pmp_core=args.research_pmp_core, research_aes_root_fallback=args.research_aes_root_fallback, research_nvme=args.research_nvme)
+              research_bridge_handoff=args.research_bridge_handoff, ramdisk=args.ramdisk, seconds=args.seconds, research_ramdisk_root=args.research_ramdisk_root, trust_cache=args.trust_cache, research_cfi_nvram=args.research_cfi_nvram, research_pmp_core=args.research_pmp_core, research_aes_root_fallback=args.research_aes_root_fallback, research_nvme=args.research_nvme, research_nvme_dma_snapshot=args.research_nvme_dma_snapshot)

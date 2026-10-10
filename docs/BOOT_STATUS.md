@@ -1,3 +1,28 @@
+## Original iOS restore launchd and restored_extern now execute with real NVMe attached
+
+Run 38039000833 boots the independent NVMe+CFI+PMP research experiment far
+past the PCIe assertion: original IONVMeController binds to the real QEMU NVMe.
+The actual serial log contains launchd pid1 hello, early boot completion and
+restored_extern pid3 restore checkpoints. Trace records 14137 EL0 returns,
+first PC0x100ddd170. This confirms original restore userland execution; it does
+not establish SpringBoard, full system boot or a native working IPA.
+
+NVMe remains broken under the original guest's mapper: the Apple driver queues
+Identify Controller, but QEMU DMA reads opcode0 (Delete SQ), returns an error
+and raises MSI-X; the guest eventually reports command timeout. Port0 DART
+TTBRs are programmed at +0x40..4c and the ASQ IOVA is0x857b4000. The backend
+still does direct DMA without DART translation or Apple MSI routing.
+
+The next separate bounded diagnostic stops at the first real NVMe command and
+reads the original DART tables before teardown. It reports 4K/16K table-layout
+candidates and actual physical queue words without applying guessed translation.
+The complete boot experiment remains separate. 66 Python unit tests pass;
+real queue DMA/read/write was verified independently on the fixed16 GiB disk.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38039000833
+
+---
+
 ## Real NVMe read/write verified; original driver link-state accessor corrected
 
 Run 38038770887 successfully enumerates the real root-port/NVMe endpoint,

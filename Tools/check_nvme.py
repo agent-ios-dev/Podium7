@@ -316,6 +316,7 @@ def check(executable, report):
             persisted = stream.read(512) == bytes(range(256)) * 2
         passed = result.returncode == 0 and persisted and disk.stat().st_size == DISK_BYTES
         report.write_text(json.dumps({"passed": passed, "disk_bytes": disk.stat().st_size,
+            "allocated_disk_bytes": disk.stat().st_blocks * 512 if hasattr(disk.stat(), "st_blocks") else None,
             "persistent_write_verified": persisted, "returncode": result.returncode,
             "checks": ["real root port and class 010802 NVMe endpoint enumeration",
                        "four original host-port capability lists; empty ports have no active link",

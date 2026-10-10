@@ -14,7 +14,9 @@ class QEMUProbeTests(unittest.TestCase):
         from unittest.mock import patch, MagicMock
         from qemu_probe import run_probe
         with tempfile.TemporaryDirectory() as temporary:
-            root = pathlib.Path(temporary)
+            # macOS /var aliases /private/var; production resolves its disk path.
+            # Canonicalize before matching the mocked fixture stat as well.
+            root = pathlib.Path(temporary).resolve()
             disk = root / "disk.raw"
             disk.touch()
             (root / "KernelCache.macho").write_bytes(b"verified fixture")

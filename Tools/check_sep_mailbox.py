@@ -137,19 +137,22 @@ str wzr, [x3, #0xbb0]
 str wzr, [x3, #0xbb4]
 ldr w6, [x3, x4]
 tbz w6, #16, failure
-ldr w6, [x3, #0x4038]
+mov x4, #0x4038
+ldr w6, [x3, x4]
 mov w5, #0x5678
 cmp w6, w5
 b.ne failure
 ldr w6, [x3, #0xba0]
 tbz w6, #16, failure
-ldr w6, [x3, #0x403c]
+mov x4, #0x403c
+ldr w6, [x3, x4]
 mov w5, #0x8765
 cmp w6, w5
 b.ne failure
 ldr w6, [x3, #0xba0]
 tbz w6, #17, failure
-ldr w6, [x3, #0x4038]
+mov x4, #0x4038
+ldr w6, [x3, x4]
 cbnz w6, failure
 // A consumed inbox accepts a new message.
 mov x5, #0x99

@@ -1945,7 +1945,7 @@ static void podium7_irq_or_set(void *opaque, int input, int level)
         '    vms->bus = pci->bus;\n    podium7_storage_attach(vms, dev);')
     # Reserve slot0 for a real root port only when this explicit backend exists.
     replace_once(directory / "hw/pci-host/gpex.c", '#include "hw/pci/pci_bus.h"',
-        '#include "hw/pci/pci_bus.h"\n#include "sysemu/block-backend.h"')
+        '#include "hw/pci/pci_bus.h"\n#include "system/block-backend.h"')
     replace_once(directory / "hw/pci-host/gpex.c",
         '    qdev_realize(DEVICE(&s->gpex_root), BUS(pci->bus), &error_fatal);',
         '    if (blk_by_name("podium7-storage")) {\n'

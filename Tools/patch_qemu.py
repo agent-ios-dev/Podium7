@@ -1173,6 +1173,21 @@ static void podium7_pmp_start(void)
     qemu_log("PODIUM7 PMP firmware release result=%d\\n", result);
 }
 '''
+    # Next original-XNU data abort is AppleJPEGDriver's reset write at +8.
+    # The n112ap DT has two 16-KiB JPEG engines adjacent to their DARTs.
+    # Discovery/reset controls only: no encode/decode DMA or completion IRQ.
+    jpeg = mipi.replace("MIPI-DSIM", "JPEG").replace("mipi_dsim", "jpeg")
+    jpeg = jpeg.replace("Podium7MIPIDSIMBank", "Podium7JPEGBank")
+    start = jpeg.index("static void podium7_jpeg_create(")
+    jpeg = jpeg[:start] + '''static void podium7_jpeg_create(MachineState *machine, MemoryRegion *memory)
+{
+    podium7_jpeg_bank_create(machine, memory, 0x207b00000ULL, 0x4000,
+                             "podium7-t8010-jpeg0-control");
+    podium7_jpeg_bank_create(machine, memory, 0x207b08000ULL, 0x4000,
+                             "podium7-t8010-jpeg1-control");
+}
+'''
+    jpeg = "\n/* Original JPEG reset/discovery apertures; codec/DMA absent. */\n" + jpeg[jpeg.index("typedef struct "):]
     # Original Samsung SPI starts by disabling +0/+0xc and setting +8.
     # Discovery/control storage only; no codec/touch traffic or fake IRQs.
     spi = mipi.replace("MIPI-DSIM", "SPI").replace("mipi_dsim", "spi")
@@ -1670,7 +1685,7 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"\n#include "qemu/timer.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + spi + i2c + pmp_system + dart + pcie + aop_system + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + jpeg + spi + i2c + pmp_system + dart + pcie + aop_system + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
     timer_fiq = r'''
 /* Research A10 EL1 timers arrive as FIQ, not GIC PPIs. External AIC device
  * interrupts use a separate CPU IRQ route; EL2 timer-enable controls are absent. */
@@ -1766,6 +1781,7 @@ static void podium7_irq_or_set(void *opaque, int input, int level)
         podium7_cpu_clpc_create(machine, sysmem);
         podium7_error_handler_create(machine, sysmem);
         podium7_sep_mailbox_create(machine, sysmem);
+        podium7_jpeg_create(machine, sysmem);
         podium7_spi_create(machine, sysmem);
         podium7_i2c_create(machine, sysmem);
         podium7_pmp_system_create(machine, sysmem);

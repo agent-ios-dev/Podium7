@@ -1,3 +1,27 @@
+## Verified genuine RTKit hello delivered to XNU
+
+Run 38028780454 confirms the corrected AP receive IRQ 170. The original PMP
+sends 0x00100000000c000c; XNU reads it through +0x4038/+0x403c and sends the
+version-12 HELLO_REPLY 0x00200000000c000c through +0x4010/+0x4014. These are
+executed original firmware/kernel instructions, not hardcoded model replies.
+RTBuddy's pending state advances from 4 to 5. Full handshake still stalls:
+CPU#1 remains in scheduler WFI at 0x01007718 and has not consumed the AP reply.
+The new private IOP receive-event/IRQ implementation is being tested next.
+
+Original firmware IOP interrupt dispatcher at 0x0100bf94 reads bank +0x81c;
+its validator at 0x0100c1fc accepts event type 4/source 0 for mailbox receive.
+This controller is separate from the AP AIC. The original +0xb88 enable bit
+and real inbox occupancy gate the new receive event and ARM32 IRQ.
+
+QMP snapshots now correctly show CPU#1 ARM32 registers via per-request
+cpu-index. All modeled-device checks and 59 Python tests pass. No launchd,
+SpringBoard or usable iOS IPA is confirmed.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38028780454
+RTKit protocol reference: https://github.com/torvalds/linux/blob/master/drivers/soc/apple/rtkit.c
+
+---
+
 ## Verified shared-memory PMP execution and bidirectional mailbox queues
 
 Run 38028359295 verifies the original ARM32 firmware executing alongside ARM64

@@ -237,7 +237,11 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                         "XNU panic capture incomplete" if panic_seen else
                         f"{seconds}-second execution deadline reached" if deadline else "16-MiB trace limit reached")
                 try:
-                    snapshot = capture_cpu(monitor_path)
+                    # Capture the actual panic FAR translation while the guest
+                    # page tables still exist; register snapshots alone show VA.
+                    panic_fars = re.findall(rb"\bfar:\s*(0x[0-9a-fA-F]+)", serial_bytes)
+                    addresses = tuple(dict.fromkeys(int(value, 16) for value in panic_fars[-4:]))
+                    snapshot = capture_cpu(monitor_path, addresses)
                     (directory / "cpu-snapshot.txt").write_text(snapshot["registers"])
                     (directory / "cpu-stack.txt").write_text(snapshot["stack"])
                     (directory / "cpu-snapshot.json").write_text(json.dumps(snapshot, indent=2))

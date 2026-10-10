@@ -211,11 +211,13 @@ def panic_capture_complete(serial_bytes):
         serial_bytes[header:]) is not None
 
 
-def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, research_bridge_handoff=False, ramdisk=None, seconds=30, research_ramdisk_root=False, trust_cache=None, research_cfi_nvram=False, research_pmp_core=False, research_aes_root_fallback=False, research_nvme=False, research_nvme_dma_snapshot=False, research_nvme_dart=False, research_nvme_msi=False, research_system_root=None, research_nvme_image=None, system_volume=None, research_unsealed_root=False):
+def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, research_bridge_handoff=False, ramdisk=None, seconds=30, research_ramdisk_root=False, trust_cache=None, research_cfi_nvram=False, research_pmp_core=False, research_aes_root_fallback=False, research_nvme=False, research_nvme_dma_snapshot=False, research_nvme_dart=False, research_nvme_msi=False, research_system_root=None, research_nvme_image=None, system_volume=None, research_unsealed_root=False, trace_limit_mib=16):
     if research_system_root and not (research_nvme and research_nvme_dart and research_nvme_msi and research_nvme_image):
         raise ValueError("system root requires a prepared 16 GiB disk with verified NVMe, DART and MSI")
     if research_nvme_image and not research_nvme:
         raise ValueError("storage image requires research NVMe")
+    if not isinstance(trace_limit_mib, int) or not 1 <= trace_limit_mib <= 256:
+        raise ValueError("trace budget must be an integer between 1 and 256 MiB")
     if not 1 <= seconds <= 600:
         raise ValueError("execution budget must be between 1 and 600 seconds")
     if research_bridge_handoff and cpu != "podium7-research":
@@ -278,7 +280,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
         pmp_observations = []
         while process.poll() is None:
             deadline = time.monotonic() - start > seconds
-            full_trace = trace.exists() and trace.stat().st_size > 16 * 1024 * 1024
+            full_trace = trace.exists() and trace.stat().st_size > trace_limit_mib * 1024 * 1024
             serial_bytes = serial.read_bytes()
             panic_seen = b"panic(cpu " in serial_bytes
             if panic_seen and panic_started is None:
@@ -313,7 +315,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                 stop = ("original NVMe first command captured for DART inspection" if dma_submitted else
                         "XNU panic captured" if complete else
                         "XNU panic capture incomplete" if panic_seen else
-                        f"{seconds}-second execution deadline reached" if deadline else "16-MiB trace limit reached")
+                        f"{seconds}-second execution deadline reached" if deadline else f"{trace_limit_mib}-MiB trace limit reached")
                 try:
                     # Capture the actual panic FAR translation while the guest
                     # page tables still exist; register snapshots alone show VA.
@@ -405,7 +407,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
                "pmgr_bridge_transactions": pmgr_transactions[:128],
                "pmgr_power_transactions": pmgr_power_transactions[:128],
                "pmgr_raw_transactions": pmgr_raw_transactions[:128],
-               "execution_budget_seconds": seconds, "cpu_snapshot": snapshot,
+               "execution_budget_seconds": seconds, "trace_limit_mib": trace_limit_mib, "cpu_snapshot": snapshot,
                "restore_trust_cache_supplied": trust_cache is not None and not research_system_root,
                "system_trust_cache_supplied": trust_cache is not None and bool(research_system_root),
                "research_ramdisk_root_gate_skip": research_ramdisk_root,
@@ -445,6 +447,7 @@ if __name__ == "__main__":
     parser.add_argument("--research-bridge-handoff", action="store_true",
                         help="Synthetic empty tuning lists for modeled bridges; not authentic iBoot settings")
     parser.add_argument("--ramdisk", type=pathlib.Path, help="Raw HFS restore disk, reserved in harness RAM; root md0")
+    parser.add_argument("--trace-limit-mib", type=int, default=16, help="Bounded trace budget (1..256 MiB); full-system tests need more than the bootstrap default")
     parser.add_argument("--seconds", type=int, default=30, help="Bounded execution budget (1..600 seconds)")
     parser.add_argument("--research-ramdisk-root", action="store_true",
                         help="Opt-in exact-kernel SecureRootName gate skip; unauthenticated restore userland experiment")
@@ -462,4 +465,4 @@ if __name__ == "__main__":
     parser.add_argument("--research-unsealed-root", action="store_true", help="Exact-kernel opt-in unsealed system launchd diagnostic; root is NOT authenticated")
     args = parser.parse_args()
     run_probe(args.directory, executable=args.qemu, cpu=args.cpu,
-              research_bridge_handoff=args.research_bridge_handoff, ramdisk=args.ramdisk, seconds=args.seconds, research_ramdisk_root=args.research_ramdisk_root, trust_cache=args.trust_cache, research_cfi_nvram=args.research_cfi_nvram, research_pmp_core=args.research_pmp_core, research_aes_root_fallback=args.research_aes_root_fallback, research_nvme=args.research_nvme, research_nvme_dma_snapshot=args.research_nvme_dma_snapshot, research_nvme_dart=args.research_nvme_dart, research_nvme_msi=args.research_nvme_msi, research_system_root=args.research_system_root, research_nvme_image=args.research_nvme_image, system_volume=args.system_volume, research_unsealed_root=args.research_unsealed_root)
+              research_bridge_handoff=args.research_bridge_handoff, ramdisk=args.ramdisk, seconds=args.seconds, research_ramdisk_root=args.research_ramdisk_root, trust_cache=args.trust_cache, research_cfi_nvram=args.research_cfi_nvram, research_pmp_core=args.research_pmp_core, research_aes_root_fallback=args.research_aes_root_fallback, research_nvme=args.research_nvme, research_nvme_dma_snapshot=args.research_nvme_dma_snapshot, research_nvme_dart=args.research_nvme_dart, research_nvme_msi=args.research_nvme_msi, research_system_root=args.research_system_root, research_nvme_image=args.research_nvme_image, system_volume=args.system_volume, research_unsealed_root=args.research_unsealed_root, trace_limit_mib=args.trace_limit_mib)

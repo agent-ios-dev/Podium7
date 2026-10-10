@@ -4,6 +4,16 @@ from qemu_probe import boot_args, elf_image, PHYSICAL_BASE, RAM_SIZE, virtual_ba
 
 
 class QEMUProbeTests(unittest.TestCase):
+    def test_trace_budget_rejects_unbounded_values_before_preparation(self):
+        from unittest.mock import patch
+        from qemu_probe import run_probe
+        from pathlib import Path
+        with patch("qemu_probe.make_probe") as prepare:
+            for limit in (0, -1, 257, 1.5):
+                with self.assertRaisesRegex(ValueError, "trace budget"):
+                    run_probe(Path("unused"), trace_limit_mib=limit)
+            prepare.assert_not_called()
+
     def test_panic_capture_waits_for_complete_first_saved_state(self):
         state = (b"pc: 0xfffffff005e45984 cpsr: 0x80400204 "
                  b"esr: 0x96000010 far: 0xffffffe0004ac020\n")

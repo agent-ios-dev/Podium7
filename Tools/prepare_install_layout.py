@@ -84,23 +84,29 @@ def prepare(image):
         # A lone read-only mounted volume can keep its container read-only.
         # Detach that mount before asking APFS to allocate new volumes.
         command(['diskutil', 'unmount', system['DeviceIdentifier']])
-        for role, name in [('B', 'Preboot'), ('X', 'xART'), ('D', 'Data')]:
+        for role, name in [('B', 'Preboot'), ('D', 'Data')]:
             args = ['sudo', 'diskutil', 'apfs', 'addVolume', container['ContainerReference'], 'APFSX', name, '-role', role, '-nomount']
             if role == 'D': args += ['-groupWith', system['DeviceIdentifier']]
             try:
                 command(args)
             except subprocess.CalledProcessError as error:
-                error.preparation_context = report
-                raise
+                if role == 'B':
+                    error.preparation_context = report
+                    raise
+                report['data_creation_error'] = error.output.decode(errors='replace')
+                observed = fixture_container(whole)
+                if any(v.get('Roles') == ['Data'] for v in observed.get('Volumes', [])):
+                    raise ValueError('Data allocation failed after a partial volume creation')
         updated = fixture_container(whole)
         mounted = {}
         for role, label in [('Data', 'data'), ('Preboot', 'preboot')]:
             volumes = [v for v in updated['Volumes'] if v.get('Roles') == [role]]
+            if not volumes and role == 'Data': continue
             if len(volumes) != 1: raise ValueError('created role not uniquely present: ' + role)
             mounted[role] = mount_volume(volumes[0], root / ('install-' + label))
         source = mount_volume(system, root / 'install-system', readonly=True)
         # iOS mounts the Data volume at /private/var, unlike macOS.
-        if report['source_var_present']:
+        if report['source_var_present'] and 'Data' in mounted:
             command(['sudo', 'ditto', '--rsrc', '--extattr', str(source/'private/var'), str(mounted['Data'])])
         # Current synthetic handoff has no boot-manifest hash; original mount
         # selected this exact 48-byte zero namespace in run 38053476211.
@@ -109,6 +115,7 @@ def prepare(image):
         if report['source_firmware_present']:
             command(['sudo', 'ditto', '--rsrc', '--extattr', str(source/'usr/standalone/firmware'), str(firmware)])
         report.update(volumes=updated['Volumes'], synthetic_manifest_namespace=True,
+                      data_volume_prepared='Data' in mounted, xart_volume_prepared=False,
                       authenticated_boot_confirmed=False, springboard_confirmed=False,
                       firmware_files=sum(1 for f in firmware.rglob('*') if f.is_file()))
         return report

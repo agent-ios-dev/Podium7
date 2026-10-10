@@ -1259,6 +1259,29 @@ static void podium7_pmp_start(void)
                             "podium7-t8010-isp-control");
 }
 '''
+    # Original disp0 read +4 faults in run 38030933219. Exact DT control
+    # windows only; no framebuffer scanout or fabricated display IRQ.
+    display = scaler.replace("SCALER", "DISPLAY").replace("scaler", "display").replace("Podium7ScalerBank", "Podium7DisplayBank")
+    start = display.index("static void podium7_display_create(")
+    display = display[:start] + '''static void podium7_display_create(MachineState *machine, MemoryRegion *memory)
+{
+    static const struct { hwaddr base; hwaddr size; } banks[] = {
+        { 0x206200000ULL, 0x9000 },
+        { 0x20620c000ULL, 0x4000 },
+        { 0x206400000ULL, 0x4000 },
+        { 0x206440000ULL, 0x4000 },
+        { 0x206480000ULL, 0x8000 },
+        { 0x2064c0000ULL, 0x8000 },
+        { 0x206500000ULL, 0x4000 },
+        { 0x206540000ULL, 0x4000 },
+        { 0x2067c0000ULL, 0x4000 },
+    };
+    for (unsigned i = 0; i < ARRAY_SIZE(banks); i++) {
+        podium7_display_bank_create(machine, memory, banks[i].base, banks[i].size,
+                                    "podium7-t8010-disp0-control");
+    }
+}
+'''
     # Original Samsung SPI starts by disabling +0/+0xc and setting +8.
     # Discovery/control storage only; no codec/touch traffic or fake IRQs.
     spi = mipi.replace("MIPI-DSIM", "SPI").replace("mipi_dsim", "spi")
@@ -1756,7 +1779,7 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"\n#include "qemu/timer.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",
-                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + jpeg + scaler + vxd + isp + spi + i2c + pmp_system + dart + pcie + aop_system + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
+                 uart + aic + wdt + gpio + aes + thermal + usbphy + dwi + mca + mipi + gfx + clpc + error_handler + sep + jpeg + scaler + vxd + isp + display + spi + i2c + pmp_system + dart + pcie + aop_system + i2s_switch + pmgr_bridges + pmgr_power + "static void machvirt_init(MachineState *machine)")
     timer_fiq = r'''
 /* Research A10 EL1 timers arrive as FIQ, not GIC PPIs. External AIC device
  * interrupts use a separate CPU IRQ route; EL2 timer-enable controls are absent. */
@@ -1856,6 +1879,7 @@ static void podium7_irq_or_set(void *opaque, int input, int level)
         podium7_scaler_create(machine, sysmem);
         podium7_vxd_create(machine, sysmem);
         podium7_isp_create(machine, sysmem);
+        podium7_display_create(machine, sysmem);
         podium7_spi_create(machine, sysmem);
         podium7_i2c_create(machine, sysmem);
         podium7_pmp_system_create(machine, sysmem);

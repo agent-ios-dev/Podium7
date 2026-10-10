@@ -66,6 +66,8 @@ jobs:
         run: python3 Tools/check_error_handler.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify original SEP, SIO and PMP mailbox controls and queues
         run: python3 Tools/check_sep_mailbox.py --qemu .qemu/build/qemu-system-aarch64
+      - name: Verify original disp0 control apertures
+        run: python3 Tools/check_display.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify original ISP discovery register aperture
         run: python3 Tools/check_isp.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify original VXD power and control banks
@@ -229,6 +231,7 @@ jobs:
             .firmware/scaler-checks.json
             .firmware/vxd-checks.json
             .firmware/isp-checks.json
+            .firmware/display-checks.json
             .firmware/jpeg-checks.json
             .firmware/sep-mailbox-checks.json
             .firmware/spi-checks.json

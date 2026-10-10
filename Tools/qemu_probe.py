@@ -43,14 +43,16 @@ def virtual_base_for_kernel(minimum, maximum, physical_base=PHYSICAL_BASE):
     return base
 
 
-def boot_args(virtual_base, tree_address, tree_size, top, *, ramdisk=False, system_root=None):
+def boot_args(virtual_base, tree_address, tree_size, top, *, ramdisk=False, system_root=None, research_debug_diagnostics=False):
     if system_root not in (None, "disk0s1", "disk0s1s1") or (system_root and ramdisk):
         raise ValueError("system root requires a separate APFS disk profile")
+    if research_debug_diagnostics and not system_root:
+        raise ValueError('debug diagnostic requires explicit system root')
     args = bytearray(736)
     struct.pack_into("<HH", args, 0, 2, 2)
     struct.pack_into("<4Q", args, 8, virtual_base, PHYSICAL_BASE, RAM_SIZE, top)
     struct.pack_into("<QI", args, 96, tree_address, tree_size)
-    command = b"-v serial=3 debug=0x8 cpus=1" + (b" rd=md0" if ramdisk else b"")
+    command = (b"-v serial=3 debug=0x14e cpus=1" if research_debug_diagnostics else b"-v serial=3 debug=0x8 cpus=1") + (b" rd=md0" if ramdisk else b"")
     if system_root:
         command += (" rd=" + system_root).encode("ascii")
     args[108:108 + len(command)] = command
@@ -73,13 +75,15 @@ def elf_image(entry, segments):
     return header + b"".join(headers) + b"".join(bodies)
 
 
-def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, research_ramdisk_root=False, trust_cache=None, research_cfi_nvram=False, research_aes_root_fallback=False, research_system_root=None, system_volume=None, research_unsealed_root=False, research_fastsim=False, research_no_sep=False):
+def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, research_ramdisk_root=False, trust_cache=None, research_cfi_nvram=False, research_aes_root_fallback=False, research_system_root=None, system_volume=None, research_unsealed_root=False, research_fastsim=False, research_no_sep=False, research_debug_diagnostics=False):
     if research_system_root not in (None, "disk0s1", "disk0s1s1") or (research_system_root and (ramdisk is not None or research_ramdisk_root)):
         raise ValueError("system-root experiment must use a separate APFS disk, no restore ramdisk")
     if research_aes_root_fallback and not (research_ramdisk_root or research_system_root):
         raise ValueError("AES fallback requires the explicit research restore root gate skip")
     if research_ramdisk_root and ramdisk is None:
         raise ValueError("research root gate skip is restricted to explicit restore ramdisk probes")
+    if research_debug_diagnostics and not research_no_sep:
+        raise ValueError('debug diagnostic requires explicit no-SEP experiment')
     if research_no_sep and not research_fastsim:
         raise ValueError('no-SEP diagnostic requires explicit FastSim')
     if research_fastsim and not (research_system_root and research_unsealed_root):
@@ -183,7 +187,7 @@ def make_probe(directory, *, research_bridge_handoff=False, ramdisk=None, resear
     segments = [(int(x["address"], 16) - virtual_base + PHYSICAL_BASE, x["length"],
                  kernel[x["offset"]:x["offset"] + x["file_size"]]) for x in regions]
     segments += [(stub_address, 0x4000, b"".join(struct.pack("<I", x) for x in stub)),
-                 (args_address, 0x4000, boot_args(virtual_base, virtual_base + tree_address - PHYSICAL_BASE, len(tree), top, ramdisk=disk is not None, system_root=research_system_root)),
+                 (args_address, 0x4000, boot_args(virtual_base, virtual_base + tree_address - PHYSICAL_BASE, len(tree), top, ramdisk=disk is not None, system_root=research_system_root, research_debug_diagnostics=research_debug_diagnostics)),
                  (tree_address, align(len(tree)), tree)]
     if disk is not None:
         segments.append((disk_address, align(len(disk)), disk))
@@ -215,7 +219,7 @@ def panic_capture_complete(serial_bytes):
         serial_bytes[header:]) is not None
 
 
-def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, research_bridge_handoff=False, ramdisk=None, seconds=30, research_ramdisk_root=False, trust_cache=None, research_cfi_nvram=False, research_pmp_core=False, research_aes_root_fallback=False, research_nvme=False, research_nvme_dma_snapshot=False, research_nvme_dart=False, research_nvme_msi=False, research_system_root=None, research_nvme_image=None, system_volume=None, research_unsealed_root=False, research_fastsim=False, research_no_sep=False, trace_limit_mib=16):
+def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, research_bridge_handoff=False, ramdisk=None, seconds=30, research_ramdisk_root=False, trust_cache=None, research_cfi_nvram=False, research_pmp_core=False, research_aes_root_fallback=False, research_nvme=False, research_nvme_dma_snapshot=False, research_nvme_dart=False, research_nvme_msi=False, research_system_root=None, research_nvme_image=None, system_volume=None, research_unsealed_root=False, research_fastsim=False, research_no_sep=False, research_debug_diagnostics=False, trace_limit_mib=16):
     if research_system_root and not (research_nvme and research_nvme_dart and research_nvme_msi and research_nvme_image):
         raise ValueError("system root requires a prepared 16 GiB disk with verified NVMe, DART and MSI")
     if research_nvme_image and not research_nvme:
@@ -234,7 +238,7 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
         raise ValueError("MSI research requires the verified port0 DART path")
     if research_nvme_dart and not research_nvme:
         raise ValueError("port0 DART translation requires the real NVMe backend")
-    image, kernel_entry, rorgn = make_probe(directory, research_bridge_handoff=research_bridge_handoff, ramdisk=ramdisk, research_ramdisk_root=research_ramdisk_root, trust_cache=trust_cache, research_cfi_nvram=research_cfi_nvram, research_aes_root_fallback=research_aes_root_fallback, research_system_root=research_system_root, system_volume=system_volume, research_unsealed_root=research_unsealed_root, research_fastsim=research_fastsim, research_no_sep=research_no_sep)
+    image, kernel_entry, rorgn = make_probe(directory, research_bridge_handoff=research_bridge_handoff, ramdisk=ramdisk, research_ramdisk_root=research_ramdisk_root, trust_cache=trust_cache, research_cfi_nvram=research_cfi_nvram, research_aes_root_fallback=research_aes_root_fallback, research_system_root=research_system_root, system_volume=system_volume, research_unsealed_root=research_unsealed_root, research_fastsim=research_fastsim, research_no_sep=research_no_sep, research_debug_diagnostics=research_debug_diagnostics)
     trace, serial = directory / "qemu-trace.txt", directory / "qemu-serial.txt"
     command = [executable, "-machine", "virt,secure=off,virtualization=off", "-cpu", f"{cpu},cntfrq={COUNTER_FREQUENCY}", "-accel", "tcg",
                "-m", "2048", "-smp", "1", "-display", "none", "-monitor", "none", "-serial", "stdio",
@@ -469,6 +473,7 @@ if __name__ == "__main__":
     parser.add_argument("--research-unsealed-root", action="store_true", help="Exact-kernel opt-in unsealed system launchd diagnostic; root is NOT authenticated")
     parser.add_argument("--research-fastsim", action="store_true", help="Explicit FastSim identity diagnostic without SEP data protection; requires unsealed APFS root")
     parser.add_argument("--research-no-sep", action="store_true", help="Explicit no-SEP platform experiment; requires FastSim and unsealed APFS root")
+    parser.add_argument("--research-debug-diagnostics", action="store_true", help="Explicit Apple debug=0x14e diagnostic profile; no-SEP experiment only")
     args = parser.parse_args()
     run_probe(args.directory, executable=args.qemu, cpu=args.cpu,
-              research_bridge_handoff=args.research_bridge_handoff, ramdisk=args.ramdisk, seconds=args.seconds, research_ramdisk_root=args.research_ramdisk_root, trust_cache=args.trust_cache, research_cfi_nvram=args.research_cfi_nvram, research_pmp_core=args.research_pmp_core, research_aes_root_fallback=args.research_aes_root_fallback, research_nvme=args.research_nvme, research_nvme_dma_snapshot=args.research_nvme_dma_snapshot, research_nvme_dart=args.research_nvme_dart, research_nvme_msi=args.research_nvme_msi, research_system_root=args.research_system_root, research_nvme_image=args.research_nvme_image, system_volume=args.system_volume, research_unsealed_root=args.research_unsealed_root, trace_limit_mib=args.trace_limit_mib, research_fastsim=args.research_fastsim, research_no_sep=args.research_no_sep)
+              research_bridge_handoff=args.research_bridge_handoff, ramdisk=args.ramdisk, seconds=args.seconds, research_ramdisk_root=args.research_ramdisk_root, trust_cache=args.trust_cache, research_cfi_nvram=args.research_cfi_nvram, research_pmp_core=args.research_pmp_core, research_aes_root_fallback=args.research_aes_root_fallback, research_nvme=args.research_nvme, research_nvme_dma_snapshot=args.research_nvme_dma_snapshot, research_nvme_dart=args.research_nvme_dart, research_nvme_msi=args.research_nvme_msi, research_system_root=args.research_system_root, research_nvme_image=args.research_nvme_image, system_volume=args.system_volume, research_unsealed_root=args.research_unsealed_root, trace_limit_mib=args.trace_limit_mib, research_fastsim=args.research_fastsim, research_no_sep=args.research_no_sep, research_debug_diagnostics=args.research_debug_diagnostics)

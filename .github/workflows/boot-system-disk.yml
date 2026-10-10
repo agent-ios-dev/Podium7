@@ -22,6 +22,10 @@ on:
         description: Omit unimplemented SEP only in explicit FastSim diagnostic
         type: boolean
         default: false
+      debug_diagnostics:
+        description: Explicit debug=0x14e profile for no-SEP keybag research
+        type: boolean
+        default: false
       root_device:
         description: Explicit research root-device name
         required: true
@@ -88,6 +92,7 @@ jobs:
       - name: Boot original kernel with official system trust cache and APFS disk
         env:
           RESEARCH_ROOT: ${{ inputs.root_device }}
+          DEBUG_DIAGNOSTICS: ${{ inputs.debug_diagnostics }}
           NO_SEP_DIAGNOSTIC: ${{ inputs.no_sep_diagnostic }}
           FASTSIM_DIAGNOSTIC: ${{ inputs.fastsim_diagnostic }}
           UNSEALED_DIAGNOSTIC: ${{ inputs.unsealed_diagnostic }}
@@ -99,6 +104,7 @@ jobs:
           if [[ "$UNSEALED_DIAGNOSTIC" == "true" ]]; then extra+=(--research-unsealed-root); fi
           if [[ "$FASTSIM_DIAGNOSTIC" == "true" ]]; then extra+=(--research-fastsim); fi
           if [[ "$NO_SEP_DIAGNOSTIC" == "true" ]]; then extra+=(--research-no-sep); fi
+          if [[ "$DEBUG_DIAGNOSTICS" == "true" ]]; then extra+=(--research-debug-diagnostics); fi
           python3 Tools/qemu_probe.py "${extra[@]}" --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/system-boot --research-bridge-handoff --trust-cache .firmware/StaticTrustCache.im4p --system-volume .firmware/SystemVolume.im4p --research-system-root "$RESEARCH_ROOT" --research-pmp-core --research-cfi-nvram --research-aes-root-fallback --research-nvme --research-nvme-dart --research-nvme-msi --research-nvme-image .firmware/system-disk/storage-16g.raw --seconds 300 --trace-limit-mib 128
           python3 Tools/inspect_boot_fault.py --directory .firmware/system-boot
           python3 Tools/inspect_system_disk.py .firmware/system-disk/storage-16g.raw --trace .firmware/system-boot/qemu-trace.txt --output .firmware/system-boot/system-disk-layout.json
@@ -113,4 +119,5 @@ jobs:
             .firmware/system-boot/*.txt
             .firmware/nvme-checks.json
             .firmware/install-layout.json
+            .firmware/boot-tools/*
           if-no-files-found: ignore

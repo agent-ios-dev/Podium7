@@ -1,3 +1,28 @@
+## Mount-phase-2 and FIPS pass; original keybag task waits
+
+Run 38061956311 completes the full 300-second experiment without panic,
+DMA rejection or trace-budget exhaustion. Original launchd reaches eleven
+boot tasks through keybag; filesystem checking and both mount phases pass.
+All twenty original Apple corecrypto FIPS self-tests pass. Hardware factory
+cache exists in System and is empty; its original empty structure was copied.
+15,482 genuine EL0 returns are observed. System userland gate passes, but
+Early boot complete and SpringBoard are NOT confirmed. The last task is
+keybag; the kernel snapshot shows a wait path, not a crash.
+
+Next opt-in experiment changes only the debug boot profile from 0x8 to 0x14e,
+as used in primary qemu-t8030 research logs that report keybag diagnostic skip:
+https://github.com/TrungNguyen1909/qemu-t8030/issues/45
+Its effect in this exact firmware remains to be tested. This is a diagnostic
+path, not working SEP/keybag support. Default boot arguments remain unchanged,
+and CLI requires the explicit no-SEP/unsealed experiment. Reports distinguish
+diagnostic keybag skip, early boot completion, userland and SpringBoard.
+Original boot-tool executables are preserved without edits for inspection.
+106 local tests pass. Full boot and protected storage remain open gates.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38061956311
+
+---
+
 ## Original no-SEP path advances to mount-phase-2
 
 Run 38061424058 executes 14,311 genuine EL0 returns. The original boot task

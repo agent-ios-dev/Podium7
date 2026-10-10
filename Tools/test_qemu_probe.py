@@ -4,6 +4,16 @@ from qemu_probe import boot_args, elf_image, PHYSICAL_BASE, RAM_SIZE, virtual_ba
 
 
 class QEMUProbeTests(unittest.TestCase):
+    def test_debug_profile_is_explicit_and_keeps_default_boot_arguments(self):
+        default = boot_args(0xfffffff004000000, 0xfffffff007d00000, 1234, 0x48000000, system_root='disk0s1s1')
+        diagnostic = boot_args(0xfffffff004000000, 0xfffffff007d00000, 1234, 0x48000000, system_root='disk0s1s1', research_debug_diagnostics=True)
+        self.assertIn(b'debug=0x8 ', default[108:716])
+        self.assertIn(b'debug=0x14e ', diagnostic[108:716])
+        self.assertEqual(default[:108], diagnostic[:108])
+        self.assertEqual(default[716:], diagnostic[716:])
+        with self.assertRaises(ValueError):
+            boot_args(0xfffffff004000000, 0xfffffff007d00000, 1234, 0x48000000, research_debug_diagnostics=True)
+
     def test_fastsim_requires_explicit_unsealed_system_experiment_before_reading_files(self):
         from pathlib import Path
         from qemu_probe import make_probe

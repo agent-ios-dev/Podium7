@@ -1,5 +1,5 @@
 /* Separate opt-in research PCIe/NVMe backend, using stock QEMU devices.
- * No Apple NVMe firmware, DART or MSI routing is claimed by this experiment. */
+ * Port0 DART/MSI are separate explicit research paths; no Apple NVMe firmware. */
 static PCIDevice *podium7_storage_port;
 
 static bool podium7_storage_link_active(void)
@@ -44,5 +44,7 @@ static void podium7_storage_attach(VirtMachineState *vms, DeviceState *host)
     memory_region_init_alias(mmio32, OBJECT(host), "podium7-storage-mmio32",
         sysbus_mmio_get_region(SYS_BUS_DEVICE(host), 1), 0xc0000000ULL, 0x40000000);
     memory_region_add_subregion(get_system_memory(), 0x7c0000000ULL, mmio32);
-    qemu_log("PODIUM7 genuine QEMU NVMe attached; direct DMA, MSI routing not implemented\n");
+    qemu_log("PODIUM7 genuine QEMU NVMe attached; DART=%s MSI=%s\n",
+             g_getenv("PODIUM7_RESEARCH_NVME_DART") ?: "0",
+             g_getenv("PODIUM7_RESEARCH_NVME_MSI") ?: "0");
 }

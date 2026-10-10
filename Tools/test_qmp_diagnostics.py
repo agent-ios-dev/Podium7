@@ -17,6 +17,20 @@ class Stream:
 
 
 class QMPTests(unittest.TestCase):
+    def test_live_snapshot_resumes_guest_even_when_register_capture_fails(self):
+        stream = Stream([
+            {'QMP': {}}, {'id': 'qmp_capabilities', 'return': {}},
+            {'id': 'stop', 'return': {}},
+            {'id': 'query-cpus-fast', 'error': {'desc': 'snapshot failed'}},
+            {'id': 'cont', 'return': {}}])
+        connection = MagicMock()
+        connection.__enter__.return_value = connection
+        connection.makefile.return_value = stream
+        with patch('qmp_diagnostics.socket.AF_UNIX', 1, create=True), patch('qmp_diagnostics.socket.socket', return_value=connection):
+            with self.assertRaisesRegex(ValueError, 'snapshot failed'):
+                capture('local.sock', resume_after=True)
+        self.assertEqual(stream.sent[-1]['execute'], 'cont')
+
     def test_stop_events_do_not_hide_cpu_register_reply(self):
         stream = Stream([
             {"QMP": {}}, {"id": "qmp_capabilities", "return": {}},

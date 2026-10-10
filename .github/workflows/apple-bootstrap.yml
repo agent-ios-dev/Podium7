@@ -216,6 +216,8 @@ jobs:
             .firmware/nvme-dart-kernel-experiment/*.txt
           if-no-files-found: ignore
       - name: Probe original iOS NVMe with verified DART and real MSI IRQs
+        env:
+          PODIUM7_RESEARCH_PMP_SNAPSHOT: '1'
         if: always() && steps.nvme_msi_check.outcome == 'success' && (steps.pmp_probe.outcome == 'success' || steps.pmp_probe.outcome == 'failure')
         run: |
           mkdir .firmware/nvme-msi-kernel-experiment

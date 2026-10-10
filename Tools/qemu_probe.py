@@ -262,6 +262,10 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
         start = time.monotonic()
         stop = "QEMU exited"
         panic_started = None
+        pmp_observe = research_pmp_core and os.environ.get('PODIUM7_RESEARCH_PMP_SNAPSHOT') == '1'
+        pmp_trace_offset = 0
+        pmp_power_at = None
+        pmp_observations = []
         while process.poll() is None:
             deadline = time.monotonic() - start > seconds
             full_trace = trace.exists() and trace.stat().st_size > 16 * 1024 * 1024
@@ -269,6 +273,28 @@ def run_probe(directory, executable="qemu-system-aarch64", cpu="max", *, researc
             panic_seen = b"panic(cpu " in serial_bytes
             if panic_seen and panic_started is None:
                 panic_started = time.monotonic()
+            if pmp_observe and not panic_seen and len(pmp_observations) < 3:
+                if trace.exists() and pmp_power_at is None:
+                    with trace.open('rb') as observed_trace:
+                        observed_trace.seek(pmp_trace_offset)
+                        chunk = observed_trace.read()
+                        # Keep a suffix for a trace line split across polls.
+                        pmp_trace_offset = max(0, observed_trace.tell() - 256)
+                    if b'SEP-MAILBOX base=000000020e300000 write offset=4014 value=00500020' in chunk:
+                        pmp_power_at = time.monotonic()
+                delay = (0, 1, 5)[len(pmp_observations)]
+                if pmp_power_at is not None and time.monotonic() - pmp_power_at >= delay:
+                    observed = {'seconds_after_power_notification': time.monotonic() - pmp_power_at,
+                                'observational_pause_used': True}
+                    try:
+                        observed['snapshot'] = capture_cpu(monitor_path,
+                            physical_windows=((0x20e300b84, 5), (0x20e300ba0, 2),
+                                              (0x20e304008, 1), (0x20e304020, 1)),
+                            resume_after=True)
+                    except (OSError, ValueError) as error:
+                        observed['capture_error'] = str(error)
+                    pmp_observations.append(observed)
+                    (directory / 'pmp-before-panic.json').write_text(json.dumps(pmp_observations, indent=2))
             complete = panic_capture_complete(serial_bytes)
             panic_timeout = panic_started is not None and time.monotonic() - panic_started > 2
             dma_trace = trace.read_text(errors="replace") if research_nvme_dma_snapshot and trace.exists() else ""

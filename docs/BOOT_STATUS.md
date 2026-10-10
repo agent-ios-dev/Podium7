@@ -1,3 +1,17 @@
+## PCIe capability list accepted; virtual maximum speed added
+
+Run 38036534007 passes root-port configuration guest checks. Both original
+kernel probes advance beyond the missing _expressCapOffset panic and stop
+at AppleEmbeddedPCIEPort::setMaximumLinkSpeed, limitedSpeed > 0. The virtual
+root-port capability omitted its maximum link speed. Gen1 x1 is now declared
+read-only in LinkCapabilities and tested while actual LinkStatus stays zero.
+This describes research virtual capabilities only; no endpoint or PCI DMA
+has been implemented. The next kernel probe must validate this change.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38036534007
+
+---
+
 ## PCIe channel reset removed; virtual root-port capability validation pending
 
 Run 38036292150 passes the channel reset guest: reg[1] +4 bit16 self-clears,

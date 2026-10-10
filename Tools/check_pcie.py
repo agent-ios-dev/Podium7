@@ -90,6 +90,9 @@ str wzr, [x3, #0x8c]
 ldr w4, [x3, #0x8c]
 cmp w4, #0x11
 b.ne failure
+ldr w4, [x3, #0xac]
+cmp w4, #2
+b.ne failure
 ldr w4, [x3, #0x90]
 cbnz w4, failure
 add x3, x3, #0x100, lsl #12

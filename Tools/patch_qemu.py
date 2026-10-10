@@ -1383,7 +1383,7 @@ static void podium7_pcie_config_write(void *opaque, hwaddr address, uint64_t dat
 {
     unsigned port, offset;
     if (!podium7_pcie_root_config(address, &port, &offset) ||
-        offset < 4 || (offset >= 8 && offset < 16) || offset == 0x34 ||
+        offset < 4 || (offset >= 8 && offset < 16) || offset == 0x34 || offset == 0xac ||
         (offset >= 0x80 && offset < 0x84) || (offset >= 0x8c && offset < 0x94)) { return; }
     unsigned shift = (offset & 3) * 8;
     uint32_t mask = (size == 4 ? 0xffffffffU : ((1U << (size * 8)) - 1)) << shift;
@@ -1420,6 +1420,7 @@ static void podium7_pcie_create(MachineState *machine, MemoryRegion *memory)
         podium7_pcie_config[port][0x34 >> 2] = 0x80;
         podium7_pcie_config[port][0x80 >> 2] = 0x00420010; /* PCIe v2 RootPort. */
         podium7_pcie_config[port][0x8c >> 2] = 0x11; /* Virtual Gen1 x1 capability. */
+        podium7_pcie_config[port][0xac >> 2] = 2; /* Supported Link Speeds Vector: Gen1. */
         podium7_pcie_config[port][0xb0 >> 2] = 1; /* Target speed Gen1. */
         /* Link status remains zero: no downstream endpoint exists. */
     }

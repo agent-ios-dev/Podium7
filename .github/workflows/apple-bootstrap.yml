@@ -87,7 +87,7 @@ jobs:
       - name: Verify original DART discovery and stream controls
         run: python3 Tools/check_dart.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify original PCIe controls and empty configuration space
-        run: python3 Tools/check_pcie.py --qemu .qemu/build/qemu-system-aarch64
+        run: python3 Tools/check_pcie.py --qemu .qemu/build/qemu-system-aarch64 --device-tree .firmware/DeviceTree.bin
       - name: Verify free-running AOP counter and firmware apertures
         run: python3 Tools/check_aop.py --qemu .qemu/build/qemu-system-aarch64
       - name: Verify original CPU debug and CLPC control banks

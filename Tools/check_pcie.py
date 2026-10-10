@@ -4,12 +4,23 @@ import json
 import pathlib
 import subprocess
 import tempfile
+import struct
+
+from analyze_firmware import device_tree
 
 from check_qemu_registers import text_section
 from qemu_probe import elf_image
 
 
-def check(executable, report):
+def check(executable, report, tree):
+    nodes = device_tree(tree.read_bytes())
+    node = next(n for n in nodes if n["path"] == "/device-tree/arm-io/apcie")
+    apertures = list(struct.iter_unpack("<QQ", bytes.fromhex(node["properties"]["reg"])))
+    if len(apertures) != 12 or apertures[0] != (0x610000000, 0x1000000):
+        raise ValueError("original T8010 PCIe aperture schema changed")
+    banks = apertures[1:]
+    if any(size < 0x1000 or size > 0x8000 for base, size in banks):
+        raise ValueError("unexpected PCIe control aperture size")
     assembly = '''.text
 adr x7, banks
 mov x9, #11
@@ -155,6 +166,9 @@ banks:
 .quad 0x600000000, 0x8000, 0x600008000, 0x4000
 .quad 0x60a000000, 0x4000
 '''
+    bank_start = assembly.index("banks:\n")
+    assembly = assembly[:bank_start] + "banks:\n" + "".join(
+        f".quad {hex(base)}, {hex(size)}\n" for base, size in banks)
     with tempfile.TemporaryDirectory() as temporary:
         root = pathlib.Path(temporary)
         (root / "test.s").write_text(assembly)
@@ -183,5 +197,6 @@ if __name__ == "__main__":
     parser.add_argument("--qemu", required=True)
     parser.add_argument("--report", type=pathlib.Path,
                         default=pathlib.Path(".firmware/pcie-checks.json"))
+    parser.add_argument("--device-tree", required=True, type=pathlib.Path)
     arguments = parser.parse_args()
-    check(arguments.qemu, arguments.report)
+    check(arguments.qemu, arguments.report, arguments.device_tree)

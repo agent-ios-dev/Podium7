@@ -89,6 +89,7 @@ jobs:
       - name: Verify original PCIe controls and empty configuration space
         run: python3 Tools/check_pcie.py --qemu .qemu/build/qemu-system-aarch64 --device-tree .firmware/DeviceTree.bin
       - name: Verify real NVMe admin DMA and persistent 16 GiB disk I/O
+        id: nvme_check
         run: python3 Tools/check_nvme.py --qemu .qemu/build/qemu-system-aarch64
       - uses: actions/upload-artifact@v4
         if: always()
@@ -144,6 +145,22 @@ jobs:
             .firmware/pmp-cfi-experiment/*.json
             .firmware/pmp-cfi-experiment/*.txt
           if-no-files-found: warn
+      - name: Probe original iOS kernel with independently verified real NVMe
+        if: always() && steps.nvme_check.outcome == 'success' && (steps.pmp_probe.outcome == 'success' || steps.pmp_probe.outcome == 'failure')
+        run: |
+          mkdir .firmware/nvme-kernel-experiment
+          cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/nvme-kernel-experiment/
+          python3 Tools/qemu_probe.py --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/nvme-kernel-experiment --research-bridge-handoff --ramdisk .firmware/RestoreRamDisk.payload --trust-cache .firmware/RestoreTrustCache.im4p --research-ramdisk-root --research-pmp-core --research-cfi-nvram --research-aes-root-fallback --research-nvme --seconds 180
+          python3 Tools/inspect_boot_fault.py --directory .firmware/nvme-kernel-experiment
+      - name: Save original kernel NVMe experiment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nvme-kernel-evidence
+          path: |
+            .firmware/nvme-kernel-experiment/*.json
+            .firmware/nvme-kernel-experiment/*.txt
+          if-no-files-found: ignore
       - name: Repeat genuine PMP startup in a fresh machine to catch queue races
         run: |
           mkdir .firmware/pmp-integrated-repeat

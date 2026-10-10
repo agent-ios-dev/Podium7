@@ -18,6 +18,21 @@ DISK_BYTES = 16 << 30
 def assembly():
     return '''.text
 mov x20, #1
+// Apple port0 link bit reflects the real root port, only while enabled.
+movz x3, #0
+movk x3, #0x100, lsl #16
+movk x3, #6, lsl #32
+ldr w0, [x3, #0x208]
+tbnz w0, #6, failure
+mov w0, #1
+str w0, [x3, #0x80]
+mov w0, #0x80000000
+str w0, [x3, #0x140]
+ldr w0, [x3, #0x208]
+tbz w0, #6, failure
+str wzr, [x3, #0x80]
+ldr w0, [x3, #0x208]
+tbnz w0, #6, failure
 movz x21, #0
 movk x21, #0x1000, lsl #16
 movk x21, #6, lsl #32
@@ -102,12 +117,11 @@ str x0, [x23, #24]
 mov w0, #1
 str w0, [x23, #40]
 bl submit_admin
-// Controller reports exactly one namespace.
+// NN is the controller namespace limit, not the active namespace count.
 movz x0, #0x8000
 movk x0, #0x4501, lsl #16
 ldr w1, [x0, #516]
-cmp w1, #1
-b.ne failure
+cbz w1, failure
 mov x20, #5
 movz w0, #6
 movk w0, #1, lsl #16
@@ -264,6 +278,7 @@ def check(executable, report):
             "-cpu", "podium7-research", "-m", "128", "-display", "none", "-monitor", "none",
             "-serial", "none", "-semihosting-config", "enable=on,target=native",
             "-drive", f"if=none,id=podium7-storage,format=raw,file={disk}",
+            "-trace", "enable=pci_nvme*", "-D", str(root / "nvme-trace.txt"),
             "-device", f"loader,file={image},cpu-num=0"], capture_output=True, text=True, timeout=25)
         with disk.open("rb") as stream:
             stream.seek(8 * 512)
@@ -276,7 +291,9 @@ def check(executable, report):
                        "I/O queue creation, 512-byte write and independent read comparison",
                        "host-side exact persisted sector verification"],
             "interrupt_delivery_tested": False, "apple_dart_tested": False,
-            "stdout": result.stdout, "stderr": result.stderr}, indent=2))
+            "stdout": result.stdout, "stderr": result.stderr,
+            "nvme_trace_tail": (root / "nvme-trace.txt").read_text(errors="replace")[-8192:]
+                if (root / "nvme-trace.txt").exists() else ""}, indent=2))
         if not passed:
             raise RuntimeError(f"Real NVMe DMA checks failed at stage {result.returncode}")
 

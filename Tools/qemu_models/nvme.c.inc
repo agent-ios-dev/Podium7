@@ -1,5 +1,15 @@
 /* Separate opt-in research PCIe/NVMe backend, using stock QEMU devices.
  * No Apple NVMe firmware, DART or MSI routing is claimed by this experiment. */
+static PCIDevice *podium7_storage_port;
+
+static bool podium7_storage_link_active(void)
+{
+    if (!podium7_storage_port) { return false; }
+    unsigned cap = podium7_storage_port->exp.exp_cap;
+    return cap && (pci_get_word(podium7_storage_port->config + cap + PCI_EXP_LNKSTA)
+                   & PCI_EXP_LNKSTA_DLLLA);
+}
+
 static void podium7_storage_attach(VirtMachineState *vms, DeviceState *host)
 {
     BlockBackend *disk = blk_by_name("podium7-storage");
@@ -13,6 +23,7 @@ static void podium7_storage_attach(VirtMachineState *vms, DeviceState *host)
     qdev_prop_set_string(DEVICE(nvme), "serial", "Podium7-Research");
     qdev_prop_set_drive(DEVICE(nvme), "drive", disk);
     pci_realize_and_unref(nvme, &PCI_BRIDGE(port)->sec_bus, &error_fatal);
+    podium7_storage_port = port;
     MemoryRegion *ecam = g_new0(MemoryRegion, 1);
     memory_region_init_alias(ecam, OBJECT(host), "podium7-storage-ecam",
         sysbus_mmio_get_region(SYS_BUS_DEVICE(host), 0), 0, 0x1000000);

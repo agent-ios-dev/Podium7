@@ -77,6 +77,18 @@ b.ne phy_lane
 movz x3, #0
 movk x3, #0x0100, lsl #16
 movk x3, #6, lsl #32
+// An empty root port cannot acquire link-up by guest register writes.
+mov w5, #1
+str w5, [x3, #0x80]
+mov w5, #0x80000000
+str w5, [x3, #0x140]
+mov w5, #0x40
+str w5, [x3, #0x208]
+ldr w4, [x3, #0x208]
+tbnz w4, #6, failure
+str wzr, [x3, #0x80]
+str wzr, [x3, #0x140]
+str wzr, [x3, #0x208]
 mov w5, #0x31
 str w5, [x3, #0x124]
 movz x11, #0x8000

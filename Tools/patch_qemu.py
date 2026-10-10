@@ -1361,10 +1361,14 @@ static void podium7_pmp_start(void)
         "    bool channel = bank->base >= 0x601004000ULL && bank->base <= 0x604004000ULL &&\n"
         "                   (bank->base & 0xffffff) == 0x4000;\n"
         "    bank->registers[address >> 2] = (channel && address == 4) ? (value & ~0x10000U) : value;")
-    pcie = "static uint32_t podium7_pcie_lane_requests;\n" + pcie
+    pcie = "static bool podium7_storage_link_active(void);\nstatic uint32_t podium7_pcie_lane_requests;\n" + pcie
     pcie = pcie.replace("    uint32_t value = bank->registers[address >> 2];",
         "    uint32_t value = bank->registers[address >> 2];\n"
-        "    if (bank->base == 0x600008000ULL && address == 0xc) { value = podium7_pcie_lane_requests; }")
+        "    if (bank->base == 0x600008000ULL && address == 0xc) { value = podium7_pcie_lane_requests; }\n"
+        "    if (bank->base == 0x601000000ULL && address == 0x208) {\n"
+        "        bool requested = (bank->registers[0x80 >> 2] & 1) && (bank->registers[0x140 >> 2] & 0x80000000U);\n"
+        "        value = (value & ~0x40U) | ((requested && podium7_storage_link_active()) ? 0x40U : 0);\n"
+        "    }")
     pcie = pcie.replace("    uint32_t value = (uint32_t)data;",
         "    uint32_t value = (uint32_t)data;\n"
         "    if (bank->base >= 0x601000000ULL && bank->base <= 0x604000000ULL &&\n"

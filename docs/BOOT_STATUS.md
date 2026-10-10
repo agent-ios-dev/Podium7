@@ -1,3 +1,30 @@
+## Real NVMe backend experiment; original PCIe link timeout isolated
+
+Run 38037759808 passes the exact original DeviceTree PCIe aperture guest
+check, but both kernel probes now reach a real port0 link-training timeout.
+There was no downstream storage endpoint; the model correctly kept link down.
+
+A separate opt-in backend now connects stock QEMU PCIe root-port and NVMe
+at the original ECAM and PCI MMIO windows. Its scratch disk is always 16 GiB;
+existing files are never silently resized. Direct DMA and polling are under
+test; Apple DART/MSI and native IPA integration remain unimplemented.
+
+Run 38038593460 compiles this backend and its ARM64 guest enumerates PCI,
+enables NVMe and completes Identify Controller DMA. The guest then rejects
+NN because it mistakenly expected an active namespace count of one. Pinned
+QEMU sets NN to its namespace limit. That assertion is corrected; Identify
+Namespace and persistent read/write checks must still pass before the kernel
+experiment runs. Port0 link status now derives from the actual root-port DLLLA
+and the original port-enable controls; the no-disk guest checks cannot forge it.
+
+There is still no restore launchd hello or SpringBoard boot. The strict original
+PMP and restore-userland gates are unchanged. The new NVMe kernel probe is
+separate and runs only after successful real guest disk I/O verification.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38038593460
+
+---
+
 ## Original DeviceTree validation catches exact PHY span mismatch
 
 Run 38037480360 rejects the new DeviceTree aperture check before boot: the

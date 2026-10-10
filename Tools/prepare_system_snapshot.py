@@ -12,7 +12,7 @@ import time
 from analyze_firmware import payload
 
 
-def prepare(image, auth, helper, mount):
+def prepare(image, auth, helper, mount, *, apple_systemsnapshot=False):
     image, helper, mount = (pathlib.Path(p).resolve() for p in (image, helper, mount))
     workspace = pathlib.Path.cwd().resolve()
     if not image.is_relative_to(workspace / '.firmware' / 'system-disk') or image.name != 'storage-16g.raw':
@@ -52,7 +52,9 @@ def prepare(image, auth, helper, mount):
         mounted = plistlib.loads(subprocess.check_output(['diskutil', 'info', '-plist', str(mount)], timeout=60))
         if mounted.get('DeviceIdentifier') != device or mounted.get('MountPoint') != str(mount):
             raise ValueError('fixture mount does not identify the selected image volume')
-        created = subprocess.run(['sudo', str(helper), str(mount), name], check=True, timeout=60,
+        command = ['sudo', '/System/Library/Filesystems/apfs.fs/Contents/Resources/apfs_systemsnapshot',
+                   '-s', name, '-v', str(mount)] if apple_systemsnapshot else ['sudo', str(helper), str(mount), name]
+        created = subprocess.run(command, check=True, timeout=60,
                                  capture_output=True, text=True)
         print(created.stdout, end='')
         snapshots = plistlib.loads(subprocess.check_output([
@@ -73,9 +75,10 @@ if __name__ == '__main__':
     parser.add_argument('--helper', required=True)
     parser.add_argument('--mount', required=True)
     parser.add_argument('--output', type=pathlib.Path, required=True)
+    parser.add_argument('--apple-systemsnapshot', action='store_true', help='Use installed Apple-signed snapshot utility')
     args = parser.parse_args()
     try:
-        report = prepare(args.disk, args.auth, args.helper, args.mount)
+        report = prepare(args.disk, args.auth, args.helper, args.mount, apple_systemsnapshot=args.apple_systemsnapshot)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         report = {'preparation_error': str(error), 'booted_ios': False}
         if isinstance(error, subprocess.CalledProcessError):

@@ -15,12 +15,9 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch original root hash and build host snapshot API helper
+      - name: Fetch original root hash
         run: |
           python3 Tools/fetch_firmware.py --system-volume
-          clang -Wall -Wextra -Werror Tools/create_apfs_snapshot.c -o .firmware/create-apfs-snapshot
-          codesign --force --sign - --entitlements Tools/snapshot-helper.entitlements.plist .firmware/create-apfs-snapshot
-          codesign --verify --strict .firmware/create-apfs-snapshot
       - uses: actions/download-artifact@v4
         with:
           name: ios-system-disk
@@ -28,7 +25,7 @@ jobs:
           run-id: ${{ inputs.disk_run_id }}
           github-token: ${{ github.token }}
       - name: Create actual named snapshot only on the isolated source-volume fixture
-        run: python3 Tools/prepare_system_snapshot.py --disk .firmware/system-disk/storage-16g.raw --auth .firmware/SystemVolume.im4p --helper .firmware/create-apfs-snapshot --mount .firmware/snapshot-mount --output .firmware/root-snapshot.json
+        run: python3 Tools/prepare_system_snapshot.py --disk .firmware/system-disk/storage-16g.raw --auth .firmware/SystemVolume.im4p --helper .firmware/create-apfs-snapshot --apple-systemsnapshot --mount .firmware/snapshot-mount --output .firmware/root-snapshot.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

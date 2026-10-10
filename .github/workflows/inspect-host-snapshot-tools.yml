@@ -12,6 +12,9 @@ jobs:
         run: |
           mkdir snapshot-tools
           bless --help > snapshot-tools/bless-help.txt 2>&1 || true
+          diskutil apfs addVolume > snapshot-tools/add-volume-help.txt 2>&1 || true
+          man diskutil | col -b > snapshot-tools/diskutil-man.txt || true
+          /System/Library/Filesystems/apfs.fs/Contents/Resources/newfs_apfs -h > snapshot-tools/newfs-apfs-help.txt 2>&1 || true
           diskutil apfs > snapshot-tools/diskutil-apfs-help.txt 2>&1 || true
           asr help restore > snapshot-tools/asr-restore-help.txt 2>&1 || true
           asr restore --help > snapshot-tools/asr-options.txt 2>&1 || true

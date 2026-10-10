@@ -8,9 +8,11 @@ import secrets
 from analyze_firmware import device_tree
 
 
-def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, dram_size=2 * 1024 * 1024 * 1024, research_bridge_handoff=False, research_internal_storage=False, research_fastsim=False):
+def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, dram_size=2 * 1024 * 1024 * 1024, research_bridge_handoff=False, research_internal_storage=False, research_fastsim=False, research_no_sep=False):
     if not 1_000_000 <= counter_frequency <= 1_000_000_000:
         raise ValueError("invalid counter frequency")
+    if research_no_sep and not research_fastsim:
+        raise ValueError('no-SEP diagnostic requires explicit FastSim identity')
     original_nodes = device_tree(data)  # Validate bounds/depth before rewriting.
     seed = secrets.token_bytes(64) if random_seed is None else random_seed
     if len(seed) != 64:
@@ -223,12 +225,25 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
                 properties[existing] = (properties[existing][0], encoded_value)
         if handoff:
             changes.append({"path": path, "source": "minimal one-plane research MCC model", "properties": list(handoff)})
+        if research_no_sep and path == '/device-tree/arm-io/sep':
+            if names.get(b'compatible') != b'iop,t8010\0iop,s8000\0':
+                raise ValueError('no-SEP diagnostic requires original T8010 SEP node')
+            changes.append({'path': path, 'property': 'node', 'action': 'omit',
+                            'source': 'explicit research platform without implemented SEP',
+                            'sep_data_protection_confirmed': False})
+            for _ in range(children):
+                _, cursor = node(cursor, path)
+            return b'', cursor
         encoded = [struct.pack("<II", len(properties), children)]
         for name, value in properties:
             encoded += [name, struct.pack("<I", len(value)), value, bytes((-len(value)) & 3)]
         for _ in range(children):
             child, cursor = node(cursor, path)
-            encoded.append(child)
+            if child:
+                encoded.append(child)
+            else:
+                children -= 1
+        encoded[0] = struct.pack("<II", len(properties), children)
         return b"".join(encoded), cursor
     prepared, end = node(0, "")
     if end != len(data) or not changes:
@@ -240,4 +255,6 @@ def prepare(data, counter_frequency, *, random_seed=None, dram_base=0x40000000, 
         raise ValueError('original internal storage endpoint missing')
     if research_fastsim and not any(c.get('value') == 'FastSim' for c in changes):
         raise ValueError('original product node missing for FastSim diagnostic')
+    if research_no_sep and not any(c.get('action') == 'omit' for c in changes):
+        raise ValueError('original SEP node missing for no-SEP diagnostic')
     return prepared, changes

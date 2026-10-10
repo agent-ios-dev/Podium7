@@ -12,6 +12,25 @@ def node(properties, children=()):
 
 
 class DeviceTreePreparationTests(unittest.TestCase):
+    def test_no_sep_diagnostic_omits_only_verified_sep_and_requires_fastsim(self):
+        cpu = node([('name', b'cpu0\0'), ('device_type', b'cpu\0')])
+        sep = node([('name', b'sep\0'), ('compatible', b'iop,t8010\0iop,s8000\0')], [node([('name', b'xART\0')])])
+        pmp = node([('name', b'pmp\0'), ('reg', bytes(range(16)))])
+        arm = node([('name', b'arm-io\0'), ('compatible', b'arm-io,t8010\0')], [sep, pmp])
+        tree = node([('name', b'device-tree\0')], [cpu, arm, node([('name', b'product\0')])])
+        with self.assertRaises(ValueError): prepare(tree, 24000000, research_no_sep=True)
+        ordinary, _ = prepare(tree, 24000000, random_seed=bytes(64), research_fastsim=True)
+        self.assertIn('/device-tree/arm-io/sep', [n['path'] for n in device_tree(ordinary)])
+        prepared, changes = prepare(tree, 24000000, random_seed=bytes(64), research_fastsim=True, research_no_sep=True)
+        paths = [n['path'] for n in device_tree(prepared)]
+        self.assertNotIn('/device-tree/arm-io/sep', paths)
+        self.assertNotIn('/device-tree/arm-io/sep/xART', paths)
+        self.assertEqual(next(n for n in device_tree(prepared) if n['path'].endswith('/pmp')),
+                         next(n for n in device_tree(tree) if n['path'].endswith('/pmp')))
+        self.assertEqual(len([c for c in changes if c.get('action') == 'omit']), 1)
+        with self.assertRaises(ValueError):
+            prepare(tree.replace(b'iop,s8000', b'iop,s9999'), 24000000, research_fastsim=True, research_no_sep=True)
+
     def test_fastsim_is_opt_in_preserves_devices_and_requires_original_board(self):
         cpu = node([('name', b'cpu0\0'), ('device_type', b'cpu\0')])
         sep = node([('name', b'sep\0'), ('compatible', b'iop,t8010\0'), ('reg', bytes(range(16)))])

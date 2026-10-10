@@ -18,6 +18,10 @@ on:
         description: Explicit no-SEP FastSim identity experiment requiring unsealed root
         type: boolean
         default: false
+      no_sep_diagnostic:
+        description: Omit unimplemented SEP only in explicit FastSim diagnostic
+        type: boolean
+        default: false
       root_device:
         description: Explicit research root-device name
         required: true
@@ -84,6 +88,7 @@ jobs:
       - name: Boot original kernel with official system trust cache and APFS disk
         env:
           RESEARCH_ROOT: ${{ inputs.root_device }}
+          NO_SEP_DIAGNOSTIC: ${{ inputs.no_sep_diagnostic }}
           FASTSIM_DIAGNOSTIC: ${{ inputs.fastsim_diagnostic }}
           UNSEALED_DIAGNOSTIC: ${{ inputs.unsealed_diagnostic }}
         run: |
@@ -93,6 +98,7 @@ jobs:
           extra=()
           if [[ "$UNSEALED_DIAGNOSTIC" == "true" ]]; then extra+=(--research-unsealed-root); fi
           if [[ "$FASTSIM_DIAGNOSTIC" == "true" ]]; then extra+=(--research-fastsim); fi
+          if [[ "$NO_SEP_DIAGNOSTIC" == "true" ]]; then extra+=(--research-no-sep); fi
           python3 Tools/qemu_probe.py "${extra[@]}" --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/system-boot --research-bridge-handoff --trust-cache .firmware/StaticTrustCache.im4p --system-volume .firmware/SystemVolume.im4p --research-system-root "$RESEARCH_ROOT" --research-pmp-core --research-cfi-nvram --research-aes-root-fallback --research-nvme --research-nvme-dart --research-nvme-msi --research-nvme-image .firmware/system-disk/storage-16g.raw --seconds 300 --trace-limit-mib 128
           python3 Tools/inspect_boot_fault.py --directory .firmware/system-boot
           python3 Tools/inspect_system_disk.py .firmware/system-disk/storage-16g.raw --trace .firmware/system-boot/qemu-trace.txt --output .firmware/system-boot/system-disk-layout.json

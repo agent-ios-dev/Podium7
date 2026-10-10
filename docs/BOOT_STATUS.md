@@ -1,3 +1,20 @@
+## FastSim identity alone does not skip SEP
+
+Run 38060545190 confirms FastSim is enabled in original APFS and repeats
+clean filesystem checking and successful xART/Preboot mounting. However,
+data-protection still exits 2 on missing Gigalocker: the original SEP node
+continues to publish AppleSEPManager. FastSim alone is not a fix.
+
+Next explicit no-SEP platform experiment omits only the verified T8010 SEP
+subtree, while preserving PMP, other devices, original binaries, fstab and
+kernel checks. It requires both FastSim and unsealed APFS diagnostic flags;
+normal configuration remains unchanged. Reports explicitly mark the omitted
+hardware and unimplemented SEP protection. 105 local tests pass. The guest
+must demonstrate its own no-SEP branch and subsequent boot tasks before any
+progress beyond data-protection can be claimed.
+
+---
+
 ## Mount-phase-1 passes; next task needs SEP-backed Gigalocker
 
 Run 38059471628 genuinely checks all six APFS volume superblocks and prints

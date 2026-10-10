@@ -1355,6 +1355,12 @@ static void podium7_pmp_start(void)
         "    if (bank->base == 0x600000000ULL && address == 0x28) {\n"
         "        value = (value & ~0x11U) | ((bank->registers[0x124 >> 2] & 1) ? 0x11U : 0);\n"
         "    }")
+    # Original AppleT8010PCIe channel stop issues a self-clearing reset at
+    # reg[1] +4 bit16 and spins until clear. No DMA completion is synthesized.
+    pcie = pcie.replace("    bank->registers[address >> 2] = value;",
+        "    bool channel = bank->base >= 0x601004000ULL && bank->base <= 0x604004000ULL &&\n"
+        "                   (bank->base & 0xffffff) == 0x4000;\n"
+        "    bank->registers[address >> 2] = (channel && address == 4) ? (value & ~0x10000U) : value;")
     start = pcie.index("static void podium7_pcie_create(")
     pcie = pcie[:start] + '''static uint64_t podium7_pcie_config_read(void *opaque, hwaddr address, unsigned size)
 {

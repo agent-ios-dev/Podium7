@@ -1,3 +1,18 @@
+## Original user code progresses; PCIe common-control second phase added
+
+Run 38035660772 passes the first PCIe request check, confirms PMP startup and
+records 901 EL0 returns in its normal 120-second restore probe. The stopped
+stack advances from PCIe 0xfffffff00694d69c to 0xfffffff00694eef4: the original
+driver first waits for status +0x28 bit4 and then for bit0. No launchd hello or
+SpringBoard is observed. Both response bits now derive from the same observed
++0x124 bit0 request, with reset tested; kernel validation is pending in
+run 38035964095. This remains an explicit research control acknowledgement,
+not an authenticated hardware handoff or a functioning PCIe/NVMe endpoint.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38035660772
+
+---
+
 ## SPI fix validated; next stop is original PCIe control acknowledgement
 
 Run 38035420066 passes the SPI W1C guest check and its normal 120-second boot

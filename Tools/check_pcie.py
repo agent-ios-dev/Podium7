@@ -43,6 +43,18 @@ cmp w4, w5
 b.ne failure
 subs x9, x9, #1
 b.ne next_bank
+movz x3, #0x4000
+movk x3, #0x0100, lsl #16
+movk x3, #6, lsl #32
+movz w5, #1, lsl #16
+str w5, [x3, #4]
+ldr w4, [x3, #4]
+cbnz w4, failure
+mov w5, #3
+str w5, [x3, #4]
+ldr w4, [x3, #4]
+cmp w4, w5
+b.ne failure
 movz x3, #0
 movk x3, #6, lsl #32
 ldr w4, [x3, #0x28]

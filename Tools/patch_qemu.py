@@ -1060,6 +1060,33 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
         "            else { bank->outbox_high = value; bank->outbox_pending = true; }\n"
         "        }\n"
         "    } else if (address == 0x4008) {\n        /* Queue status is read-only. */")
+    sep = sep.replace("typedef struct Podium7SEPMailboxBank {",
+        "static ARMCPU *podium7_pmp_cpu;\n"
+        "static void podium7_pmp_start(void);\n"
+        "typedef struct Podium7SEPMailboxBank {")
+    sep = sep.replace("    uint32_t value = bank->registers[address >> 2];",
+        "    uint32_t value = bank->registers[address >> 2];\n"
+        "    /* Private ARM32 SRAM alias is a research boot handoff. AP descriptor stays original. */\n"
+        "    if (podium7_pmp_cpu && current_cpu == CPU(podium7_pmp_cpu) && bank->base == 0x20e300000ULL) {\n"
+        "        if (address == 8) { value = 0x41000000; }\n"
+        "        else if (address == 0x10) { value = 0; }\n"
+        "    }")
+    # Preserve the real driver's release trigger; do not start before SRAM copy.
+    write_log = "    if (bank->logged_accesses < 256) {"
+    last = sep.rindex(write_log)
+    sep = sep[:last] + """    if (bank->base == 0x20e300000ULL && address == 0x38 && (value & 1)) {
+        podium7_pmp_start();
+    }
+""" + sep[last:]
+    sep = sep.replace("    return value;", """    if (bank->base == 0x20e300000ULL) {
+        podium7_aic_set_external(167, bank->outbox_pending && (bank->registers[0x4020 >> 2] & 1));
+    }
+    return value;""")
+    last = sep.rindex("    if (bank->logged_accesses < 256) {")
+    sep = sep[:last] + """    if (bank->base == 0x20e300000ULL) {
+        podium7_aic_set_external(167, bank->outbox_pending && (bank->registers[0x4020 >> 2] & 1));
+    }
+""" + sep[last:]
     sep = sep.replace("static void podium7_sep_mailbox_bank_create(",
                       "static Podium7SEPMailboxBank *podium7_sep_mailbox_bank_create(")
     bank_end = "    memory_region_add_subregion(memory, base, &bank->io);\n}"
@@ -1074,8 +1101,8 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
     /* Same original AppleA7IOP helper, distinct SIO register aperture. */
     podium7_sep_mailbox_bank_create(machine, memory, 0x20ae00000ULL, 0x10000,
                                     "podium7-t8010-sio-mailbox");
-    podium7_sep_mailbox_bank_create(machine, memory, 0x20e300000ULL, 0x20000,
-                                    "podium7-t8010-pmp-mailbox");
+    Podium7SEPMailboxBank *pmp_bank = podium7_sep_mailbox_bank_create(
+        machine, memory, 0x20e300000ULL, 0x20000, "podium7-t8010-pmp-mailbox");
     podium7_sep_mailbox_bank_create(machine, memory, 0x210800000ULL, 0x1c000,
                                     "podium7-t8010-aop-mailbox");
     /* Original AOP reg[1] is a separate 640-KiB firmware SRAM window. */
@@ -1083,11 +1110,51 @@ static void podium7_usbphy_create(MachineState *machine, MemoryRegion *memory)
     memory_region_init_ram(aop_sram, NULL, "podium7-t8010-aop-sram", 0xa0000, &error_fatal);
     memory_region_add_subregion(memory, 0x210e00000ULL, aop_sram);
     /* Original PMP reg[1] is firmware SRAM, not mailbox control registers.
-     * RTBuddy copies real t8010pmp words here. No PMP CPU is realized yet. */
+     * RTBuddy copies real t8010pmp words here before +0x38 release. */
     MemoryRegion *pmp_sram = g_new0(MemoryRegion, 1);
     memory_region_init_ram(pmp_sram, NULL, "podium7-t8010-pmp-sram",
                            0x20000, &error_fatal);
     memory_region_add_subregion(memory, 0x20e500000ULL, pmp_sram);
+    if (blk_by_name("podium7-pmp-integrated")) {
+        /* Explicit research core, not an AP/SMP CPU and not the exact PMP ISA model.
+         * Share the original firmware SRAM, with a low physical alias private to
+         * ARM32. Its MMU subsequently translates peripheral access above 4 GiB. */
+        MemoryRegion *private_memory = g_new0(MemoryRegion, 1);
+        MemoryRegion *sram_alias = g_new0(MemoryRegion, 1);
+        MemoryRegion *fallback = g_new0(MemoryRegion, 1);
+        memory_region_init(private_memory, OBJECT(machine), "podium7-pmp-private-memory", UINT64_MAX);
+        memory_region_init_alias(fallback, OBJECT(machine), "podium7-pmp-system-view",
+                                 memory, 0, UINT64_MAX);
+        memory_region_add_subregion_overlap(private_memory, 0, fallback, -1);
+        memory_region_init_alias(sram_alias, OBJECT(machine), "podium7-pmp-low-sram",
+                                 pmp_sram, 0, 0x20000);
+        memory_region_add_subregion(private_memory, 0x41000000, sram_alias);
+        Object *core = object_new("cortex-a7-arm-cpu");
+        object_property_set_int(core, "mp-affinity", 0xff00, &error_fatal);
+        object_property_set_bool(core, "has_el3", false, &error_fatal);
+        object_property_set_bool(core, "has_el2", false, &error_fatal);
+        object_property_set_bool(core, "start-powered-off", true, &error_fatal);
+        object_property_set_int(core, "cntfrq", 24000000, &error_fatal);
+        object_property_set_link(core, "memory", OBJECT(private_memory), &error_fatal);
+        qdev_realize(DEVICE(core), NULL, &error_fatal);
+        podium7_pmp_cpu = ARM_CPU(core);
+        /* Local interrupt-controller state must not overwrite AP IRQ masks. */
+        Podium7AIC *local_aic = g_new0(Podium7AIC, 1);
+        local_aic->output = qdev_get_gpio_in(DEVICE(core), ARM_CPU_IRQ);
+        memset(local_aic->irq_mask, 0xff, sizeof(local_aic->irq_mask));
+        local_aic->ipi_mask = 0x80000001U;
+        memory_region_init_io(&local_aic->io, OBJECT(machine), &podium7_aic_ops,
+                              local_aic, "podium7-pmp-private-aic", 0x100000);
+        memory_region_add_subregion(private_memory, 0x20e100000ULL, &local_aic->io);
+        qemu_log("PODIUM7 PMP integrated ARM32 core realized; no fabricated handshake\\n");
+    }
+    (void)pmp_bank;
+}
+static void podium7_pmp_start(void)
+{
+    if (!podium7_pmp_cpu) { return; }
+    int result = arm_set_cpu_on(0xff00, 0x41000000, 0, 1, false);
+    qemu_log("PODIUM7 PMP firmware release result=%d\\n", result);
 }
 '''
     # Original Samsung SPI starts by disabling +0/+0xc and setting +8.
@@ -1582,6 +1649,8 @@ static void podium7_pmgr_power_create(MachineState *machine, MemoryRegion *memor
     kconfig.write_text(config[:start] + block + config[end:])
     replace_once(directory / "hw/arm/virt.c", '#include "hw/block/flash.h"',
                  '#include "hw/block/flash.h"\n#include "system/block-backend.h"')
+    replace_once(directory / "hw/arm/virt.c", '#include "hw/arm/virt.h"',
+                 '#include "hw/arm/virt.h"\n#include "target/arm/arm-powerctl.h"')
     replace_once(directory / "hw/arm/virt.c", '#include "qemu/error-report.h"',
                  '#include "qemu/error-report.h"\n#include "qemu/log.h"\n#include "qemu/timer.h"')
     replace_once(directory / "hw/arm/virt.c", "static void machvirt_init(MachineState *machine)",

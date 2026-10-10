@@ -1,0 +1,30 @@
+name: Inspect official system APFS snapshots read only
+on:
+  workflow_dispatch:
+    inputs:
+      disk_run_id:
+        description: Successful official system disk preparation run
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-system-disk
+          path: .firmware/system-disk
+          run-id: ${{ inputs.disk_run_id }}
+          github-token: ${{ github.token }}
+      - name: Inspect original volumes and snapshots without modifying or mounting them
+        run: python3 Tools/inspect_apfs_host.py .firmware/system-disk/storage-16g.raw --output .firmware/apfs-host.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: apfs-host-evidence
+          path: .firmware/apfs-host.json

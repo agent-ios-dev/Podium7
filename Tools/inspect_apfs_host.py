@@ -24,7 +24,11 @@ def inspect(image):
             store.get('DeviceIdentifier', '').startswith(identifier + 's')
             for store in c.get('PhysicalStores', []))]
         if not containers:
-            raise ValueError('prepared image has no host-recognized APFS container')
+            # Keep the actual attachment/listing: older iOS containers can be
+            # attached without macOS synthesizing volumes automatically.
+            return {'read_only_attachment': True, 'attachment': attached,
+                    'apfs_listing': listing, 'containers': [], 'booted_ios': False,
+                    'inspection_error': 'prepared image has no host-recognized APFS container'}
         snapshots = {}
         for container in containers:
             for volume in container.get('Volumes', []):

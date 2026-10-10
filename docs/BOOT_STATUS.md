@@ -1,3 +1,34 @@
+## System volume found; official auth blob accepted; named snapshot missing
+
+Run38047075315 confirms original iOS creates disk0s1s1 and mounts
+SkyUpdate19H422.N112OS after the internal-storage DeviceTree correction.
+It then panics because /chosen/system-volume-auth-blob is missing.
+
+Run38047922400 supplies the unchanged208-byte SystemVolume isys payload
+from Firmware/098-68748-067.dmg.root_hash; container SHA384 matches Apple's
+BuildManifest. Original APFS imports it without the missing-blob error.
+The next failure is apfs_find_named_root_snapshot_xid returning ENOENT,
+followed by rootvp not authenticated after mounting. System launchd, EL0
+and SpringBoard remain unconfirmed; original APFS authentication is intact.
+The bootloader handoff and previously documented research patches remain
+synthetic, not an authenticated iBoot chain.
+
+APFS builds the expected name from com.apple.os.update- and the32-byte
+primary hash at payload offset16. Run38048484989 inspects volume roles and
+snapshots through a read-only, unmounted macOS attachment of the prepared
+image, to distinguish a missing restore-install snapshot from a naming bug.
+
+The latest NVMe readback report contains one interleaved log record, not
+confirmed disk corruption: its93-byte prefix matches the source GPT header.
+Readback logging now emits each bounded buffer in one call, the parser
+rejects incomplete lines explicitly, and comparisons can read the exact
+transfer length from the original disk.87 Python tests pass, including
+payload guards, read-only APFS attachment cleanup and interleaved records.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38047922400
+
+---
+
 ## APFS probe rejects external NVMe; internal DT handoff under test
 
 Full-system run38046156960 proves byte-for-byte equality of the protective

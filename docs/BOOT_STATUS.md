@@ -1,3 +1,33 @@
+## PMP startup, bounded message FIFO and later display/video faults
+
+Runs 38030017923 and 38030307496 both print genuine `ApplePMP: started`
+and original firmware `[PMP:main.cpp:579] PMP started`. The second fresh-machine
+probe in 38030017923 also reaches both startup messages. Its strict evidence
+gate rejects the run because status polling exhausted the shared trace budget
+before the firmware data-port read was recorded. A separate bounded data-port
+budget has been added; the gate still requires actual consumed-message evidence.
+
+The AP-to-PMP mailbox now uses a research FIFO of capacity 16, rather than a
+single slot which dropped original endpoint-start bursts. Its exact ASIC depth
+is not established. ARM64 guest checks cover full/empty flags, ordered draining,
+rejected overflow, low/high-word publication, and a consumer freeing space
+between low-word staging and high-word publication.
+
+Original XNU passed the JPEG reset banks, 64-bit PMGR bridge accesses and scaler0
+reset/discovery banks. Run 38030307496 stops at PC 0xfffffff006451a5c with physical
+fault address 0x208130004, resolved by stopped-AP QMP translation to the original
+DT `/device-tree/arm-io/vxd` secondary bank. VXD control windows and a guest
+read/modify/write check have been added; their follow-up is pending. Codec DMA,
+video decoding and scaler pixel processing are not implemented.
+
+61 Python tests pass locally. This is still the external QEMU research backend:
+no restore launchd/EL0, normal iOS root mount, SpringBoard or usable emulator IPA
+is confirmed. Native fixed 16-GiB sparse storage is not yet guest NVMe storage.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38030307496
+
+---
+
 ## Verified original PMP protocol exchanges in both directions
 
 Run 38028974526 confirms AP reads the authentic firmware hello, responds with

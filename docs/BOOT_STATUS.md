@@ -23,7 +23,7 @@ service users to investigate where these proxies wait before exec.
 Run 38086369069 confirms that UID collection works in the original guest:
 59 processes, 100,232 EL0 returns in 300 seconds, no panic. Mobile launchd and
 many original services run as UID 501. Of the 22 remaining xpcproxy processes,
-13 have UID 501, eight have UID 0, and one has UID 25. All have parent PID 1.
+12 have UID 501, nine have UID 0, and one has UID 25. All have parent PID 1.
 Thus a general failure to resolve/switch to mobile credentials is ruled out.
 The snapshot still has no SpringBoard/backboardd. Proxy target identities and
 their exact wait conditions have not yet been established; do not infer them

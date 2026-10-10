@@ -28,10 +28,13 @@ def inspect(path, trace, *, dump_root_pages=False):
                 windows.extend((base + offset, 64) for offset in range(0, 4096, 256))
         if windows:
             report["original_root_table_pages"] = capture(path, physical_windows=tuple(windows))["physical_windows"]
-    for shift in (12, 14):
+    # Extra port-address candidate comes from actual root-table occupancy;
+    # this diagnostic never installs an assumed PCIe inbound translation.
+    for shift, iova_mask in ((12, 0xffffffff), (14, 0xffffffff), (12, 0x7fffffff)):
+        walk_iova = iova & iova_mask
         bits = shift - 3
-        index = iova >> (shift + bits * 2)
-        candidate = {"page_shift": shift, "root_index": index}
+        index = walk_iova >> (shift + bits * 2)
+        candidate = {"page_shift": shift, "root_index": index, "iova_mask": hex(iova_mask)}
         report["candidates"].append(candidate)
         ttbr = roots.get(0x40 + index * 4, 0)
         candidate["ttbr"] = hex(ttbr)
@@ -39,7 +42,7 @@ def inspect(path, trace, *, dump_root_pages=False):
             candidate["error"] = "root descriptor is absent or invalid"
             continue
         base = (ttbr & 0xfffffff) << 12
-        l1 = base + ((iova >> (shift + bits)) & ((1 << bits) - 1)) * 8
+        l1 = base + ((walk_iova >> (shift + bits)) & ((1 << bits) - 1)) * 8
         candidate["l1_address"] = hex(l1)
         if not 0x40000000 <= l1 <= 0xbffffff8:
             candidate["error"] = "root table outside research RAM"
@@ -50,7 +53,7 @@ def inspect(path, trace, *, dump_root_pages=False):
             candidate["error"] = "invalid level1 descriptor"
             continue
         mask = ((1 << 40) - 1) & ~((1 << shift) - 1)
-        l2 = (first & mask) + ((iova >> shift) & ((1 << bits) - 1)) * 8
+        l2 = (first & mask) + ((walk_iova >> shift) & ((1 << bits) - 1)) * 8
         candidate["l2_address"] = hex(l2)
         if not 0x40000000 <= l2 <= 0xbffffff8:
             candidate["error"] = "level2 table outside research RAM"
@@ -60,7 +63,7 @@ def inspect(path, trace, *, dump_root_pages=False):
         if not second & 1:
             candidate["error"] = "invalid level2 descriptor"
             continue
-        physical = (second & mask) | (iova & ((1 << shift) - 1))
+        physical = (second & mask) | (walk_iova & ((1 << shift) - 1))
         candidate["translated_asq"] = hex(physical)
         if not 0x40000000 <= physical <= 0xbfffffc0:
             candidate["error"] = "submission queue outside research RAM"

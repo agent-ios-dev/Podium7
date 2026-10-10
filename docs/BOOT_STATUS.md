@@ -1,3 +1,22 @@
+## Original DART root pages captured before command timeout
+
+Run 38039924882 captures the original tables before any NVMe FatalHandling:
+ASQ IOVA0x86b9c000, TTBR0..3=0x80055e80..83. Four nonzero64-bit root entries
+appear at physical0x55e801a0..1b8:0x55e64003,0x55e65003,0x55e66003,0x55e67003.
+Both unmodified-address4K/16K table walks select invalid zero entries. A separate
+31-bit PCIe-address candidate matches the observed4K root occupancy and will
+read the next-level descriptors and actual submission queue. This candidate is
+diagnostic only: no assumed inbound remapping or DMA translation is installed.
+
+Run38039538343 again confirms real launchd hello, restore environment and14237
+EL0 returns. Its16 GiB disk uses16384 physical bytes after persisted sector I/O.
+A strict independent NVMe restore-userland regression check is now added;
+the preexisting PMP/control boot gates remain intact. Full desktop boot is absent.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38039924882
+
+---
+
 ## Original iOS restore launchd and restored_extern now execute with real NVMe attached
 
 Run 38039000833 boots the independent NVMe+CFI+PMP research experiment far

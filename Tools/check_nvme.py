@@ -426,7 +426,7 @@ str x0, [x1]
 str wzr, [x1, #8]
 str wzr, [x1, #12]
 ldrh w0, [x2, #2]
-and w0, w0, #0xbfff
+and w0, w0, #0xffffbfff
 orr w0, w0, #0x8000
 strh w0, [x2, #2]
 dsb sy

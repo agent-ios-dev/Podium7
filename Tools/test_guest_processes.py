@@ -11,6 +11,7 @@ class GuestProcessesTests(unittest.TestCase):
                   base: struct.pack("<Q", nodes[0])}
         for i, (node, name) in enumerate(zip(nodes, names)):
             memory[node + 0x68] = struct.pack("<I", i + 1)
+            memory[node + 0x28] = struct.pack("<I", i)
             memory[node + 0x370] = name.encode().ljust(32, b"\0")
             memory[node + 0xa8] = struct.pack("<Q", nodes[i+1] if i+1 < len(nodes) else 0)
         return memory, nodes
@@ -18,8 +19,8 @@ class GuestProcessesTests(unittest.TestCase):
     def test_names_are_evidence_of_processes_not_visible_desktop(self):
         memory, _ = self.fixture()
         result = inspect(lambda address, size: memory[address])
-        self.assertEqual(result["processes"], [{"pid": 1, "name": "launchd"},
-                                               {"pid": 2, "name": "SpringBoard"}])
+        self.assertEqual(result["processes"], [{"pid": 1, "ppid": 0, "name": "launchd"},
+                                               {"pid": 2, "ppid": 1, "name": "SpringBoard"}])
         self.assertTrue(result["springboard_process_seen"])
         self.assertFalse(result["visible_springboard_confirmed"])
 

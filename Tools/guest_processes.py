@@ -41,11 +41,13 @@ def inspect(read):
                 raise ValueError("process metadata limit exceeded")
             chain.add(current); seen.add(current)
             pid = struct.unpack("<I", data(current + 0x68, 4))[0]
+            # Original _proc_ppid at 0xfffffff0075db0dc returns proc +0x28.
+            ppid = struct.unpack("<I", data(current + 0x28, 4))[0]
             name_bytes = data(current + 0x370, 32).split(b"\0", 1)[0]
-            if pid > 1000000 or any(byte < 32 or byte > 126 for byte in name_bytes):
+            if max(pid, ppid) > 1000000 or any(byte < 32 or byte > 126 for byte in name_bytes):
                 raise ValueError("invalid process identity metadata")
             name = name_bytes.decode("ascii")
-            processes.append({"pid": pid, "name": name})
+            processes.append({"pid": pid, "ppid": ppid, "name": name})
             current = word(current + 0xa8)
     return {"source": "stopped original kernel process hash", "read_only": True,
             "processes": sorted(processes, key=lambda item: item["pid"]),

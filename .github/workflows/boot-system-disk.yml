@@ -2,6 +2,13 @@ name: Probe original iOS from prepared APFS system disk
 on:
   workflow_dispatch:
     inputs:
+      execution_seconds:
+        description: Bounded real guest observation period
+        type: choice
+        default: '300'
+        options:
+          - '300'
+          - '600'
       disk_run_id:
         description: Successful official system disk preparation run
         required: true
@@ -98,6 +105,7 @@ jobs:
       - name: Boot original kernel with official system trust cache and APFS disk
         env:
           RESEARCH_ROOT: ${{ inputs.root_device }}
+          EXECUTION_SECONDS: ${{ inputs.execution_seconds }}
           KEYBAG_DIAGNOSTICS: ${{ inputs.keybag_diagnostics }}
           DEBUG_DIAGNOSTICS: ${{ inputs.debug_diagnostics }}
           NO_SEP_DIAGNOSTIC: ${{ inputs.no_sep_diagnostic }}
@@ -108,12 +116,13 @@ jobs:
           cp .firmware/KernelCache.macho .firmware/DeviceTree.bin .firmware/system-boot/
           python3 Tools/inspect_system_disk.py .firmware/system-disk/storage-16g.raw --output .firmware/system-boot/system-disk-layout.json
           extra=()
+          case "$EXECUTION_SECONDS" in 300|600) ;; *) echo 'Invalid guest execution budget'; exit 1;; esac
           if [[ "$UNSEALED_DIAGNOSTIC" == "true" ]]; then extra+=(--research-unsealed-root); fi
           if [[ "$FASTSIM_DIAGNOSTIC" == "true" ]]; then extra+=(--research-fastsim); fi
           if [[ "$NO_SEP_DIAGNOSTIC" == "true" ]]; then extra+=(--research-no-sep); fi
           if [[ "$KEYBAG_DIAGNOSTICS" == "true" ]]; then extra+=(--research-keybag-diagnostics); fi
           if [[ "$DEBUG_DIAGNOSTICS" == "true" ]]; then extra+=(--research-debug-diagnostics); fi
-          python3 Tools/qemu_probe.py "${extra[@]}" --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/system-boot --research-bridge-handoff --trust-cache .firmware/StaticTrustCache.im4p --system-volume .firmware/SystemVolume.im4p --research-system-root "$RESEARCH_ROOT" --research-pmp-core --research-cfi-nvram --research-aes-root-fallback --research-nvme --research-nvme-dart --research-nvme-msi --research-nvme-image .firmware/system-disk/storage-16g.raw --seconds 300 --trace-limit-mib 128
+          python3 Tools/qemu_probe.py "${extra[@]}" --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/system-boot --research-bridge-handoff --trust-cache .firmware/StaticTrustCache.im4p --system-volume .firmware/SystemVolume.im4p --research-system-root "$RESEARCH_ROOT" --research-pmp-core --research-cfi-nvram --research-aes-root-fallback --research-nvme --research-nvme-dart --research-nvme-msi --research-nvme-image .firmware/system-disk/storage-16g.raw --seconds "$EXECUTION_SECONDS" --trace-limit-mib 256
           python3 Tools/inspect_boot_fault.py --directory .firmware/system-boot
           python3 Tools/inspect_system_disk.py .firmware/system-disk/storage-16g.raw --trace .firmware/system-boot/qemu-trace.txt --output .firmware/system-boot/system-disk-layout.json
           python3 Tools/verify_system_userland.py .firmware/system-boot

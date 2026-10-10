@@ -53,6 +53,16 @@ def check(executable, tree, report):
         for edge, address in enumerate((base, base + size - 4)):
             assembly += address_register(address)
             assembly += ["ldr w4, [x3]", f"cmp w4, #{0x100 + index * 2 + edge}", "b.ne failure"]
+    # Original ApplePMGR telemetry reads an aligned 64-bit pair at +0x8110.
+    # Check the actual faulting offset and paired-word semantics in every bank.
+    for base, size in banks:
+        offsets = [8, size - 16] + ([0x8110] if size > 0x8118 else [])
+        for offset in offsets:
+            assembly += address_register(base + offset)
+            assembly += ["movz x5, #0x1234", "movk x5, #0xabcd, lsl #48",
+                         "str x5, [x3]", "ldr x6, [x3]", "cmp x5, x6", "b.ne failure",
+                         "ldr w6, [x3]", "mov w5, #0x1234", "cmp w5, w6", "b.ne failure",
+                         "ldr w6, [x3, #4]", "mov w5, #0xabcd0000", "cmp w5, w6", "b.ne failure"]
     assembly += ["mov x0, #0x20", "adr x1, success_exit", "hlt #0xf000", "b .",
                  "failure:", "mov x0, #0x20", "adr x1, failure_exit", "hlt #0xf000", "b .",
                  ".p2align 3", "success_exit:", ".quad 0x20026, 0",
@@ -73,7 +83,7 @@ def check(executable, tree, report):
             "scope": "PMGR bridge backing registers; no iBoot settings or power transition claim",
             "banks": [{"base": hex(base), "size": size} for base, size in banks],
             "checks": ["zero initialization", "both boundaries persist", "independent banks",
-                       "bridge 11 preserves physical address above 16 GiB"],
+                       "bridge 11 preserves physical address above 16 GiB", "64-bit pairs, word order, and original +0x8110 telemetry access"],
             "returncode": result.returncode, "stderr": result.stderr}, indent=2))
         if result.returncode:
             raise RuntimeError("PMGR bridge guest MMIO checks failed")

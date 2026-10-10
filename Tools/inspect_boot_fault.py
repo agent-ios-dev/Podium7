@@ -53,9 +53,13 @@ if panic:
                             f"{extension.get(option, 'option-' + str(option))}{modifier}]"
                         )
                 break
-    from resolve_mmio_fault import physical_address, owners
+    from resolve_mmio_fault import physical_address, snapshot_physical_address, owners
     if "far" in values:
         physical = physical_address(trace, int(values["far"], 16))
+        if physical is None and (root / "cpu-snapshot.json").exists():
+            physical = snapshot_physical_address(json.loads((root / "cpu-snapshot.json").read_text()), int(values["far"], 16))
+            if physical is not None:
+                report["physical_translation_source"] = "stopped AP QMP gva2gpa"
         if physical is not None:
             report["observed_physical_fault_address"] = hex(physical)
             tree_path = root / "DeviceTree.bin"

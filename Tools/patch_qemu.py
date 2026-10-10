@@ -1461,7 +1461,7 @@ static void podium7_pmgr_bridge_write(void *opaque, hwaddr address,
 static const MemoryRegionOps podium7_pmgr_bridge_ops = {
     .read = podium7_pmgr_bridge_read, .write = podium7_pmgr_bridge_write,
     .endianness = DEVICE_LITTLE_ENDIAN,
-    .valid = { .min_access_size = 4, .max_access_size = 4, .unaligned = false },
+    .valid = { .min_access_size = 4, .max_access_size = 8, .unaligned = false },
     .impl = { .min_access_size = 4, .max_access_size = 4, .unaligned = false },
 };
 

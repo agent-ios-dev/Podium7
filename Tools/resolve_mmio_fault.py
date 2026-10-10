@@ -17,6 +17,20 @@ def physical_address(trace, virtual_address):
     return max(candidates)[2] if candidates else None
 
 
+def snapshot_physical_address(snapshot, virtual_address):
+    """Accept only the exact VA's successful stopped-CPU QMP translation."""
+    for entry in snapshot.get("translations", []):
+        try:
+            if int(entry["virtual_address"], 16) != virtual_address:
+                continue
+        except (KeyError, TypeError, ValueError):
+            continue
+        match = re.fullmatch(r"\s*gpa:\s*(0x[0-9a-fA-F]+)\s*", entry.get("backend_result", ""))
+        if match and int(match[1], 16) < 1 << 64:
+            return int(match[1], 16)
+    return None
+
+
 def owners(tree, physical):
     nodes = device_tree(tree)
     armio = next((n for n in nodes if n["path"] == "/device-tree/arm-io"), None)

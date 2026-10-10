@@ -21,3 +21,18 @@ class IntegrationEvidenceTests(unittest.TestCase):
         result = evidence("PODIUM7 SEP-MAILBOX base=000000020da00000 write offset=0bb0 value=000c000c\n"
                           "PODIUM7 SEP-MAILBOX base=000000020da00000 write offset=0bb4 value=00100000")
         self.assertFalse(result["original_boot_hello_written"])
+
+    def test_startup_text_without_executed_protocol_is_not_boot(self):
+        result = evidence("", "ApplePMP: started\n[PMP:main.cpp:579] PMP started\n")
+        self.assertTrue(result["pmp_driver_started"])
+        self.assertTrue(result["original_firmware_started"])
+        self.assertFalse(result["pmp_boot_confirmed"])
+        self.assertFalse(result["ios_boot_confirmed"])
+
+    def test_saved_fault_translation_must_match_exact_virtual_address(self):
+        from resolve_mmio_fault import snapshot_physical_address
+        snapshot = {"translations": [{"virtual_address": "0xffffffe84dc6c008", "backend_result": "gpa: 0x207b00008\r\n"}]}
+        self.assertEqual(snapshot_physical_address(snapshot, 0xffffffe84dc6c008), 0x207b00008)
+        self.assertIsNone(snapshot_physical_address(snapshot, 0xffffffe84dc6c000))
+        snapshot["translations"][0]["backend_result"] = "translation failed: gpa: 0x207b00008"
+        self.assertIsNone(snapshot_physical_address(snapshot, 0xffffffe84dc6c008))

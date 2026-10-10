@@ -1,3 +1,27 @@
+## Verified original PMP protocol exchanges in both directions
+
+Run 38028974526 confirms AP reads the authentic firmware hello, responds with
+version 12, and PMP consumes that response through its real ARM32 receive
+handler. Further real messages advertise endpoints and negotiate buffers.
+CPU#1 has no data abort. Main XNU no longer stops at the prior PMP status-4/5
+20-second timeout in this run: the new fatal point is AppleJPEGDriver's reset
+write at original PC 0xfffffff0060edc88 (STR W9,[X8,#8]).
+
+The driver module was resolved from the original __PRELINK_INFO metadata and
+its __TEXT_EXEC Mach-O segment, not inferred from an arbitrary register value.
+The original n112ap DT maps JPEG0/JPEG1 at 0x207b00000/0x207b08000, each 0x4000.
+Discovery/reset controls and a guest reset-sequence test have been added;
+codec DMA and encode/decode results remain unsupported. Follow-up is pending.
+
+All previous hardware tests and 59 Python tests pass. Both processors genuinely
+execute original firmware/kernel instructions; no protocol responses are
+fabricated. Restore EL0, launchd and graphical SpringBoard are still absent.
+This remains an external research backend, not a usable iOS emulator IPA.
+
+Evidence: https://github.com/agent-ios-dev/Podium7/actions/runs/38028974526
+
+---
+
 ## Verified genuine RTKit hello delivered to XNU
 
 Run 38028780454 confirms the corrected AP receive IRQ 170. The original PMP

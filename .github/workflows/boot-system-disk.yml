@@ -11,6 +11,7 @@ on:
           - 'true'
           - 'disabled-aks'
           - 'disabled-aks-root-unsupported'
+          - 'embedded-disabled-aks-root-unsupported'
       execution_seconds:
         description: Bounded real guest observation period
         type: choice
@@ -82,10 +83,25 @@ jobs:
         run: |
           git clone --depth 1 --branch v10.0.0 https://github.com/qemu/qemu.git .qemu
           python3 Tools/patch_qemu.py .qemu
+          if [[ "${{ inputs.sep_manager_probe }}" == "embedded-disabled-aks-root-unsupported" ]]; then
+            python3 Tools/patch_qemu_embedding.py .qemu
+          fi
           mkdir .qemu/build
           cd .qemu/build
           ../configure --python="$(python -c 'import sys; print(sys.executable)')" --cc="ccache clang" --cxx="ccache clang++" --target-list=aarch64-softmmu --disable-docs --disable-tools --disable-guest-agent --disable-slirp --disable-hvf --disable-cocoa --disable-vnc --disable-sdl --disable-gtk --disable-curses
           ninja qemu-system-aarch64
+          if [[ "${{ inputs.sep_manager_probe }}" == "embedded-disabled-aks-root-unsupported" ]]; then
+            ninja libPodium7QEMU.dylib
+          fi
+      - name: Require real in-process execution before embedded system boot
+        if: inputs.sep_manager_probe == 'embedded-disabled-aks-root-unsupported'
+        run: |
+          python3 Tools/check_embedded_guest.py --library .qemu/build/libPodium7QEMU.dylib --output .embedding-evidence
+          cat > .qemu/build/qemu-library-host <<'SH'
+          #!/bin/bash
+          exec python3 Tools/check_qemu_embedding.py --library .qemu/build/libPodium7QEMU.dylib -- "$@"
+          SH
+          chmod +x .qemu/build/qemu-library-host
       - name: Require guest PMGR state transitions before system boot
         run: python3 Tools/check_pmgr_power.py --qemu .qemu/build/qemu-system-aarch64
       - name: Require real scratch NVMe DMA and EL1 IRQ delivery before system boot
@@ -133,9 +149,14 @@ jobs:
           if [[ "$SEP_MANAGER_PROBE" == "true" ]]; then extra+=(--research-sep-manager-probe); fi
           if [[ "$SEP_MANAGER_PROBE" == "disabled-aks" ]]; then extra+=(--research-sep-manager-probe --research-disabled-aks); fi
           if [[ "$SEP_MANAGER_PROBE" == "disabled-aks-root-unsupported" ]]; then extra+=(--research-sep-manager-probe --research-disabled-aks --research-platform-root-unsupported); fi
+          qemu=.qemu/build/qemu-system-aarch64
+          if [[ "$SEP_MANAGER_PROBE" == "embedded-disabled-aks-root-unsupported" ]]; then
+            extra+=(--research-sep-manager-probe --research-disabled-aks --research-platform-root-unsupported)
+            qemu=.qemu/build/qemu-library-host
+          fi
           if [[ "$KEYBAG_DIAGNOSTICS" == "true" ]]; then extra+=(--research-keybag-diagnostics); fi
           if [[ "$DEBUG_DIAGNOSTICS" == "true" ]]; then extra+=(--research-debug-diagnostics); fi
-          python3 Tools/qemu_probe.py "${extra[@]}" --qemu .qemu/build/qemu-system-aarch64 --cpu podium7-research --directory .firmware/system-boot --research-bridge-handoff --trust-cache .firmware/StaticTrustCache.im4p --system-volume .firmware/SystemVolume.im4p --research-system-root "$RESEARCH_ROOT" --research-pmp-core --research-cfi-nvram --research-aes-root-fallback --research-nvme --research-nvme-dart --research-nvme-msi --research-nvme-image .firmware/system-disk/storage-16g.raw --seconds "$EXECUTION_SECONDS" --trace-limit-mib 256
+          python3 Tools/qemu_probe.py "${extra[@]}" --qemu "$qemu" --cpu podium7-research --directory .firmware/system-boot --research-bridge-handoff --trust-cache .firmware/StaticTrustCache.im4p --system-volume .firmware/SystemVolume.im4p --research-system-root "$RESEARCH_ROOT" --research-pmp-core --research-cfi-nvram --research-aes-root-fallback --research-nvme --research-nvme-dart --research-nvme-msi --research-nvme-image .firmware/system-disk/storage-16g.raw --seconds "$EXECUTION_SECONDS" --trace-limit-mib 256
           python3 Tools/inspect_boot_fault.py --directory .firmware/system-boot
           python3 Tools/inspect_system_disk.py .firmware/system-disk/storage-16g.raw --trace .firmware/system-boot/qemu-trace.txt --output .firmware/system-boot/system-disk-layout.json
           python3 Tools/verify_system_userland.py .firmware/system-boot
@@ -150,4 +171,5 @@ jobs:
             .firmware/nvme-checks.json
             .firmware/pmgr-power-checks.json
             .firmware/install-layout.json
+            .embedding-evidence/*.json
           if-no-files-found: ignore

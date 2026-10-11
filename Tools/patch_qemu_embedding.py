@@ -60,12 +60,18 @@ int p7_qemu_stop(void)
 
 ANCHOR = "    if host_os == 'darwin'\n      icon = 'pc-bios/qemu.rsrc'"
 LIBRARY = """    if target == 'aarch64-softmmu'
+      embedding_link_args = link_args
+      if host_os == 'darwin'
+        embedding_link_args += ['-Wl,-exported_symbol,_p7_qemu_abi',
+                                '-Wl,-exported_symbol,_p7_qemu_run',
+                                '-Wl,-exported_symbol,_p7_qemu_stop']
+      endif
       shared_library('Podium7QEMU', files('system/podium7-embedding.c'),
         c_args: c_args,
         dependencies: arch_deps + exe['dependencies'],
         objects: lib.extract_all_objects(recursive: true),
         link_depends: [block_syms, qemu_syms],
-        link_args: link_args,
+        link_args: embedding_link_args,
         install: false)
     endif
 

@@ -87,8 +87,14 @@ import QEMUHost
             status = "QEMU выполняет гостевую систему. Графический вывод ещё разрабатывается."
             polling = Task { [weak self] in
                 while !Task.isCancelled {
-                    if let data = try? Data(contentsOf: logDirectory.appendingPathComponent("serial.txt")) {
-                        self?.serial = String(decoding: data.suffix(65536), as: UTF8.self)
+                    if let file = try? FileHandle(forReadingFrom: logDirectory.appendingPathComponent("serial.txt")) {
+                        if let size = try? file.seekToEnd() {
+                            try? file.seek(toOffset: size > 65536 ? size - 65536 : 0)
+                            if let data = try? file.read(upToCount: 65536) {
+                                self?.serial = String(decoding: data, as: UTF8.self)
+                            }
+                        }
+                        try? file.close()
                     }
                     try? await Task.sleep(nanoseconds: 1_000_000_000)
                 }

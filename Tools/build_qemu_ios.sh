@@ -30,6 +30,22 @@ c_link_args = ['-target', 'arm64-apple-ios17.0', '-isysroot', '$sdk']
 cpp_link_args = ['-target', 'arm64-apple-ios17.0', '-isysroot', '$sdk']
 b_staticpic = true
 EOF
+git clone https://github.com/libffi/libffi.git .ios-build/libffi
+git -C .ios-build/libffi checkout --detach 3d0ce1e6fcf19f853894862abcbac0ae78a7be60
+(
+  cd .ios-build/libffi
+  ./autogen.sh
+  CC="xcrun --sdk iphoneos clang" CFLAGS="-target arm64-apple-ios17.0 -isysroot $sdk -fPIC" \
+    LDFLAGS="-target arm64-apple-ios17.0 -isysroot $sdk" \
+    ./configure --host=aarch64-apple-darwin --prefix="$prefix" --disable-shared --enable-static
+  make -j3
+  make install
+)
+git clone https://github.com/utmapp/libucontext.git .ios-build/libucontext
+git -C .ios-build/libucontext checkout --detach 9b1d8f01a6e99166f9808c79966abe10786de8b6
+meson setup .ios-build/ucontext-build .ios-build/libucontext \
+  --cross-file .ios-build/cross.ini --prefix "$prefix" --default-library static -Dfreestanding=true
+ninja -C .ios-build/ucontext-build install
 # Static dependencies simplify signing: the only shipped binary is our framework.
 meson setup .ios-build/glib-build .ios-build/glib-2.82.5 \
   --cross-file .ios-build/cross.ini --prefix "$prefix" --default-library static \
@@ -39,12 +55,13 @@ meson setup .ios-build/glib-build .ios-build/glib-2.82.5 \
 ninja -C .ios-build/glib-build install
 export PKG_CONFIG_LIBDIR="$prefix/lib/pkgconfig"
 export PKG_CONFIG_PATH="$PKG_CONFIG_LIBDIR"
+python3 Tools/patch_qemu_ios.py .qemu
 mkdir -p .qemu/build-ios
 cd .qemu/build-ios
 ../configure --python="$(command -v python3)" --cpu=aarch64 \
   --cc="xcrun --sdk iphoneos clang" --cxx="xcrun --sdk iphoneos clang++" \
-  --extra-cflags="-target arm64-apple-ios17.0 -isysroot $sdk" \
-  --extra-ldflags="-target arm64-apple-ios17.0 -isysroot $sdk" \
+  --extra-cflags="-target arm64-apple-ios17.0 -isysroot $sdk -DPODIUM7_IOS=1 -I$prefix/include" \
+  --extra-ldflags="-target arm64-apple-ios17.0 -isysroot $sdk -L$prefix/lib -lucontext" \
   --target-list=aarch64-softmmu --without-default-features --enable-tcg \
   --enable-tcg-interpreter --enable-fdt --disable-pixman --disable-tools \
   --disable-docs --disable-guest-agent --disable-hvf --disable-cocoa \

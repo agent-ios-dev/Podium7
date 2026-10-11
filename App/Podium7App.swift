@@ -36,6 +36,7 @@ struct LaboratoryView: View {
                 }
                 Text(diskStatus).font(.footnote)
                 Text(jit.status).font(.footnote)
+                Text("StikDebug сейчас ускоряет ARM64-тест. Подключение JIT к QEMU ещё разрабатывается.").font(.caption)
                 HStack {
                     Button("Включить JIT в StikDebug") { jit.requestStikDebug() }
                     Button("Проверить JIT") { jit.prepare() }

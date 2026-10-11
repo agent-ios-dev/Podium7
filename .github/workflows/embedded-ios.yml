@@ -7,6 +7,8 @@ jobs:
   host-library:
     runs-on: macos-15
     timeout-minutes: 30
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -15,7 +17,12 @@ jobs:
       - run: python3 -m pip install capstone==5.0.9 distlib==0.3.9
       - run: swift test
       - run: python3 -m unittest discover -s Tools -p 'test_*.py'
-      - run: brew install glib pixman ninja pkgconf
+      - run: brew install glib pixman ninja pkgconf ccache
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: qemu-embedding-darwin-v1-${{ github.sha }}
+          restore-keys: qemu-embedding-darwin-v1-
       - name: Build the pinned machine as executable and library
         run: |
           git clone --depth 1 --branch v10.0.0 https://github.com/qemu/qemu.git .qemu
@@ -23,7 +30,7 @@ jobs:
           python3 Tools/patch_qemu_embedding.py .qemu
           mkdir .qemu/build
           cd .qemu/build
-          ../configure --python="$(command -v python3)" --target-list=aarch64-softmmu --disable-docs --disable-tools --disable-guest-agent --disable-slirp --disable-hvf --disable-cocoa --disable-vnc --disable-sdl --disable-gtk --disable-curses
+          ../configure --python="$(command -v python3)" --cc="ccache clang" --cxx="ccache clang++" --target-list=aarch64-softmmu --disable-docs --disable-tools --disable-guest-agent --disable-slirp --disable-hvf --disable-cocoa --disable-vnc --disable-sdl --disable-gtk --disable-curses
           ninja libPodium7QEMU.dylib qemu-system-aarch64
       - name: Require real embedded PMGR execution and clean return to host
         run: python3 Tools/check_embedded_guest.py --library .qemu/build/libPodium7QEMU.dylib --output .embedding-evidence
@@ -43,7 +50,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python3 -m pip install meson==1.8.1 distlib==0.3.9 pyyaml
-      - run: brew install ninja pkgconf xcodegen
+      - run: brew install ninja pkgconf xcodegen autoconf automake libtool
       - run: |
           git clone --depth 1 --branch v10.0.0 https://github.com/qemu/qemu.git .qemu
           python3 Tools/patch_qemu.py .qemu

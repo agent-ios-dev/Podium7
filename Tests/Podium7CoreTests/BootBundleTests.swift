@@ -33,6 +33,8 @@ final class BootBundleTests: XCTestCase {
             XCTAssertTrue(args.contains("1,maxcpus=2"))
             XCTAssertEqual(try disk.read(offset: VirtualDisk.capacity - 4, count: 4), Data([9, 8, 7, 6]))
             XCTAssertThrowsError(try bundle.arguments(directory: URL(fileURLWithPath: "/tmp/a,readonly=off"), logs: root, qmp: root))
+            XCTAssertThrowsError(try bundle.arguments(directory: root, logs: root,
+                qmp: URL(fileURLWithPath: "/tmp/" + String(repeating: "x", count: 104))))
         }
     }
 

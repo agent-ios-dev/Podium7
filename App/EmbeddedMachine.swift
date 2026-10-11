@@ -79,9 +79,9 @@ import QEMUHost
             }
             let logDirectory = directory.appendingPathComponent("Logs-\(UUID().uuidString)")
             try FileManager.default.createDirectory(at: logDirectory, withIntermediateDirectories: true)
-            // Darwin UNIX socket paths are limited to 104 bytes. /tmp is the
-            // app's sandbox temporary directory; a short path avoids long UUID roots.
-            let socket = URL(fileURLWithPath: "/tmp/p7-\(ProcessInfo.processInfo.processIdentifier).sock")
+            // Absolute /tmp is outside the iOS data-container sandbox.
+            // Keep a short filename inside the actual app temporary directory.
+            let socket = FileManager.default.temporaryDirectory.appendingPathComponent("p7.sock")
             let arguments = try bundle.arguments(directory: directory, logs: logDirectory, qmp: socket)
             logs = logDirectory; consumed = true; running = true
             status = "Запуск QEMU. Графический вывод ещё разрабатывается."

@@ -59,7 +59,7 @@ export PKG_CONFIG_PATH="$PKG_CONFIG_LIBDIR"
 python3 Tools/patch_qemu_ios.py .qemu
 mkdir -p .qemu/build-ios
 cd .qemu/build-ios
-../configure --python="$(command -v python3)" --cpu=aarch64 \
+../configure --python="$(command -v python3)" --cpu=aarch64 --cross-prefix= --host-cc=clang \
   --cc="xcrun --sdk iphoneos clang" --cxx="xcrun --sdk iphoneos clang++" \
   --extra-cflags="-target arm64-apple-ios17.0 -isysroot $sdk -DPODIUM7_IOS=1 -I$prefix/include" \
   --extra-ldflags="-target arm64-apple-ios17.0 -isysroot $sdk -L$prefix/lib -lucontext" \
@@ -72,6 +72,9 @@ ninja libPodium7QEMU.dylib
 cd "$repo"
 mkdir -p build-ios/Podium7QEMU.framework
 cp .qemu/build-ios/libPodium7QEMU.dylib build-ios/Podium7QEMU.framework/Podium7QEMU
+mkdir -p build-ios/Podium7QEMU.framework/Licenses
+cp .qemu/COPYING build-ios/Podium7QEMU.framework/Licenses/QEMU-GPL.txt
+cp .ios-build/glib-2.82.5/COPYING build-ios/Podium7QEMU.framework/Licenses/GLib.txt
 install_name_tool -id '@rpath/Podium7QEMU.framework/Podium7QEMU' build-ios/Podium7QEMU.framework/Podium7QEMU
 python3 - <<'PY'
 import pathlib, plistlib

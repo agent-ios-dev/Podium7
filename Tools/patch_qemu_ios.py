@@ -13,6 +13,11 @@ def patch(directory):
     actual = subprocess.check_output(['git', '-C', str(directory), 'rev-parse', 'HEAD'], text=True).strip()
     if actual != PIN or not (directory / 'system/podium7-embedding.c').exists():
         raise ValueError('pinned embedded backend required')
+    # ARM64 macOS and ARM64 iOS share CPU/system labels but not executable ABI.
+    # Force Meson to compile/link probes without trying to execute iOS binaries.
+    replace_once(directory / 'configure',
+                 '  if test "$cross_compile" = "yes"; then\n    echo "[host_machine]" >> $cross',
+                 '  if test "$cross_compile" = "yes"; then\n    echo "[properties]" >> $cross\n    echo "needs_exe_wrapper = true" >> $cross\n    echo "[host_machine]" >> $cross')
     replace_once(directory / 'meson.build',
                  "  if host_os != 'darwin' and cc.links(ucontext_probe)",
                  "  if cc.get_define('PODIUM7_IOS') == '1' or (host_os != 'darwin' and cc.links(ucontext_probe))")

@@ -73,6 +73,7 @@ public struct BootBundle: Codable {
     }
 
     public func arguments(directory: URL, logs: URL, qmp: URL) throws -> [String] {
+        guard qmp.path.utf8.count < 104 else { throw BootBundleError.invalidFile("QMP socket path too long") }
         for path in [directory.path, logs.path, qmp.path] {
             guard !path.contains(","), !path.contains("\n"), !path.contains("\0") else {
                 throw BootBundleError.invalidManifest

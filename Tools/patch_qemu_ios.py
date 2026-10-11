@@ -44,6 +44,17 @@ def patch(directory):
 #endif
 #if defined(__APPLE__) && !defined(CONFIG_TCG_INTERPRETER)
 static inline void qemu_thread_jit_execute(void)''')
+    replace_once(directory / 'include/qemu/osdep.h',
+                 '#if defined(PODIUM7_IOS) && !defined(CONFIG_TCG_INTERPRETER)',
+                 '''#ifdef PODIUM7_IOS
+/* SDK 18.5 exposes strchrnul, but our minimum iOS is 17. Use QEMU's
+ * real portable implementation instead of calling a missing weak symbol. */
+#undef HAVE_STRCHRNUL
+#endif
+#if defined(PODIUM7_IOS) && !defined(CONFIG_TCG_INTERPRETER)''')
+    replace_once(directory / 'block/file-posix.c',
+                 '#include <sys/ioctl.h>\n#if defined(HAVE_HOST_BLOCK_DEVICE)',
+                 '#include <sys/ioctl.h>\n#include <sys/param.h>\n#include <sys/mount.h>\n#if defined(HAVE_HOST_BLOCK_DEVICE)')
 
 
 if __name__ == '__main__':

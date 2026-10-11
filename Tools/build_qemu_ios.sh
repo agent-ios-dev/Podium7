@@ -61,7 +61,7 @@ mkdir -p .qemu/build-ios
 cd .qemu/build-ios
 ../configure --python="$(command -v python3)" --cpu=aarch64 --cross-prefix= --host-cc=clang \
   --cc="xcrun --sdk iphoneos clang" --cxx="xcrun --sdk iphoneos clang++" \
-  --extra-cflags="-target arm64-apple-ios17.0 -isysroot $sdk -DPODIUM7_IOS=1 -I$prefix/include" \
+  --extra-cflags="-target arm64-apple-ios17.0 -isysroot $sdk -DPODIUM7_IOS=1 -I$prefix/include -Werror=unguarded-availability-new" \
   --extra-ldflags="-target arm64-apple-ios17.0 -isysroot $sdk -L$prefix/lib -lucontext" \
   --target-list=aarch64-softmmu --without-default-features --enable-tcg \
   --enable-tcg-interpreter --enable-fdt --disable-pixman --disable-tools \

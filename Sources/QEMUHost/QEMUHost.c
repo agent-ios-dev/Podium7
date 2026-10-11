@@ -23,7 +23,7 @@ int p7_backend_load(const char *path) {
     stop_backend = (int (*)(void))dlsym(image, "p7_qemu_stop");
     if (!abi || !run_backend || !stop_backend || abi() != 1) {
         snprintf(error, sizeof(error), "Unsupported QEMU framework ABI");
-        dlclose(image); image = NULL; run_backend = NULL;
+        dlclose(image); image = NULL; run_backend = NULL; stop_backend = NULL;
         pthread_mutex_unlock(&lock); return -2;
     }
     /* Never unload an initialized QEMU: threads and global state remain live. */

@@ -46,6 +46,7 @@ jobs:
         with:
           name: in-process-core-evidence
           path: .embedding-evidence/*.json
+          include-hidden-files: true
           if-no-files-found: ignore
   iphone-library:
     needs: host-library

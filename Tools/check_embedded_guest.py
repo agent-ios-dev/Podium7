@@ -75,9 +75,11 @@ message:
     second = backend.p7_qemu_run(len(encoded), argv)
     assert second == -2
     assert backend.p7_qemu_stop() == -1
-    (output / 'embedding.json').write_text(json.dumps({'embedded_guest_pmgr_passed': passed,
+    evidence = {'embedded_guest_pmgr_passed': passed,
         'returned_to_host': True, 'second_init_rejected': True,
-        'ios_device_execution_confirmed': False, 'visible_springboard_confirmed': False}, indent=2))
+        'ios_device_execution_confirmed': False, 'visible_springboard_confirmed': False}
+    (output / 'embedding.json').write_text(json.dumps(evidence, indent=2))
+    print(json.dumps(evidence))
 
 
 if __name__ == '__main__':

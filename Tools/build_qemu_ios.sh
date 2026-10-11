@@ -37,7 +37,7 @@ git -C .ios-build/libffi checkout --detach 3d0ce1e6fcf19f853894862abcbac0ae78a7b
   ./autogen.sh
   CC="xcrun --sdk iphoneos clang" CFLAGS="-target arm64-apple-ios17.0 -isysroot $sdk -fPIC" \
     LDFLAGS="-target arm64-apple-ios17.0 -isysroot $sdk" \
-    ./configure --host=aarch64-apple-darwin --prefix="$prefix" --disable-shared --enable-static
+    ./configure --host=aarch64-apple-darwin --prefix="$prefix" --disable-shared --enable-static --disable-docs
   make -j3
   make install
 )

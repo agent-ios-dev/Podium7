@@ -3,6 +3,11 @@
 The real SpringBoard/backboardd processes in run 38092985645 executed in a
 desktop QEMU executable. They do **not** establish an iPhone app boot.
 
+Run 38130230235 (bf4336b) passed the actual in-process PMGR guest test and native
+run/stop/reinitialization guards on macOS. The ordinary iPhone app build also
+passed on bf4336b. Cross-compilation of the QEMU framework and execution on an
+iPhone are separate checks; neither is implied by this macOS result.
+
 The app now has a prepared-fixture folder importer, host-controlled boot arguments,
 an in-process framework loader, worker-thread execution, serial log display/export
 and a native QEMU shutdown request. Only one QEMU lifetime is permitted per app

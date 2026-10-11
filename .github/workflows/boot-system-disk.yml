@@ -12,6 +12,7 @@ on:
           - 'disabled-aks'
           - 'disabled-aks-root-unsupported'
           - 'embedded-disabled-aks-root-unsupported'
+          - 'embedded-tci-disabled-aks-root-unsupported'
       execution_seconds:
         description: Bounded real guest observation period
         type: choice
@@ -83,18 +84,20 @@ jobs:
         run: |
           git clone --depth 1 --branch v10.0.0 https://github.com/qemu/qemu.git .qemu
           python3 Tools/patch_qemu.py .qemu
-          if [[ "${{ inputs.sep_manager_probe }}" == "embedded-disabled-aks-root-unsupported" ]]; then
+          if [[ "${{ inputs.sep_manager_probe }}" == embedded-* ]]; then
             python3 Tools/patch_qemu_embedding.py .qemu
           fi
           mkdir .qemu/build
           cd .qemu/build
-          ../configure --python="$(python -c 'import sys; print(sys.executable)')" --cc="ccache clang" --cxx="ccache clang++" --target-list=aarch64-softmmu --disable-docs --disable-tools --disable-guest-agent --disable-slirp --disable-hvf --disable-cocoa --disable-vnc --disable-sdl --disable-gtk --disable-curses
+          mode=()
+          if [[ "${{ inputs.sep_manager_probe }}" == "embedded-tci-disabled-aks-root-unsupported" ]]; then mode+=(--enable-tcg-interpreter); fi
+          ../configure "${mode[@]}" --python="$(python -c 'import sys; print(sys.executable)')" --cc="ccache clang" --cxx="ccache clang++" --target-list=aarch64-softmmu --disable-docs --disable-tools --disable-guest-agent --disable-slirp --disable-hvf --disable-cocoa --disable-vnc --disable-sdl --disable-gtk --disable-curses
           ninja qemu-system-aarch64
-          if [[ "${{ inputs.sep_manager_probe }}" == "embedded-disabled-aks-root-unsupported" ]]; then
+          if [[ "${{ inputs.sep_manager_probe }}" == embedded-* ]]; then
             ninja libPodium7QEMU.dylib
           fi
       - name: Require real in-process execution before embedded system boot
-        if: inputs.sep_manager_probe == 'embedded-disabled-aks-root-unsupported'
+        if: startsWith(inputs.sep_manager_probe, 'embedded-')
         run: |
           python3 Tools/check_embedded_guest.py --library .qemu/build/libPodium7QEMU.dylib --output .embedding-evidence
           cat > .qemu/build/qemu-library-host <<'SH'
@@ -150,7 +153,7 @@ jobs:
           if [[ "$SEP_MANAGER_PROBE" == "disabled-aks" ]]; then extra+=(--research-sep-manager-probe --research-disabled-aks); fi
           if [[ "$SEP_MANAGER_PROBE" == "disabled-aks-root-unsupported" ]]; then extra+=(--research-sep-manager-probe --research-disabled-aks --research-platform-root-unsupported); fi
           qemu=.qemu/build/qemu-system-aarch64
-          if [[ "$SEP_MANAGER_PROBE" == "embedded-disabled-aks-root-unsupported" ]]; then
+          if [[ "$SEP_MANAGER_PROBE" == embedded-* ]]; then
             extra+=(--research-sep-manager-probe --research-disabled-aks --research-platform-root-unsupported)
             qemu=.qemu/build/qemu-library-host
           fi

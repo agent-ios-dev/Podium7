@@ -16,8 +16,8 @@ def patch(directory):
     # ARM64 macOS and ARM64 iOS share CPU/system labels but not executable ABI.
     # Force Meson to compile/link probes without trying to execute iOS binaries.
     replace_once(directory / 'configure',
-                 '  if test "$cross_compile" = "yes"; then\n    echo "[host_machine]" >> $cross',
-                 '  if test "$cross_compile" = "yes"; then\n    echo "[properties]" >> $cross\n    echo "needs_exe_wrapper = true" >> $cross\n    echo "[host_machine]" >> $cross')
+                 '  echo "[properties]" >> $cross',
+                 '  echo "[properties]" >> $cross\n  echo "needs_exe_wrapper = true" >> $cross')
     replace_once(directory / 'meson.build',
                  "  if host_os != 'darwin' and cc.links(ucontext_probe)",
                  "  if cc.get_define('PODIUM7_IOS') == '1' or (host_os != 'darwin' and cc.links(ucontext_probe))")

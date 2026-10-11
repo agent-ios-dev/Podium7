@@ -84,7 +84,7 @@ import QEMUHost
             let socket = URL(fileURLWithPath: "/tmp/p7-\(ProcessInfo.processInfo.processIdentifier).sock")
             let arguments = try bundle.arguments(directory: directory, logs: logDirectory, qmp: socket)
             logs = logDirectory; consumed = true; running = true
-            status = "QEMU выполняет гостевую систему. Графический вывод ещё разрабатывается."
+            status = "Запуск QEMU. Графический вывод ещё разрабатывается."
             polling = Task { [weak self] in
                 while !Task.isCancelled {
                     if let file = try? FileHandle(forReadingFrom: logDirectory.appendingPathComponent("serial.txt")) {

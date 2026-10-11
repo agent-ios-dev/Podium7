@@ -31,7 +31,8 @@ cpp_link_args = ['-target', 'arm64-apple-ios17.0', '-isysroot', '$sdk']
 b_staticpic = true
 EOF
 git clone https://github.com/libffi/libffi.git .ios-build/libffi
-git -C .ios-build/libffi checkout --detach 3d0ce1e6fcf19f853894862abcbac0ae78a7be60
+# 3.5.0 includes upstream Mach-O CFI fixes needed by Xcode 16.4 (PR #857).
+git -C .ios-build/libffi checkout --detach d2c78d2ebbd9e65401095c6a2f281fe5132f028b
 (
   cd .ios-build/libffi
   ./autogen.sh

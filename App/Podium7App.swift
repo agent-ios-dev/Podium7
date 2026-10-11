@@ -66,7 +66,7 @@ struct LaboratoryView: View {
                     .appendingPathComponent("VirtualMachine", isDirectory: true)
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
                 disk = try VirtualDisk(url: directory.appendingPathComponent("disk.raw"))
-                diskStatus = "Диск: 16 ГБ. Подключение к гостевой iOS ещё разрабатывается."
+                diskStatus = "Диск: 16 ГБ. Для загрузки нужен импортированный образ iOS."
             } catch { diskStatus = "Ошибка подготовки диска: \(error)" }
         }
         .onChange(of: scenePhase) { _, phase in if phase == .active { jit.returnedToApp() } }

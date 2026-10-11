@@ -12,6 +12,7 @@ import sys
 import tempfile
 from qemu_probe import make_probe
 from probe_pmp_core import extract
+from inspect_system_disk import inspect
 
 PROFILE = '19H422-disabled-aks-root-unsupported-v1'
 
@@ -23,6 +24,13 @@ def export(firmware, disk, output):
         raise ValueError('destination exists; refusing to replace any VM')
     if disk.is_symlink() or not disk.is_file() or disk.stat().st_size != 16 << 30:
         raise ValueError('a prepared regular 16-GiB APFS system disk is required')
+    with disk.open('rb') as stream:
+        layout = inspect(stream)
+    partitions = layout['partitions']
+    if not any(p['index'] == 1 and p['nxsb_at_offset32'] for p in partitions):
+        raise ValueError('primary APFS system container is missing')
+    if any(p['last_lba'] >= (16 << 30) // 512 for p in partitions):
+        raise ValueError('partition extends beyond fixed 16-GiB disk')
     required = ['KernelCache.macho', 'DeviceTree.bin', 'StaticTrustCache.im4p', 'SystemVolume.im4p']
     for name in required:
         source = firmware / name

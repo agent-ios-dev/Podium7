@@ -34,6 +34,16 @@ def patch(directory):
 #else
 #include <ucontext.h>
 #endif''')
+    # TCI executes bytecode, not generated host machine code. Its code buffers
+    # do not need the macOS-only MAP_JIT write/execute toggle. Never quietly
+    # apply these no-ops to an eventual native iOS TCG build.
+    replace_once(directory / 'include/qemu/osdep.h',
+                 '#ifdef __APPLE__\nstatic inline void qemu_thread_jit_execute(void)',
+                 '''#if defined(PODIUM7_IOS) && !defined(CONFIG_TCG_INTERPRETER)
+#error Native QEMU TCG JIT on iOS has not been ported
+#endif
+#if defined(__APPLE__) && !defined(CONFIG_TCG_INTERPRETER)
+static inline void qemu_thread_jit_execute(void)''')
 
 
 if __name__ == '__main__':

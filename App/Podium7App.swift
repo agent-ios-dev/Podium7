@@ -12,6 +12,7 @@ struct LaboratoryView: View {
     @State private var diskStatus = "Подготовка диска…"
     @StateObject private var jit = JITCoordinator()
     @StateObject private var machine = EmbeddedMachine()
+    @StateObject private var firmware = FirmwareDownload()
     @State private var importing = false
     @Environment(\.scenePhase) private var scenePhase
     var body: some View {
@@ -21,6 +22,14 @@ struct LaboratoryView: View {
                 Text(machine.available ? "Встроенный QEMU · исследовательский режим" : "Перенос QEMU на iPhone. Библиотека ещё не собрана.")
                 Text("Исследовательский образ использует отключённый AKS. SEP и защищённая загрузка не реализованы.").font(.caption)
                 Text(machine.status).font(.footnote)
+                Text(firmware.status).font(.footnote)
+                if firmware.downloading {
+                    ProgressView(value: firmware.progress)
+                    Button("Отменить загрузку") { firmware.cancel() }
+                } else if firmware.archive == nil {
+                    Button("Скачать официальную iOS") { firmware.start() }
+                        .disabled(machine.running || machine.busy)
+                }
                 HStack {
                     Button("Импортировать образ") { importing = true }
                         .disabled(machine.busy || machine.consumed)

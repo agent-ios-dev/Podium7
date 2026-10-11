@@ -63,6 +63,23 @@ close and reopen the app before starting another machine session.
 
 ## Preparing the private boot fixture
 
+No developer-only image is required. On macOS, the full preparation from Apple's
+official IPSW can be invoked with one command (Python 3 and the project's
+capstone dependency are required):
+
+```
+python3 -m pip install capstone==5.0.9
+python3 Tools/create_boot_bundle.py --output ~/Podium7Boot
+```
+
+This downloads the original firmware, decodes the boot components, converts the
+official OS DMG, prepares real install volumes and exports the fixed 16-GiB
+folder. It refuses existing destinations and keeps its private intermediate
+workspace. This process has not yet been implemented inside the iPhone app.
+The app's new direct Apple download retrieves the original IPSW only, and does
+not claim that the resulting archive is a ready-to-boot machine. Disk preparation,
+real display scanout and touchscreen/button input remain separate incomplete work.
+
 Prepare official 19H422 firmware and the established 16-GiB APFS install disk on
 macOS, then run:
 

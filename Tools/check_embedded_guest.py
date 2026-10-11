@@ -22,6 +22,15 @@ str w4, [x3]
 ldr w5, [x3]
 cmp w5, #0x99
 b.ne failed
+// Real ARM64 exclusive operations: the failed full iOS TCI trace ends
+// at an LDXR/STXR pair. Check the same instruction forms on normal RAM.
+adr x9, atomic_word
+mov w0, #1
+ldxr w10, [x9]
+stxr wzr, w0, [x9]
+ldr w10, [x9]
+cmp w10, #1
+b.ne failed
 movz x6, #0
 movk x6, #0x0900, lsl #16
 adr x7, message
@@ -38,6 +47,9 @@ wfi
 b failed
 message:
 .asciz "P7-LIB-PASS\\n"
+.balign 16
+atomic_word:
+.word 0
 ''')
     obj = output / 'guest.o'
     subprocess.run(['xcrun', 'clang', '-arch', 'arm64', '-c', str(source), '-o', str(obj)], check=True)
@@ -76,6 +88,7 @@ message:
     assert second == -2
     assert backend.p7_qemu_stop() == -1
     evidence = {'embedded_guest_pmgr_passed': passed,
+        'guest_ldxr_stxr_normal_ram_passed': passed,
         'returned_to_host': True, 'second_init_rejected': True,
         'ios_device_execution_confirmed': False, 'visible_springboard_confirmed': False}
     (output / 'embedding.json').write_text(json.dumps(evidence, indent=2))

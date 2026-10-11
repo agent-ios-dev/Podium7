@@ -1,5 +1,6 @@
 import SwiftUI
 import Podium7Core
+import UniformTypeIdentifiers
 
 @main struct Podium7App: App {
     var body: some Scene { WindowGroup { LaboratoryView() } }
@@ -10,12 +11,29 @@ struct LaboratoryView: View {
     @State private var disk: VirtualDisk?
     @State private var diskStatus = "Подготовка диска…"
     @StateObject private var jit = JITCoordinator()
+    @StateObject private var machine = EmbeddedMachine()
+    @State private var importing = false
     @Environment(\.scenePhase) private var scenePhase
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 20) {
                 Text("iPod touch 7 · A10").font(.title2.bold())
-                Text("Начальный этап разработки. Загрузка iOS пока не реализована.")
+                Text(machine.available ? "Встроенный QEMU · исследовательский режим" : "Перенос QEMU на iPhone. Библиотека ещё не собрана.")
+                Text("Исследовательский образ использует отключённый AKS. SEP и защищённая загрузка не реализованы.").font(.caption)
+                Text(machine.status).font(.footnote)
+                HStack {
+                    Button("Импортировать образ") { importing = true }
+                        .disabled(machine.busy || machine.consumed)
+                    Button("Запустить iOS") { machine.start() }
+                        .disabled(!machine.available || machine.directory == nil || machine.busy || machine.consumed)
+                }
+                if !machine.exportedLogs.isEmpty {
+                    ShareLink(items: machine.exportedLogs) { Text("Сохранить логи") }
+                }
+                if machine.running {
+                    Button("Остановить эмуляцию") { machine.stop() }
+                    ScrollView { Text(machine.serial).font(.system(.caption, design: .monospaced)).textSelection(.enabled) }
+                }
                 Text(diskStatus).font(.footnote)
                 Text(jit.status).font(.footnote)
                 HStack {
@@ -32,6 +50,12 @@ struct LaboratoryView: View {
                 ScrollView { Text(output).font(.system(.body, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
                 Spacer()
             }.padding().navigationTitle("Podium7")
+        }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.folder]) { result in
+            switch result {
+            case .success(let url): machine.importFolder(url)
+            case .failure(let error): machine.status = "Импорт: \(error)"
+            }
         }
         .task {
             guard disk == nil else { return }

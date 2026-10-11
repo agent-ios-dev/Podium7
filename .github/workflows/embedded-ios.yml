@@ -1,0 +1,84 @@
+name: Build in-process QEMU and iPhone app
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-library:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m pip install capstone==5.0.9 distlib==0.3.9
+      - run: swift test
+      - run: python3 -m unittest discover -s Tools -p 'test_*.py'
+      - run: brew install glib pixman ninja pkgconf
+      - name: Build the pinned machine as executable and library
+        run: |
+          git clone --depth 1 --branch v10.0.0 https://github.com/qemu/qemu.git .qemu
+          python3 Tools/patch_qemu.py .qemu
+          python3 Tools/patch_qemu_embedding.py .qemu
+          mkdir .qemu/build
+          cd .qemu/build
+          ../configure --python="$(command -v python3)" --target-list=aarch64-softmmu --disable-docs --disable-tools --disable-guest-agent --disable-slirp --disable-hvf --disable-cocoa --disable-vnc --disable-sdl --disable-gtk --disable-curses
+          ninja libPodium7QEMU.dylib qemu-system-aarch64
+      - name: Require real embedded PMGR execution and clean return to host
+        run: python3 Tools/check_embedded_guest.py --library .qemu/build/libPodium7QEMU.dylib --output .embedding-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: in-process-core-evidence
+          path: .embedding-evidence/*.json
+          if-no-files-found: ignore
+  iphone-library:
+    needs: host-library
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m pip install meson==1.8.1 distlib==0.3.9 pyyaml
+      - run: brew install ninja pkgconf xcodegen
+      - run: |
+          git clone --depth 1 --branch v10.0.0 https://github.com/qemu/qemu.git .qemu
+          python3 Tools/patch_qemu.py .qemu
+          python3 Tools/patch_qemu_embedding.py .qemu
+      - name: Cross-compile the real QEMU library for iPhoneOS
+        run: bash Tools/build_qemu_ios.sh
+      - name: Embed the iPhone framework into the app
+        run: |
+          python3 - <<'PY'
+          import yaml
+          p = yaml.safe_load(open('project.yml'))
+          p['targets']['Podium7']['dependencies'].append({'framework': 'build-ios/Podium7QEMU.framework', 'embed': True, 'link': False})
+          open('project.yml', 'w').write(yaml.safe_dump(p, sort_keys=False))
+          PY
+          xcodegen generate
+          xcodebuild -project Podium7.xcodeproj -scheme Podium7 -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - name: Require iOS platform and embedded ABI before packaging
+        run: |
+          binary=build/Build/Products/Release-iphoneos/Podium7.app/Frameworks/Podium7QEMU.framework/Podium7QEMU
+          xcrun vtool -show-build "$binary" | grep 'platform IOS'
+          nm -gU "$binary" | grep '_p7_qemu_run'
+          nm -gU "$binary" | grep '_p7_qemu_stop'
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/Podium7.app Payload/
+          zip -qr Podium7-embedded-research-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Podium7-embedded-research-unsigned
+          path: Podium7-embedded-research-unsigned.ipa
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: iphone-cross-compile-diagnostics
+          path: |
+            .ios-build/**/meson-logs/meson-log.txt
+            .qemu/build-ios/meson-logs/meson-log.txt
+            .qemu/build-ios/config.log
+          if-no-files-found: ignore

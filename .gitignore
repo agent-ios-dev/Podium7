@@ -19,3 +19,7 @@ artifacts/
 .qemu/
 .ccache/
 /.tools/
+.ios-build/
+.ios-deps/
+build-ios/
+.embedding-evidence/

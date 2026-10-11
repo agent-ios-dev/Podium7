@@ -1,0 +1,15 @@
+{
+  "embedded_guest_pmgr_passed": true,
+  "guest_ldxr_stxr_normal_ram_passed": true,
+  "provided_native_tcg_buffer_passed": true,
+  "returned_to_host": true,
+  "second_init_rejected": true,
+  "ios_device_execution_confirmed": false,
+  "visible_springboard_confirmed": false,
+  "run_id": 38153336079,
+  "commit": "2ce3383",
+  "host": "macOS ARM64",
+  "physical_stikdebug_execution_confirmed": false,
+  "txm_split_alias_execution_confirmed": false,
+  "measured_speedup_confirmed": false
+}

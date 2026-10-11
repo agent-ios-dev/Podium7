@@ -35,9 +35,9 @@ struct LaboratoryView: View {
                 }
                 HStack {
                     Button("Импортировать образ") { importing = true }
-                        .disabled(machine.busy || machine.consumed)
+                        .disabled(machine.busy || machine.consumed || firmware.busy || jit.preparing)
                     Button("Запустить iOS") { machine.start(jit: jit.backend) }
-                        .disabled(!machine.available || machine.directory == nil || machine.busy || machine.consumed)
+                        .disabled(!machine.available || machine.directory == nil || machine.busy || machine.consumed || firmware.busy || jit.preparing)
                 }
                 if !machine.exportedLogs.isEmpty {
                     ShareLink(items: machine.exportedLogs) { Text("Сохранить логи") }
@@ -52,7 +52,7 @@ struct LaboratoryView: View {
                 HStack {
                     Button("Включить JIT в StikDebug") { jit.requestStikDebug() }
                     Button("Проверить JIT") { jit.prepare() }
-                }.disabled(jit.preparing || jit.backend != nil)
+                }.disabled(jit.preparing || jit.backend != nil || machine.running || machine.consumed)
                 Button("Проверить ARM64") {
                     do {
                         let before = jit.backend?.executedInstructions ?? 0

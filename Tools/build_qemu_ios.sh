@@ -57,35 +57,48 @@ ninja -C .ios-build/glib-build install
 export PKG_CONFIG_LIBDIR="$prefix/lib/pkgconfig"
 export PKG_CONFIG_PATH="$PKG_CONFIG_LIBDIR"
 python3 Tools/patch_qemu_ios.py .qemu
-mkdir -p .qemu/build-ios
-cd .qemu/build-ios
+for mode in tci jit; do
+name=Podium7QEMU
+directory=build-ios
+flags=(--enable-tcg-interpreter)
+define=''
+if [[ "$mode" == jit ]]; then
+  name=Podium7QEMUJIT
+  directory=build-ios-jit
+  flags=(--disable-tcg-interpreter)
+  define='-DPODIUM7_IOS_JIT=1'
+fi
+mkdir -p ".qemu/$directory"
+cd ".qemu/$directory"
 ../configure --python="$(command -v python3)" --cpu=aarch64 --cross-prefix= --host-cc=clang \
   --cc="xcrun --sdk iphoneos clang" --cxx="xcrun --sdk iphoneos clang++" \
-  --extra-cflags="-target arm64-apple-ios17.0 -isysroot $sdk -DPODIUM7_IOS=1 -I$prefix/include -Werror=unguarded-availability-new" \
+  --extra-cflags="-target arm64-apple-ios17.0 -isysroot $sdk -DPODIUM7_IOS=1 $define -I$prefix/include -Werror=unguarded-availability-new" \
   --extra-ldflags="-target arm64-apple-ios17.0 -isysroot $sdk -L$prefix/lib -lucontext" \
   --target-list=aarch64-softmmu --without-default-features --enable-tcg \
-  --enable-tcg-interpreter --enable-fdt --disable-pixman --disable-tools \
+  "${flags[@]}" --enable-fdt --disable-pixman --disable-tools \
   --disable-docs --disable-guest-agent --disable-hvf --disable-cocoa \
   --disable-vnc --disable-sdl --disable-gtk --disable-curses --disable-slirp \
   --with-coroutine=ucontext
 ninja libPodium7QEMU.dylib
 cd "$repo"
-mkdir -p build-ios/Podium7QEMU.framework
-cp .qemu/build-ios/libPodium7QEMU.dylib build-ios/Podium7QEMU.framework/Podium7QEMU
-mkdir -p build-ios/Podium7QEMU.framework/Licenses
-cp .qemu/COPYING build-ios/Podium7QEMU.framework/Licenses/QEMU-GPL.txt
-cp .ios-build/glib-2.82.5/COPYING build-ios/Podium7QEMU.framework/Licenses/GLib.txt
-install_name_tool -id '@rpath/Podium7QEMU.framework/Podium7QEMU' build-ios/Podium7QEMU.framework/Podium7QEMU
-python3 - <<'PY'
-import pathlib, plistlib
-plist = {'CFBundleExecutable': 'Podium7QEMU', 'CFBundleIdentifier': 'com.catyuragame.podium7.qemu',
-         'CFBundleName': 'Podium7QEMU', 'CFBundlePackageType': 'FMWK',
+framework="build-ios/$name.framework"
+mkdir -p "$framework/Licenses"
+cp ".qemu/$directory/libPodium7QEMU.dylib" "$framework/$name"
+cp .qemu/COPYING "$framework/Licenses/QEMU-GPL.txt"
+cp .ios-build/glib-2.82.5/COPYING "$framework/Licenses/GLib.txt"
+install_name_tool -id "@rpath/$name.framework/$name" "$framework/$name"
+python3 - "$name" <<'PY'
+import pathlib, plistlib, sys
+name = sys.argv[1]
+plist = {'CFBundleExecutable': name, 'CFBundleIdentifier': 'com.catyuragame.podium7.' + name.lower(),
+         'CFBundleName': name, 'CFBundlePackageType': 'FMWK',
          'CFBundleVersion': '1', 'CFBundleShortVersionString': '0.0.2', 'MinimumOSVersion': '17.0'}
-pathlib.Path('build-ios/Podium7QEMU.framework/Info.plist').write_bytes(plistlib.dumps(plist))
+pathlib.Path('build-ios', name + '.framework', 'Info.plist').write_bytes(plistlib.dumps(plist))
 PY
-xcrun vtool -show-build build-ios/Podium7QEMU.framework/Podium7QEMU
-otool -L build-ios/Podium7QEMU.framework/Podium7QEMU
+xcrun vtool -show-build "$framework/$name"
+otool -L "$framework/$name"
 # A macOS dependency in an iOS dylib is a hard error, never silently packaged.
-if otool -L build-ios/Podium7QEMU.framework/Podium7QEMU | grep -E '/opt/homebrew|/usr/local|\.ios-deps'; then
+if otool -L "$framework/$name" | grep -E '/opt/homebrew|/usr/local|\.ios-deps'; then
   echo 'Non-system dependency leaked into iOS framework' >&2; exit 1
 fi
+done

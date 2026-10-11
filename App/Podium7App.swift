@@ -23,17 +23,20 @@ struct LaboratoryView: View {
                 Text("Исследовательский образ использует отключённый AKS. SEP и защищённая загрузка не реализованы.").font(.caption)
                 Text(machine.status).font(.footnote)
                 Text(firmware.status).font(.footnote)
-                if firmware.downloading {
+                if firmware.busy {
                     ProgressView(value: firmware.progress)
-                    Button("Отменить загрузку") { firmware.cancel() }
+                    if firmware.downloading { Button("Отменить загрузку") { firmware.cancel() } }
                 } else if firmware.archive == nil {
                     Button("Скачать официальную iOS") { firmware.start() }
+                        .disabled(machine.running || machine.busy)
+                } else {
+                    Button("Подготовить скачанную iOS") { firmware.prepareDisk() }
                         .disabled(machine.running || machine.busy)
                 }
                 HStack {
                     Button("Импортировать образ") { importing = true }
                         .disabled(machine.busy || machine.consumed)
-                    Button("Запустить iOS") { machine.start() }
+                    Button("Запустить iOS") { machine.start(jit: jit.backend) }
                         .disabled(!machine.available || machine.directory == nil || machine.busy || machine.consumed)
                 }
                 if !machine.exportedLogs.isEmpty {
@@ -45,7 +48,7 @@ struct LaboratoryView: View {
                 }
                 Text(diskStatus).font(.footnote)
                 Text(jit.status).font(.footnote)
-                Text("StikDebug сейчас ускоряет ARM64-тест. Подключение JIT к QEMU ещё разрабатывается.").font(.caption)
+                Text("После StikDebug QEMU использует нативный TCG и отдельные 64 МБ исполняемой памяти. Работа на телефоне проверяется.").font(.caption)
                 HStack {
                     Button("Включить JIT в StikDebug") { jit.requestStikDebug() }
                     Button("Проверить JIT") { jit.prepare() }

@@ -7,6 +7,7 @@ public enum JITError: Error { case unavailable(Int32) }
 /// One preallocated pool per backend, immutable native blocks, no guest code copied verbatim.
 public final class AArch64BlockJIT {
     private let pool: OpaquePointer
+    private let capacity: Int
     private struct Block { let words: [UInt32]; let code: UnsafeMutableRawPointer; let version: CodeVersion? }
     private var blocks: [UInt64: Block] = [:]
     public private(set) var executedInstructions: UInt64 = 0
@@ -15,8 +16,17 @@ public final class AArch64BlockJIT {
         var error: Int32 = 0
         guard let pool = p7_jit_create(capacity, &error) else { throw JITError.unavailable(error) }
         self.pool = pool
+        self.capacity = capacity
     }
     deinit { p7_jit_destroy(pool) }
+    /// The diagnostic keeps its first MiB; QEMU alone owns the remaining 64 MiB.
+    /// Retain this object for the entire QEMU lifetime (and never initialize twice).
+    public func qemuBuffers() -> (rx: UnsafeMutableRawPointer, rw: UnsafeMutableRawPointer, size: Int)? {
+        let prefix = 1 << 20, size = 64 << 20
+        guard capacity >= prefix + size, p7_jit_limit_emission(pool, prefix),
+              let rx = p7_jit_rx(pool), let rw = p7_jit_rw(pool) else { return nil }
+        return (rx.advanced(by: prefix), rw.advanced(by: prefix), size)
+    }
     private func translation(_ word: UInt32) -> [UInt32]? {
         let rd = word & 31, rn = (word >> 5) & 31
         if word == 0xd503201f { return [] }

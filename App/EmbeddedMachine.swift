@@ -12,6 +12,7 @@ import QEMUHost
     @Published private(set) var directory: URL?
     private var logs: URL?
     private var polling: Task<Void, Never>?
+    private var retainedJIT: AArch64BlockJIT?
 
     var available: Bool {
         Bundle.main.privateFrameworksURL.map {
@@ -66,25 +67,37 @@ import QEMUHost
         }
     }
 
-    func start() {
+    func start(jit: AArch64BlockJIT? = nil) {
         guard !busy, !running, !consumed, let directory else { return }
         do {
             let bundle = try BootBundle.read(directory: directory)
             guard let frameworks = Bundle.main.privateFrameworksURL, available else {
                 status = "В этой сборке ещё нет библиотеки QEMU для iPhone."; return
             }
-            let framework = frameworks.appendingPathComponent("Podium7QEMU.framework/Podium7QEMU")
+            let useJIT = jit != nil
+            let name = useJIT ? "Podium7QEMUJIT" : "Podium7QEMU"
+            let framework = frameworks.appendingPathComponent("\(name).framework/\(name)")
+            guard FileManager.default.fileExists(atPath: framework.path) else {
+                status = "В этой сборке отсутствует QEMU с нативным JIT."; return
+            }
             guard p7_backend_load(framework.path) == 0 else {
                 status = "Ошибка библиотеки: \(String(cString: p7_backend_error()))"; return
+            }
+            if let jit {
+                guard let buffer = jit.qemuBuffers(),
+                      p7_backend_set_jit_buffer(buffer.rx, buffer.rw, buffer.size) == 0 else {
+                    status = "QEMU не принял исполняемую память StikDebug. Перезапусти приложение."; return
+                }
+                retainedJIT = jit
             }
             let logDirectory = directory.appendingPathComponent("Logs-\(UUID().uuidString)")
             try FileManager.default.createDirectory(at: logDirectory, withIntermediateDirectories: true)
             // Absolute /tmp is outside the iOS data-container sandbox.
             // Keep a short filename inside the actual app temporary directory.
             let socket = FileManager.default.temporaryDirectory.appendingPathComponent("p7.sock")
-            let arguments = try bundle.arguments(directory: directory, logs: logDirectory, qmp: socket)
+            let arguments = try bundle.arguments(directory: directory, logs: logDirectory, qmp: socket, nativeJIT: useJIT)
             logs = logDirectory; consumed = true; running = true
-            status = "Запуск QEMU. Графический вывод ещё разрабатывается."
+            status = "Запуск QEMU: \(useJIT ? "нативный TCG JIT" : "TCI без JIT"). Графический вывод ещё разрабатывается."
             polling = Task { [weak self] in
                 while !Task.isCancelled {
                     if let file = try? FileHandle(forReadingFrom: logDirectory.appendingPathComponent("serial.txt")) {

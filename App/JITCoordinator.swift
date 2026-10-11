@@ -33,7 +33,10 @@ import Podium7Core
         Task {
             let result = await Task.detached { () -> Result<AArch64BlockJIT, Error> in
                 do {
-                    let jit = try AArch64BlockJIT()
+                    // Prepare one region while StikDebug's script is attached.
+                    // The protocol detaches afterwards; a second TXM allocation
+                    // cannot be assumed to remain possible.
+                    let jit = try AArch64BlockJIT(capacity: 65 << 20)
                     let memory = LabMemory(); try memory.load([0xd2800540, 0xd4200000])
                     let cpu = AArch64CPU(memory: memory); cpu.jit = jit; try cpu.run()
                     guard cpu.registers[0] == 42, jit.executedInstructions > 0 else { throw JITError.unavailable(5) }

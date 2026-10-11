@@ -103,7 +103,7 @@ jobs:
           cat > .qemu/build/qemu-library-host <<'SH'
           #!/bin/bash
           if [[ "${PODIUM7_TCI_BACKTRACE:-0}" == "1" && "${1:-}" != "--version" ]]; then
-            exec xcrun lldb --batch -o run -o 'thread backtrace all -c 16' -o 'process kill' -- "$(command -v python3)" Tools/check_qemu_embedding.py --library .qemu/build/libPodium7QEMU.dylib -- "$@"
+            exec xcrun lldb --batch -o 'settings set target.process.stop-on-exec false' -o run -o 'thread backtrace all -c 16' -o 'process kill' -- "$(command -v python3)" Tools/check_qemu_embedding.py --library .qemu/build/libPodium7QEMU.dylib -- "$@"
           fi
           exec python3 Tools/check_qemu_embedding.py --library .qemu/build/libPodium7QEMU.dylib -- "$@"
           SH

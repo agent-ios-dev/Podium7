@@ -10,3 +10,6 @@ P7JITPool *p7_jit_create(size_t capacity, int *error);
 void p7_jit_destroy(P7JITPool *pool);
 void *p7_jit_emit(P7JITPool *pool, const uint32_t *words, size_t count);
 void p7_jit_call(void *code, uint64_t *registers);
+void *p7_jit_rx(P7JITPool *pool);
+void *p7_jit_rw(P7JITPool *pool);
+bool p7_jit_limit_emission(P7JITPool *pool, size_t limit);

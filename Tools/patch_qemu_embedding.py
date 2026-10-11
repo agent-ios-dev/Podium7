@@ -21,6 +21,22 @@ ENTRY = r'''
 int (*qemu_main)(void);
 static gint used;
 static gint ready;
+void *podium7_jit_rx;
+void *podium7_jit_rw;
+size_t podium7_jit_size;
+__attribute__((visibility("default")))
+int p7_qemu_set_jit_buffer(void *rx, void *rw, size_t size)
+{
+#if defined(PODIUM7_IOS_JIT) && !defined(CONFIG_TCG_INTERPRETER)
+    size_t page = qemu_real_host_page_size();
+    if (g_atomic_int_get(&used) || !rx || !rw || size != (64ULL << 20) ||
+        (uintptr_t)rx % page || (uintptr_t)rw % page) { return -1; }
+    podium7_jit_rx = rx; podium7_jit_rw = rw; podium7_jit_size = size;
+    return 0;
+#else
+    return -2;
+#endif
+}
 __attribute__((visibility("default")))
 int p7_qemu_abi(void) { return 1; }
 __attribute__((visibility("default")))
@@ -64,7 +80,8 @@ LIBRARY = """    if target == 'aarch64-softmmu'
       if host_os == 'darwin'
         embedding_link_args += ['-Wl,-exported_symbol,_p7_qemu_abi',
                                 '-Wl,-exported_symbol,_p7_qemu_run',
-                                '-Wl,-exported_symbol,_p7_qemu_stop']
+                                '-Wl,-exported_symbol,_p7_qemu_stop',
+                                '-Wl,-exported_symbol,_p7_qemu_set_jit_buffer']
       endif
       shared_library('Podium7QEMU', files('system/podium7-embedding.c'),
         c_args: c_args,

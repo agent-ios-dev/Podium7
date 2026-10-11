@@ -71,6 +71,7 @@ jobs:
           import yaml
           p = yaml.safe_load(open('project.yml'))
           p['targets']['Podium7']['dependencies'].append({'framework': 'build-ios/Podium7QEMU.framework', 'embed': True, 'link': False})
+          p['targets']['Podium7']['dependencies'].append({'framework': 'build-ios/Podium7QEMUJIT.framework', 'embed': True, 'link': False})
           open('project.yml', 'w').write(yaml.safe_dump(p, sort_keys=False))
           PY
           xcodegen generate
@@ -81,6 +82,9 @@ jobs:
           xcrun vtool -show-build "$binary" | grep 'platform IOS'
           nm -gU "$binary" | grep '_p7_qemu_run'
           nm -gU "$binary" | grep '_p7_qemu_stop'
+          jit=build/Build/Products/Release-iphoneos/Podium7.app/Frameworks/Podium7QEMUJIT.framework/Podium7QEMUJIT
+          xcrun vtool -show-build "$jit" | grep 'platform IOS'
+          nm -gU "$jit" | grep '_p7_qemu_set_jit_buffer'
           mkdir Payload
           cp -R build/Build/Products/Release-iphoneos/Podium7.app Payload/
           zip -qr Podium7-embedded-research-unsigned.ipa Payload
@@ -96,4 +100,6 @@ jobs:
             .ios-build/**/meson-logs/meson-log.txt
             .qemu/build-ios/meson-logs/meson-log.txt
             .qemu/build-ios/config.log
+            .qemu/build-ios-jit/meson-logs/meson-log.txt
+            .qemu/build-ios-jit/config.log
           if-no-files-found: ignore

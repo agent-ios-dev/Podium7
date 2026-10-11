@@ -72,7 +72,7 @@ public struct BootBundle: Codable {
         return bundle
     }
 
-    public func arguments(directory: URL, logs: URL, qmp: URL) throws -> [String] {
+    public func arguments(directory: URL, logs: URL, qmp: URL, nativeJIT: Bool = false) throws -> [String] {
         guard qmp.path.utf8.count < 104 else { throw BootBundleError.invalidFile("QMP socket path too long") }
         for path in [directory.path, logs.path, qmp.path] {
             guard !path.contains(","), !path.contains("\n"), !path.contains("\0") else {
@@ -81,7 +81,7 @@ public struct BootBundle: Codable {
         }
         func file(_ name: String) -> String { directory.appendingPathComponent(name).path }
         return ["Podium7QEMU", "-machine", "virt,secure=off,virtualization=off",
-                "-cpu", "podium7-research,cntfrq=24000000", "-accel", "tcg",
+                "-cpu", "podium7-research,cntfrq=24000000", "-accel", nativeJIT ? "tcg,tb-size=64" : "tcg",
                 "-m", "2048", "-smp", "1,maxcpus=2", "-display", "none", "-monitor", "none", "-nic", "none",
                 "-serial", "file:\(logs.appendingPathComponent("serial.txt").path)",
                 "-device", "loader,file=\(file("boot.elf")),cpu-num=0",

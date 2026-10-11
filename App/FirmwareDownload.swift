@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import Podium7Core
 
 // Download official firmware directly; never label an IPSW as a prepared VM.
 @MainActor final class FirmwareDownload: ObservableObject {
@@ -9,6 +10,8 @@ import Combine
     @Published private(set) var progress = 0.0
     @Published private(set) var status = "Официальная iOS 15.8.8 · загрузка с Apple · 5 ГБ."
     @Published private(set) var archive: URL?
+    @Published private(set) var preparing = false
+    var busy: Bool { downloading || preparing }
     private var session: URLSession?
     private var task: URLSessionDownloadTask?
     private var delegate: FirmwareTransfer?
@@ -52,7 +55,7 @@ import Combine
                     switch result {
                     case .success(let url):
                         self.archive = url; self.progress = 1
-                        self.status = "IPSW скачана с Apple. Подготовка APFS и экран iOS ещё не подключены."
+                        self.prepareDisk()
                     case .failure(let error):
                         self.status = "Загрузка: \(error.localizedDescription)"
                     }
@@ -72,6 +75,24 @@ import Combine
     }
 
     func cancel() { task?.cancel() }
+
+    func prepareDisk() {
+        guard !busy, let archive else { return }
+        let disk = archive.deletingLastPathComponent().appendingPathComponent("official-os-16g.raw")
+        preparing = true; progress = 0
+        status = "Преобразование официальной системы в диск 16 ГБ…"
+        Task {
+            do {
+                try await Task.detached { [weak self] in
+                    try OfficialDiskPreparation.convert(archive: archive, destination: disk) { fraction in
+                        Task { @MainActor in self?.progress = fraction }
+                    }
+                }.value
+                status = "Исходный диск iOS создан на телефоне. Служебные APFS-тома, загрузчик и экран ещё разрабатываются."
+            } catch { status = "Подготовка диска: \(error)" }
+            preparing = false
+        }
+    }
 }
 
 private final class FirmwareTransfer: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {

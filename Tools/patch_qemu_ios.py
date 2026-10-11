@@ -40,9 +40,11 @@ def patch(directory):
     replace_once(directory / 'include/qemu/osdep.h',
                  '#ifdef __APPLE__\nstatic inline void qemu_thread_jit_execute(void)',
                  '''#if defined(PODIUM7_IOS) && !defined(CONFIG_TCG_INTERPRETER)
-#error Native QEMU TCG JIT on iOS has not been ported
+#ifndef PODIUM7_IOS_JIT
+#error Native iOS TCG requires an explicitly supplied StikDebug code buffer
 #endif
-#if defined(__APPLE__) && !defined(CONFIG_TCG_INTERPRETER)
+#endif
+#if defined(__APPLE__) && !defined(CONFIG_TCG_INTERPRETER) && !defined(PODIUM7_IOS_JIT)
 static inline void qemu_thread_jit_execute(void)''')
     replace_once(directory / 'include/qemu/osdep.h',
                  '#if defined(PODIUM7_IOS) && !defined(CONFIG_TCG_INTERPRETER)',
@@ -60,6 +62,23 @@ static inline void qemu_thread_jit_execute(void)''')
     replace_once(directory / 'tcg/region.c',
                  '#ifdef CONFIG_DARWIN\n    /* Applicable to both iOS and macOS (Apple Silicon). */',
                  '#if defined(CONFIG_DARWIN) && !defined(CONFIG_TCG_INTERPRETER)\n    /* Native TCG only: TCI stores non-executable bytecode. */')
+    replace_once(directory / 'tcg/region.c',
+                 'static int alloc_code_gen_buffer(size_t size, int splitwx, Error **errp)\n{\n    ERRP_GUARD();',
+                 '''static int alloc_code_gen_buffer(size_t size, int splitwx, Error **errp)
+{
+#ifdef PODIUM7_IOS_JIT
+    extern void *podium7_jit_rx, *podium7_jit_rw;
+    extern size_t podium7_jit_size;
+    if (!podium7_jit_rx || !podium7_jit_rw || size > podium7_jit_size) {
+        error_setg(errp, "StikDebug executable buffer was not supplied");
+        return -1;
+    }
+    region.start_aligned = podium7_jit_rw;
+    region.total_size = size;
+    tcg_splitwx_diff = (uintptr_t)podium7_jit_rx - (uintptr_t)podium7_jit_rw;
+    return PROT_READ | PROT_WRITE | (tcg_splitwx_diff ? 0 : PROT_EXEC);
+#endif
+    ERRP_GUARD();''')
 
 
 if __name__ == '__main__':

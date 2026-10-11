@@ -54,7 +54,7 @@ int p7_txm_presence(void) {
 #endif
 }
 
-struct P7JITPool { void *rx; void *rw; size_t size; size_t used; bool toggle; bool alias; };
+struct P7JITPool { void *rx; void *rw; size_t size; size_t used; size_t emit_limit; bool toggle; bool alias; };
 
 #if defined(__arm64__) && TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
 /* StikDebug universal protocol: x16 command, x0/x1 arguments, brk f00d.
@@ -115,6 +115,7 @@ P7JITPool *p7_jit_create(size_t capacity, int *error) {
     if (!pool) { *error = ENOMEM; return NULL; }
     size_t page = (size_t)getpagesize();
     pool->size = (capacity + page - 1) & ~(page - 1);
+    pool->emit_limit = pool->size;
     if (!capacity || pool->size < capacity) { free(pool); *error = EINVAL; return NULL; }
 #if TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
     if (!p7_get_task_allow() || !p7_debugged()) { free(pool); *error = EPERM; return NULL; }
@@ -146,7 +147,7 @@ void p7_jit_destroy(P7JITPool *pool) {
 void *p7_jit_emit(P7JITPool *pool, const uint32_t *words, size_t count) {
     if (!pool || !words || count > SIZE_MAX / 4) return NULL;
     size_t size = count * 4, offset = (pool->used + 15) & ~(size_t)15;
-    if (offset > pool->size || size > pool->size - offset) return NULL;
+    if (offset > pool->emit_limit || size > pool->emit_limit - offset) return NULL;
 #if defined(__arm64__) && TARGET_OS_OSX
     if (pool->toggle) pthread_jit_write_protect_np(0);
 #endif
@@ -160,4 +161,10 @@ void *p7_jit_emit(P7JITPool *pool, const uint32_t *words, size_t count) {
 }
 void p7_jit_call(void *code, uint64_t *registers) {
     ((void (*)(uint64_t *))code)(registers);
+}
+void *p7_jit_rx(P7JITPool *pool) { return pool ? pool->rx : NULL; }
+void *p7_jit_rw(P7JITPool *pool) { return pool ? pool->rw : NULL; }
+bool p7_jit_limit_emission(P7JITPool *pool, size_t limit) {
+    if (!pool || limit < pool->used || limit > pool->emit_limit) return false;
+    pool->emit_limit = limit; return true;
 }

@@ -7,6 +7,7 @@ static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 static void *image;
 static int (*run_backend)(int, char **);
 static int (*stop_backend)(void);
+static int (*set_jit_buffer)(void *, void *, size_t);
 static char error[256];
 static int used;
 
@@ -21,9 +22,10 @@ int p7_backend_load(const char *path) {
     int (*abi)(void) = (int (*)(void))dlsym(image, "p7_qemu_abi");
     run_backend = (int (*)(int, char **))dlsym(image, "p7_qemu_run");
     stop_backend = (int (*)(void))dlsym(image, "p7_qemu_stop");
+    set_jit_buffer = (int (*)(void *, void *, size_t))dlsym(image, "p7_qemu_set_jit_buffer");
     if (!abi || !run_backend || !stop_backend || abi() != 1) {
         snprintf(error, sizeof(error), "Unsupported QEMU framework ABI");
-        dlclose(image); image = NULL; run_backend = NULL; stop_backend = NULL;
+        dlclose(image); image = NULL; run_backend = NULL; stop_backend = NULL; set_jit_buffer = NULL;
         pthread_mutex_unlock(&lock); return -2;
     }
     /* Never unload an initialized QEMU: threads and global state remain live. */
@@ -39,6 +41,12 @@ int p7_backend_run(int argc, char **argv) {
 }
 
 const char *p7_backend_error(void) { return error; }
+
+int p7_backend_set_jit_buffer(void *rx, void *rw, size_t size) {
+    pthread_mutex_lock(&lock);
+    int result = !used && set_jit_buffer ? set_jit_buffer(rx, rw, size) : -1;
+    pthread_mutex_unlock(&lock); return result;
+}
 
 int p7_backend_stop(void) {
     pthread_mutex_lock(&lock);

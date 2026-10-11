@@ -55,6 +55,11 @@ static inline void qemu_thread_jit_execute(void)''')
     replace_once(directory / 'block/file-posix.c',
                  '#include <sys/ioctl.h>\n#if defined(HAVE_HOST_BLOCK_DEVICE)',
                  '#include <sys/ioctl.h>\n#include <sys/param.h>\n#include <sys/mount.h>\n#if defined(HAVE_HOST_BLOCK_DEVICE)')
+    # Bytecode needs ordinary read/write pages. MAP_JIT is entitlement-gated
+    # on iPhone even when no executable protection is requested.
+    replace_once(directory / 'tcg/region.c',
+                 '#ifdef CONFIG_DARWIN\n    /* Applicable to both iOS and macOS (Apple Silicon). */',
+                 '#if defined(CONFIG_DARWIN) && !defined(CONFIG_TCG_INTERPRETER)\n    /* Native TCG only: TCI stores non-executable bytecode. */')
 
 
 if __name__ == '__main__':

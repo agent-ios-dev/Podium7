@@ -16,6 +16,9 @@ def patch(directory):
     replace_once(directory / 'meson.build',
                  "  if host_os != 'darwin' and cc.links(ucontext_probe)",
                  "  if cc.get_define('PODIUM7_IOS') == '1' or (host_os != 'darwin' and cc.links(ucontext_probe))")
+    replace_once(directory / 'meson.build',
+                 "glib_pc = dependency('glib-2.0', version: glib_req_ver, required: true,",
+                 "glib_pc = dependency('glib-2.0', static: true, version: glib_req_ver, required: true,")
     replace_once(directory / 'util/coroutine-ucontext.c', '#include <ucontext.h>', '''#ifdef PODIUM7_IOS
 #include <libucontext/libucontext.h>
 #define ucontext_t libucontext_ucontext_t

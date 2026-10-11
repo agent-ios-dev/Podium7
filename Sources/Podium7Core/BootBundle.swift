@@ -81,7 +81,7 @@ public struct BootBundle: Codable {
         func file(_ name: String) -> String { directory.appendingPathComponent(name).path }
         return ["Podium7QEMU", "-machine", "virt,secure=off,virtualization=off",
                 "-cpu", "podium7-research,cntfrq=24000000", "-accel", "tcg",
-                "-m", "2048", "-smp", "1,maxcpus=2", "-display", "none", "-monitor", "none",
+                "-m", "2048", "-smp", "1,maxcpus=2", "-display", "none", "-monitor", "none", "-nic", "none",
                 "-serial", "file:\(logs.appendingPathComponent("serial.txt").path)",
                 "-device", "loader,file=\(file("boot.elf")),cpu-num=0",
                 "-drive", "if=none,id=podium7-pmp-integrated,format=raw,read-only=on,file=\(file("pmp.bin"))",

@@ -54,7 +54,7 @@ message:
     assert backend.p7_qemu_stop() == -1
     args = ['Podium7QEMU', '-machine', 'virt,secure=off,virtualization=off',
             '-cpu', 'podium7-research', '-m', '128', '-display', 'none',
-            '-monitor', 'none', '-serial', f'file:{serial}',
+            '-monitor', 'none', '-nic', 'none', '-serial', f'file:{serial}',
             '-device', f'loader,file={image},cpu-num=0']
     encoded = [a.encode() for a in args]
     argv = (ctypes.c_char_p * (len(encoded) + 1))(*encoded, None)

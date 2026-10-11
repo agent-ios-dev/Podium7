@@ -18,12 +18,14 @@ jobs:
       - run: swift test
       - run: python3 -m unittest discover -s Tools -p 'test_*.py'
       - run: brew install glib pixman ninja pkgconf ccache
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: cache
         with:
           path: .ccache
           key: qemu-embedding-darwin-v1-${{ github.sha }}
           restore-keys: qemu-embedding-darwin-v1-
       - name: Build the pinned machine as executable and library
+        id: backend
         run: |
           git clone --depth 1 --branch v10.0.0 https://github.com/qemu/qemu.git .qemu
           python3 Tools/patch_qemu.py .qemu
@@ -34,6 +36,11 @@ jobs:
           ninja libPodium7QEMU.dylib qemu-system-aarch64
       - name: Require real embedded PMGR execution and clean return to host
         run: python3 Tools/check_embedded_guest.py --library .qemu/build/libPodium7QEMU.dylib --output .embedding-evidence
+      - uses: actions/cache/save@v4
+        if: always() && steps.backend.conclusion == 'success' && steps.cache.outputs.cache-hit != 'true'
+        with:
+          path: .ccache
+          key: qemu-embedding-darwin-v1-${{ github.sha }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

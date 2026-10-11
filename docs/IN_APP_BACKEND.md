@@ -3,6 +3,13 @@
 The real SpringBoard/backboardd processes in run 38092985645 executed in a
 desktop QEMU executable. They do **not** establish an iPhone app boot.
 
+Full-system run 38130597536 (49a00c4) subsequently verified the original guest
+through the shared-library host: 104 real process identities, SpringBoard PID 158,
+backboardd PID 61 (both UID 501), and 539006 EL0 returns during the 300-second
+execution budget. See `evidence/embedded-processes-38130597536.json`. This confirms
+the embedded engine reaches real iOS processes on macOS; it still does not
+confirm execution on an iPhone or display scanout.
+
 Run 38130230235 (bf4336b) passed the actual in-process PMGR guest test and native
 run/stop/reinitialization guards on macOS. The ordinary iPhone app build also
 passed on bf4336b. Cross-compilation of the QEMU framework and execution on an

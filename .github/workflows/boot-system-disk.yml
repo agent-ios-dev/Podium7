@@ -100,9 +100,12 @@ jobs:
         if: startsWith(inputs.sep_manager_probe, 'embedded-')
         run: |
           python3 Tools/check_embedded_guest.py --library .qemu/build/libPodium7QEMU.dylib --output .embedding-evidence
-          cat > .qemu/build/qemu-library-host <<'SH'
-          #!/bin/bash
-          exec python3 Tools/check_qemu_embedding.py --library .qemu/build/libPodium7QEMU.dylib -- "$@"
+            cat > .qemu/build/qemu-library-host <<'SH'
+            #!/bin/bash
+            if [[ "${PODIUM7_TCI_BACKTRACE:-0}" == "1" && "${1:-}" != "--version" ]]; then
+              exec xcrun lldb --batch -o run -o 'thread backtrace all -c 16' -o 'process kill' -- "$(command -v python3)" Tools/check_qemu_embedding.py --library .qemu/build/libPodium7QEMU.dylib -- "$@"
+            fi
+            exec python3 Tools/check_qemu_embedding.py --library .qemu/build/libPodium7QEMU.dylib -- "$@"
           SH
           chmod +x .qemu/build/qemu-library-host
       - name: Require guest PMGR state transitions before system boot
@@ -153,10 +156,13 @@ jobs:
           if [[ "$SEP_MANAGER_PROBE" == "disabled-aks" ]]; then extra+=(--research-sep-manager-probe --research-disabled-aks); fi
           if [[ "$SEP_MANAGER_PROBE" == "disabled-aks-root-unsupported" ]]; then extra+=(--research-sep-manager-probe --research-disabled-aks --research-platform-root-unsupported); fi
           qemu=.qemu/build/qemu-system-aarch64
-          if [[ "$SEP_MANAGER_PROBE" == embedded-* ]]; then
+            if [[ "$SEP_MANAGER_PROBE" == embedded-* ]]; then
             extra+=(--research-sep-manager-probe --research-disabled-aks --research-platform-root-unsupported)
-            qemu=.qemu/build/qemu-library-host
-          fi
+              qemu=.qemu/build/qemu-library-host
+            fi
+            # Obtain real native frames for the observed TCI SIGSEGV. No memory
+            # dumps, register dumps, guest key values or artificial boot claims.
+            if [[ "$SEP_MANAGER_PROBE" == "embedded-tci-disabled-aks-root-unsupported" ]]; then export PODIUM7_TCI_BACKTRACE=1; fi
           if [[ "$KEYBAG_DIAGNOSTICS" == "true" ]]; then extra+=(--research-keybag-diagnostics); fi
           if [[ "$DEBUG_DIAGNOSTICS" == "true" ]]; then extra+=(--research-debug-diagnostics); fi
           python3 Tools/qemu_probe.py "${extra[@]}" --qemu "$qemu" --cpu podium7-research --directory .firmware/system-boot --research-bridge-handoff --trust-cache .firmware/StaticTrustCache.im4p --system-volume .firmware/SystemVolume.im4p --research-system-root "$RESEARCH_ROOT" --research-pmp-core --research-cfi-nvram --research-aes-root-fallback --research-nvme --research-nvme-dart --research-nvme-msi --research-nvme-image .firmware/system-disk/storage-16g.raw --seconds "$EXECUTION_SECONDS" --trace-limit-mib 256

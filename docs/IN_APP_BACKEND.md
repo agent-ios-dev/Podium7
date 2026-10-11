@@ -15,6 +15,13 @@ run/stop/reinitialization guards on macOS. The ordinary iPhone app build also
 passed on bf4336b. Cross-compilation of the QEMU framework and execution on an
 iPhone are separate checks; neither is implied by this macOS result.
 
+Run 38132738456 (07f8c22) subsequently passed the iPhone cross-build, framework
+platform/export gates, and unsigned IPA packaging. The IPA contains a 32,994,928
+byte iPhoneOS QEMU binary; its ZIP integrity was checked after downloading.
+This is a compilation/package result, not a physical-iPhone boot result. The
+follow-up 613c532 removes MAP_JIT from the TCI bytecode allocation as well as
+the already excluded executable protection/write-protection toggle.
+
 The app now has a prepared-fixture folder importer, host-controlled boot arguments,
 an in-process framework loader, worker-thread execution, serial log display/export
 and a native QEMU shutdown request. Only one QEMU lifetime is permitted per app
@@ -43,7 +50,18 @@ memory budget and graphics/input remain unverified. No display imitation is adde
 the prepared machine currently has `-display none`, since guest scanout is not yet
 implemented. An embedded IPA is not proof of visible SpringBoard.
 
-## Private boot fixture
+## Installing the app
+
+Use the `Podium7-embedded-research-unsigned.ipa` artifact from `embedded-ios.yml`,
+not the ordinary laboratory app artifact. Minimum host version is iOS 17.
+Sign the app and its embedded `Podium7QEMU.framework` with your installation
+tool before installing. This initial backend uses TCI; StikDebug is not required
+for its bytecode execution and does not yet accelerate QEMU. Import the prepared
+folder below, then start the machine. The screen currently shows status and
+serial logs rather than a rendered guest display. Stop requests QEMU shutdown;
+close and reopen the app before starting another machine session.
+
+## Preparing the private boot fixture
 
 Prepare official 19H422 firmware and the established 16-GiB APFS install disk on
 macOS, then run:

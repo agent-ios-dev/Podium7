@@ -9,11 +9,17 @@ final class BootBundleTests: XCTestCase {
         let manifest = BootBundle(schema: 1, profile: BootBundle.diagnosticProfile,
                                   diskBytes: VirtualDisk.capacity, rorgn: [1, 2])
         try JSONEncoder().encode(manifest).write(to: root.appendingPathComponent("boot.json"))
-        var header = Data([0x7f, 0x45, 0x4c, 0x46, 2, 1, 1] + Array(repeating: UInt8(0), count: 13))
+        var header = Data([0x7f, 0x45, 0x4c, 0x46, 2, 1, 1] + Array(repeating: UInt8(0), count: 113))
+        func put(_ offset: Int, _ value: UInt64, _ size: Int) {
+            for index in 0..<size { header[offset + index] = UInt8(truncatingIfNeeded: value >> (8 * index)) }
+        }
+        put(16, 2, 2); put(20, 1, 4); put(24, 0x45000000, 8)
+        put(32, 64, 8); put(54, 56, 2); put(56, 1, 2)
+        put(64, 1, 4); put(72, 120, 8); put(88, 0x45000000, 8); put(104, 4096, 8)
         header[18] = 0xb7
         try header.write(to: root.appendingPathComponent("boot.elf"))
         try Data([1]).write(to: root.appendingPathComponent("pmp.bin"))
-        try Data(repeating: 0, count: 128 * 1024).write(to: root.appendingPathComponent("nvram.raw"))
+        try Data(repeating: 0, count: 0x8000).write(to: root.appendingPathComponent("nvram.raw"))
         _ = try VirtualDisk(url: root.appendingPathComponent("disk.raw"))
         try body(root)
     }

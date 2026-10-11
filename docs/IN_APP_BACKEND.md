@@ -43,10 +43,14 @@ unsigned research IPA. iOS platform metadata and exported ABI are required.
 The ordinary app-build workflow does not package a missing library as functional
 iOS emulation; its UI explicitly identifies that state.
 
-The initial iPhone build uses QEMU TCI, avoiding executable-memory/JIT requirements.
-The existing StikDebug ARM64 diagnostic is **not** QEMU's TCG accelerator. Native
-QEMU JIT integration, executable-memory permissions, actual iPhone runtime testing,
-memory budget and graphics/input remain unverified. No display imitation is added:
+The app packages TCI and a separate native TCG framework. Without StikDebug it
+selects TCI; with a successfully prepared NativeJIT pool it supplies 64 MiB of
+executable memory to native TCG. The first MiB stays reserved for diagnostics.
+QEMU uses the pool's RX/RW mappings, including distinct aliases on TXM, and the
+app retains the pool for the entire VM lifetime. A failing handoff prevents boot.
+CI gates packaging on real guest execution through TCI and the native borrowed
+pool. Physical StikDebug/TXM execution, measured speedup, memory budget and
+graphics/input remain unverified. No display imitation is added:
 the prepared machine currently has `-display none`, since guest scanout is not yet
 implemented. An embedded IPA is not proof of visible SpringBoard.
 
@@ -54,9 +58,9 @@ implemented. An embedded IPA is not proof of visible SpringBoard.
 
 Use the `Podium7-embedded-research-unsigned.ipa` artifact from `embedded-ios.yml`,
 not the ordinary laboratory app artifact. Minimum host version is iOS 17.
-Sign the app and its embedded `Podium7QEMU.framework` with your installation
-tool before installing. This initial backend uses TCI; StikDebug is not required
-for its bytecode execution and does not yet accelerate QEMU. Import the prepared
+Sign the app and both embedded QEMU frameworks with your installation
+tool before installing. TCI does not require StikDebug; native TCG requires a
+successfully prepared executable pool. Import the prepared
 folder below, then start the machine. The screen currently shows status and
 serial logs rather than a rendered guest display. Stop requests QEMU shutdown;
 close and reopen the app before starting another machine session.
@@ -75,10 +79,14 @@ python3 Tools/create_boot_bundle.py --output ~/Podium7Boot
 This downloads the original firmware, decodes the boot components, converts the
 official OS DMG, prepares real install volumes and exports the fixed 16-GiB
 folder. It refuses existing destinations and keeps its private intermediate
-workspace. This process has not yet been implemented inside the iPhone app.
-The app's new direct Apple download retrieves the original IPSW only, and does
-not claim that the resulting archive is a ready-to-boot machine. Disk preparation,
-real display scanout and touchscreen/button input remain separate incomplete work.
+workspace. The app directly downloads the official IPSW and converts its stored
+OS DMG using Apple's Compression/LZFSE API. The verified DMG contains 5002 LZFSE
+blocks, 299 raw blocks and 3 skipped/zero regions; raw blocks are streamed in
+bounded chunks. It creates a new sparse 16-GiB disk, refuses overwrites and
+removes only its staging file if decoding fails. This is an intermediate OS
+disk, not an installed VM. GPT relocation, APFS install roles, boot-component
+preparation, real display scanout and touchscreen/button input remain incomplete
+in the app. The UI states this.
 
 Prepare official 19H422 firmware and the established 16-GiB APFS install disk on
 macOS, then run:

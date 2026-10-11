@@ -7,6 +7,7 @@ import argparse
 import pathlib
 import subprocess
 from patch_qemu import PIN, replace_once
+from patch_qemu_jit_pool import patch as patch_jit_pool
 
 
 def patch(directory):
@@ -62,23 +63,7 @@ static inline void qemu_thread_jit_execute(void)''')
     replace_once(directory / 'tcg/region.c',
                  '#ifdef CONFIG_DARWIN\n    /* Applicable to both iOS and macOS (Apple Silicon). */',
                  '#if defined(CONFIG_DARWIN) && !defined(CONFIG_TCG_INTERPRETER)\n    /* Native TCG only: TCI stores non-executable bytecode. */')
-    replace_once(directory / 'tcg/region.c',
-                 'static int alloc_code_gen_buffer(size_t size, int splitwx, Error **errp)\n{\n    ERRP_GUARD();',
-                 '''static int alloc_code_gen_buffer(size_t size, int splitwx, Error **errp)
-{
-#ifdef PODIUM7_IOS_JIT
-    extern void *podium7_jit_rx, *podium7_jit_rw;
-    extern size_t podium7_jit_size;
-    if (!podium7_jit_rx || !podium7_jit_rw || size > podium7_jit_size) {
-        error_setg(errp, "StikDebug executable buffer was not supplied");
-        return -1;
-    }
-    region.start_aligned = podium7_jit_rw;
-    region.total_size = size;
-    tcg_splitwx_diff = (uintptr_t)podium7_jit_rx - (uintptr_t)podium7_jit_rw;
-    return PROT_READ | PROT_WRITE | (tcg_splitwx_diff ? 0 : PROT_EXEC);
-#endif
-    ERRP_GUARD();''')
+    patch_jit_pool(directory)
 
 
 if __name__ == '__main__':

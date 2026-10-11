@@ -36,6 +36,15 @@ jobs:
           ninja libPodium7QEMU.dylib qemu-system-aarch64
       - name: Require real embedded PMGR execution and clean return to host
         run: python3 Tools/check_embedded_guest.py --library .qemu/build/libPodium7QEMU.dylib --output .embedding-evidence
+      - name: Require actual native TCG execution from the supplied NativeJIT pool
+        run: |
+          python3 Tools/patch_qemu_jit_pool.py .qemu
+          mkdir .qemu/build-native-pool
+          cd .qemu/build-native-pool
+          ../configure --disable-tcg-interpreter --extra-cflags=-DPODIUM7_IOS_JIT=1 --python="$(command -v python3)" --cc="ccache clang" --cxx="ccache clang++" --target-list=aarch64-softmmu --disable-docs --disable-tools --disable-guest-agent --disable-slirp --disable-hvf --disable-cocoa --disable-vnc --disable-sdl --disable-gtk --disable-curses
+          ninja libPodium7QEMU.dylib
+          cd ../..
+          python3 Tools/check_embedded_guest.py --library .qemu/build-native-pool/libPodium7QEMU.dylib --supplied-jit-buffer --output .embedding-evidence/native
       - uses: actions/cache/save@v4
         if: always() && steps.backend.conclusion == 'success' && steps.cache.outputs.cache-hit != 'true'
         with:
@@ -45,7 +54,7 @@ jobs:
         if: always()
         with:
           name: in-process-core-evidence
-          path: .embedding-evidence/*.json
+          path: .embedding-evidence/**/*.json
           include-hidden-files: true
           if-no-files-found: ignore
   iphone-library:

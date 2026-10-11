@@ -10,7 +10,7 @@ from check_qemu_registers import text_section
 from qemu_probe import elf_image
 
 
-def check(library, output):
+def check(library, output, supplied_jit_buffer=False):
     output.mkdir(parents=True, exist_ok=True)
     source = output / 'guest.s'
     source.write_text('''.text
@@ -64,10 +64,31 @@ atomic_word:
     backend.p7_qemu_run.restype = ctypes.c_int
     backend.p7_qemu_stop.restype = ctypes.c_int
     assert backend.p7_qemu_stop() == -1
+    if supplied_jit_buffer:
+        # Use the actual NativeJIT pool implementation, not a mock pointer.
+        # macOS validates QEMU's borrowed-buffer execution; physical StikDebug
+        # permissions and TXM remain separate device checks.
+        pool_library = output / 'native-pool.dylib'
+        subprocess.run(['xcrun', 'clang', '-dynamiclib', '-arch', 'arm64',
+            '-I', 'Sources/NativeJIT/include', 'Sources/NativeJIT/NativeJIT.c',
+            '-framework', 'Security', '-framework', 'CoreFoundation', '-o', str(pool_library)], check=True)
+        native = ctypes.CDLL(str(pool_library.resolve()))
+        native.p7_jit_create.argtypes = [ctypes.c_size_t, ctypes.POINTER(ctypes.c_int)]
+        native.p7_jit_create.restype = ctypes.c_void_p
+        for name in ['p7_jit_rx', 'p7_jit_rw']:
+            function = getattr(native, name); function.argtypes = [ctypes.c_void_p]; function.restype = ctypes.c_void_p
+        error = ctypes.c_int()
+        pool = native.p7_jit_create(64 << 20, ctypes.byref(error))
+        if not pool: raise RuntimeError(f'NativeJIT pool allocation failed: {error.value}')
+        backend.p7_qemu_set_jit_buffer.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t]
+        backend.p7_qemu_set_jit_buffer.restype = ctypes.c_int
+        if backend.p7_qemu_set_jit_buffer(native.p7_jit_rx(pool), native.p7_jit_rw(pool), 64 << 20) != 0:
+            raise RuntimeError('native QEMU did not accept the real code pool')
     args = ['Podium7QEMU', '-machine', 'virt,secure=off,virtualization=off',
             '-cpu', 'podium7-research', '-m', '128', '-display', 'none',
             '-monitor', 'none', '-nic', 'none', '-serial', f'file:{serial}',
             '-device', f'loader,file={image},cpu-num=0']
+    if supplied_jit_buffer: args += ['-accel', 'tcg,tb-size=64']
     encoded = [a.encode() for a in args]
     argv = (ctypes.c_char_p * (len(encoded) + 1))(*encoded, None)
     result = []
@@ -89,6 +110,7 @@ atomic_word:
     assert backend.p7_qemu_stop() == -1
     evidence = {'embedded_guest_pmgr_passed': passed,
         'guest_ldxr_stxr_normal_ram_passed': passed,
+        'provided_native_tcg_buffer_passed': supplied_jit_buffer,
         'returned_to_host': True, 'second_init_rejected': True,
         'ios_device_execution_confirmed': False, 'visible_springboard_confirmed': False}
     (output / 'embedding.json').write_text(json.dumps(evidence, indent=2))
@@ -99,5 +121,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--library', type=pathlib.Path, required=True)
     parser.add_argument('--output', type=pathlib.Path, required=True)
+    parser.add_argument('--supplied-jit-buffer', action='store_true')
     args = parser.parse_args()
-    check(args.library, args.output)
+    check(args.library, args.output, args.supplied_jit_buffer)

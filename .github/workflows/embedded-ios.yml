@@ -32,7 +32,7 @@ jobs:
           python3 Tools/patch_qemu_embedding.py .qemu
           mkdir .qemu/build
           cd .qemu/build
-          ../configure --python="$(command -v python3)" --cc="ccache clang" --cxx="ccache clang++" --target-list=aarch64-softmmu --disable-docs --disable-tools --disable-guest-agent --disable-slirp --disable-hvf --disable-cocoa --disable-vnc --disable-sdl --disable-gtk --disable-curses
+          ../configure --enable-tcg-interpreter --python="$(command -v python3)" --cc="ccache clang" --cxx="ccache clang++" --target-list=aarch64-softmmu --disable-docs --disable-tools --disable-guest-agent --disable-slirp --disable-hvf --disable-cocoa --disable-vnc --disable-sdl --disable-gtk --disable-curses
           ninja libPodium7QEMU.dylib qemu-system-aarch64
       - name: Require real embedded PMGR execution and clean return to host
         run: python3 Tools/check_embedded_guest.py --library .qemu/build/libPodium7QEMU.dylib --output .embedding-evidence
